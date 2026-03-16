@@ -98,15 +98,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         getInitialSession();
 
+        const loadingTimeout = setTimeout(() => {
+            if (mounted) setIsLoading(false);
+        }, 5000);
+
         // Listen for auth changes (login, logout, token refresh)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, s) => {
                 if (!mounted) return;
                 
-                if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
                     setSession(s);
-                    // Only show loading if we are acquiring a new session
-                    if (event === 'SIGNED_IN') setIsLoading(true); 
                     
                     if (s?.user) {
                         const appUser = await fetchAppUser(s.user.id);
@@ -121,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             mounted = false;
+            clearTimeout(loadingTimeout);
             subscription.unsubscribe();
         };
     }, []);

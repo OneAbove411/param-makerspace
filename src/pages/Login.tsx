@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
@@ -6,23 +6,35 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
 export function Login() {
-    const { signIn } = useAuth();
+    const { signIn, user, isLoading } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Redirect already-authenticated users (e.g. non-incognito with stored session)
+    useEffect(() => {
+        if (!isLoading && user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, isLoading, navigate]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
-        const { error: err } = await signIn(email, password);
-        setLoading(false);
-        if (err) {
-            setError(err);
-        } else {
-            navigate('/dashboard');
+        try {
+            const { error: err } = await signIn(email, password);
+            if (err) {
+                setError(err);
+            } else {
+                navigate('/dashboard');
+            }
+        } catch (err: any) {
+            setError(err?.message || 'An unexpected error occurred.');
+        } finally {
+            setLoading(false);
         }
     };
 

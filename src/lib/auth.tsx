@@ -48,12 +48,12 @@ async function fetchAppUser(authId: string): Promise<User | null> {
 
     // If no maker profile exists yet (e.g. fresh DB/schema), create a basic one so the UI doesn't break
     if (!profile) {
-         const { data: newProfile } = await supabase.from('maker_profile').insert({
-             user_id: appUser.id,
-             display_name: appUser.name,
-             is_public: true
-         }).select('avatar_url').single();
-         profile = newProfile;
+        const { data: newProfile } = await supabase.from('maker_profile').insert({
+            user_id: appUser.id,
+            display_name: appUser.name,
+            is_public: true
+        }).select('avatar_url').single();
+        profile = newProfile;
     }
 
     return {
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
                 const { data: { session: s }, error } = await supabase.auth.getSession();
                 if (error) throw error;
-                
+
                 if (mounted) {
                     setSession(s);
                     if (s?.user) {
@@ -106,10 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, s) => {
                 if (!mounted) return;
-                
+
                 if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
                     setSession(s);
-                    
+
                     if (s?.user) {
                         const appUser = await fetchAppUser(s.user.id);
                         if (mounted) setUser(appUser);

@@ -16,8 +16,7 @@ export function Dashboard() {
     const { createProject } = useProjectMutations();
 
     const [showNewProject, setShowNewProject] = useState(false);
-    const [newProjectForm, setNewProjectForm] = useState({ title: '', summary: '', description: '', domain: '', tier: '', video_url: '' });
-    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [newProjectForm, setNewProjectForm] = useState({ title: '', summary: '', description: '', domain: '', tier: '' });
     const [creating, setCreating] = useState(false);
 
     const activeProjects = stats?.activeProjects || 0;
@@ -27,35 +26,11 @@ export function Dashboard() {
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         setCreating(true);
-
-        let image_url = '';
-        if (imageFile && user) {
-            const fileExt = imageFile.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `${user.id}/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('project-media')
-                .upload(filePath, imageFile);
-
-            if (!uploadError) {
-                const { data } = supabase.storage.from('project-media').getPublicUrl(filePath);
-                image_url = data.publicUrl;
-            }
-        }
-
-        const projectData = {
-            ...newProjectForm,
-            ...(image_url ? { image_url } : {}),
-            ...(newProjectForm.video_url ? { video_url: newProjectForm.video_url } : {})
-        };
-
-        const { data: project, error } = await createProject(projectData);
+        const { data: project, error } = await createProject(newProjectForm);
         setCreating(false);
         if (!error && project) {
             setShowNewProject(false);
-            setNewProjectForm({ title: '', summary: '', description: '', domain: '', tier: '', video_url: '' });
-            setImageFile(null);
+            setNewProjectForm({ title: '', summary: '', description: '', domain: '', tier: '' });
             refetchProjects();
         }
     };
@@ -157,28 +132,6 @@ export function Dashboard() {
                                     value={newProjectForm.tier}
                                     onChange={(e) => setNewProjectForm(prev => ({ ...prev, tier: e.target.value }))}
                                     placeholder="e.g. Tier 2"
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Cover Image</label>
-                                    <input 
-                                        type="file" 
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            if (e.target.files && e.target.files[0]) {
-                                                setImageFile(e.target.files[0]);
-                                            }
-                                        }}
-                                        className="w-full text-sm font-data file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-brutal-dark file:text-brutal-bg hover:file:bg-brutal-red cursor-pointer transition-colors"
-                                    />
-                                </div>
-                                <Input
-                                    label="Video Link (YouTube/Vimeo)"
-                                    type="url"
-                                    value={newProjectForm.video_url}
-                                    onChange={(e) => setNewProjectForm(prev => ({ ...prev, video_url: e.target.value }))}
-                                    placeholder="https://..."
                                 />
                             </div>
                             <div className="flex justify-end gap-4 pt-4">

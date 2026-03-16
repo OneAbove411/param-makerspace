@@ -634,6 +634,8 @@ export function useProjectMutations() {
         domain?: string;
         tier?: string;
         github_url?: string;
+        image_url?: string;
+        video_url?: string;
         duration?: string;
     }) => {
         if (!user) return { data: null, error: 'Not authenticated' };

@@ -62,31 +62,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(async ({ data: { session: s } }) => {
-            setSession(s);
-            if (s?.user) {
-                const appUser = await fetchAppUser(s.user.id);
-                setUser(appUser);
-            }
-            setIsLoading(false);
-        });
+        let mounted = true;
 
-        // Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, s) => {
-                setSession(s);
-                if (s?.user) {
-                    const appUser = await fetchAppUser(s.user.id);
-                    setUser(appUser);
-                } else {
-                    setUser(null);
+        async function getInitialSession() {
+            try {
+                const { data: { session: s }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                
+                if (mounted) {
+                    setSession(s);
+                    if (s?.user) {
+                        const appUser = await fetchAppUser(s.user.id);
+                        if (mounted) setUser(appUser);
+                    } else {
+                        if (mounted) setUser(null);
+                    }
                 }
-                setIsLoading(false);
+            } catch (error) {
+                console.error("Error getting session:", error);
+                if (mounted) setUser(null);
+            } finally {
+                if (mounted) setIsLoading(false);
+            }
+        }
+
+        getInitialSession();
+
+        // Listen for auth changes (login, logout, token refresh)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, s) => {
+                if (!mounted) return;
+                
+                // Only trigger auth state updates on meaningful events to prevent race conditions
+                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+                    setSession(s);
+                    setIsLoading(true); // Temporarily show loading while fetching user details
+                    
+                    if (s?.user) {
+                        const appUser = await fetchAppUser(s.user.id);
+                        if (mounted) setUser(appUser);
+                    } else {
+                        if (mounted) setUser(null);
+                    }
+                    if (mounted) setIsLoading(false);
+                }
             }
         );
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const signUp = async (email: string, password: string, name: string) => {

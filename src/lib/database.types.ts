@@ -75,6 +75,8 @@ export interface Project {
     domain: string | null;
     tier: string | null;
     github_url: string | null;
+    image_url: string | null;
+    video_url: string | null;
     duration: string | null;
     status: ProjectStatus;
     visibility: ProjectVisibility;

@@ -43,7 +43,7 @@ export function ProjectDetails() {
         return <div className="pt-32 px-12 font-data text-2xl">Project not found.</div>;
     }
 
-    const coverImage = project.images?.find((_, i) => i === 0)?.image_url || (project as any).cover_image_url;
+    const coverImage = project.images?.find((_, i) => i === 0)?.image_url || project.image_url || (project as any).cover_image_url;
 
     return (
         <div className="flex-1 w-full bg-brutal-bg pt-24 min-h-screen">
@@ -114,22 +114,35 @@ export function ProjectDetails() {
                         </p>
                     </section>
 
-                    {project.images && project.images.length > 0 && (
+                    {(project.image_url || (project.images && project.images.length > 0)) && (
                         <section>
                             <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Gallery</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                {project.images.map((img, i) => (
-                                    <img key={i} src={img.image_url} className="rounded-2xl w-full h-48 object-cover border border-brutal-dark/10 shadow-sm" alt="Gallery item" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {project.image_url && (
+                                    <img src={project.image_url} className="rounded-2xl w-full h-48 md:h-64 object-cover border border-brutal-dark/10 shadow-sm" alt="Primary visual" />
+                                )}
+                                {project.images?.map((img, i) => (
+                                    <img key={i} src={img.image_url} className="rounded-2xl w-full h-48 md:h-64 object-cover border border-brutal-dark/10 shadow-sm" alt="Gallery item" />
                                 ))}
                             </div>
                         </section>
                     )}
 
-                    {project.videos && project.videos.length > 0 && (
+                    {(project.video_url || (project.videos && project.videos.length > 0)) && (
                         <section>
                             <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Video Content</h3>
                             <div className="space-y-8">
-                                {project.videos.map(vid => (
+                                {project.video_url && (
+                                    <div className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
+                                        <iframe
+                                            src={getEmbedUrl(project.video_url)}
+                                            className="absolute inset-0 w-full h-full"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        ></iframe>
+                                    </div>
+                                )}
+                                {project.videos?.map(vid => (
                                     <div key={vid.id} className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
                                         <iframe
                                             src={getEmbedUrl(vid.video_url)}

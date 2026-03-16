@@ -74,56 +74,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let mounted = true;
 
-        async function getInitialSession() {
-            try {
-                const { data: { session: s }, error } = await supabase.auth.getSession();
-                if (error) throw error;
-
-                if (mounted) {
-                    setSession(s);
-                    if (s?.user) {
-                        const appUser = await fetchAppUser(s.user.id);
-                        if (mounted) setUser(appUser);
-                    } else {
-                        if (mounted) setUser(null);
-                    }
-                }
-            } catch (error) {
-                console.error("Error getting session:", error);
-                if (mounted) setUser(null);
-            } finally {
-                if (mounted) setIsLoading(false);
+        // Safety timeout: if auth resolution takes longer than 5s, stop loading
+        // so the UI doesn't get permanently stuck
+        const safetyTimeout = setTimeout(() => {
+            if (mounted) {
+                console.warn('Auth resolution timed out after 5s, forcing isLoading=false');
+                setIsLoading(false);
             }
-        }
+        }, 5000);
 
-        getInitialSession();
-
-        const loadingTimeout = setTimeout(() => {
-            if (mounted) setIsLoading(false);
-        }, 100);
-
-        // Listen for auth changes (login, logout, token refresh)
+        // Use onAuthStateChange as the single source of truth.
+        // It fires INITIAL_SESSION on mount (covers existing sessions),
+        // and SIGNED_IN / SIGNED_OUT for subsequent changes.
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, s) => {
                 if (!mounted) return;
 
-                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-                    setSession(s);
+                setSession(s);
 
-                    if (s?.user) {
+                if (s?.user) {
+                    try {
                         const appUser = await fetchAppUser(s.user.id);
                         if (mounted) setUser(appUser);
-                    } else {
+                    } catch (err) {
+                        console.error('Error fetching app user:', err);
                         if (mounted) setUser(null);
                     }
-                    if (mounted) setIsLoading(false);
+                } else {
+                    setUser(null);
                 }
+
+                if (mounted) setIsLoading(false);
             }
         );
 
         return () => {
             mounted = false;
-            clearTimeout(loadingTimeout);
+            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
         };
     }, []);

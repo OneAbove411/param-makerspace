@@ -1,73 +1,92 @@
-# React + TypeScript + Vite
+# Param Makerspace Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, high-performance web application serving as the digital hub for the Param Makerspace. 
 
-Currently, two official plugins are available:
+![Param Makerspace](/src/assets/hero.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### 🚀 Live Demo
+**[param-ms.netlify.app](https://param-ms.netlify.app/)**
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠 Tech Stack
 
-## Expanding the ESLint configuration
+This project is built with a modern frontend stack emphasizing performance, type safety, and a "brutalist" aesthetic:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Framework:** [React 18](https://react.dev/)
+- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Language:** [TypeScript](https://www.typescriptlang.org/)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **Icons:** [Lucide React](https://lucide.dev/)
+- **Routing:** [React Router v6](https://reactrouter.com/)
+- **Animations:** [GSAP (GreenSock)](https://gsap.com/)
+- **Backend/Auth/DB:** [Supabase](https://supabase.com/)
+- **Deployment:** [Netlify](https://www.netlify.com/)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 💻 Local Development
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Follow these instructions to set up the project on your local machine.
+
+### 1. Prerequisites
+
+Make sure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- `npm` (comes with Node.js)
+- Git
+
+### 2. Clone the repository
+
+```bash
+git clone https://github.com/OneAbove411/param-makerspace.git
+cd param-makerspace
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 3. Install Dependencies
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm install
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 4. Environment Variables setup
+
+This project uses Supabase for the backend Database and Authentication. You will need to link your own Supabase project.
+
+1. **Copy the example file**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Add your Supabase details**
+   Open the newly created `.env` file and replace the placeholder values with your actual Supabase Project URL and Anon Key (found in your Supabase dashboard under Project Settings > API):
+
+   ```env
+   VITE_SUPABASE_URL=https://your-project-id.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   ```
+   *Note: Never commit your `.env` file to version control. It is already included in the `.gitignore`.*
+
+### 5. Start the Development Server
+
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173`. Open this URL in your browser to view the app!
+
+---
+
+## 📦 Building for Production
+
+To create a production-ready build:
+
+```bash
+npm run build
+```
+
+The built files will be located in the `dist` directory. You can preview the production build locally using:
+
+```bash
+npm run preview
 ```

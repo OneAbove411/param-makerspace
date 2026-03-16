@@ -6,7 +6,7 @@ import { useMyProjects, useMyStats, useProjectMutations } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users } from 'lucide-react';
+import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award } from 'lucide-react';
 
 export function Dashboard() {
     const { user, role } = useAuth();
@@ -197,9 +197,13 @@ export function Dashboard() {
                                         </div>
                                         <h4 className="font-heading font-bold text-xl mb-1">{p.title}</h4>
                                         <p className="font-data text-xs text-brutal-dark/60 line-clamp-2 flex-1">{p.summary}</p>
-                                        {p.status === 'draft' && (
+                                        {p.status === 'draft' || p.status === 'rejected' ? (
                                             <div className="mt-3 flex gap-2">
-                                                <Button size="sm" onClick={() => navigate(`/projects/${p.id}`)}>View</Button>
+                                                <Button size="sm" onClick={() => navigate(`/projects/${p.id}/edit`)}>Edit Project</Button>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-3 flex gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${p.id}`)}>View Public</Button>
                                             </div>
                                         )}
                                     </Card>
@@ -216,56 +220,69 @@ export function Dashboard() {
                     </div>
                 </div>
 
-                {/* ── Mentor-Specific Section ── */}
-                {(role === 'mentor' || role === 'admin') && (
-                    <div className="pt-12 border-t-2 border-brutal-dark/10">
-                        <div className="flex items-center gap-3 mb-8">
-                            <span className="bg-yellow-500 text-brutal-dark px-3 py-1 text-xs font-bold font-data rounded uppercase">Mentor Tools</span>
-                            <h2 className="font-heading text-3xl font-bold uppercase tracking-tight-heading">Review Queue</h2>
+        {/* ── Mentor-Specific Section ── */}
+        {(role === 'mentor' || role === 'admin') && (
+            <div className="pt-12 border-t-2 border-brutal-dark/10">
+                <div className="flex items-center gap-3 mb-8">
+                    <span className="bg-yellow-500 text-brutal-dark px-3 py-1 text-xs font-bold font-data rounded uppercase">Mentor Tools</span>
+                    <h2 className="font-heading text-3xl font-bold uppercase tracking-tight-heading">Review Queue</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <ClipboardCheck className="w-5 h-5 text-yellow-600" />
+                            <h3 className="font-heading font-bold text-xl uppercase">Project Reviews</h3>
                         </div>
+                        <p className="font-data text-sm text-brutal-dark/60 mb-4">
+                            Review pending project submissions from makers. Approve or request changes.
+                        </p>
+                        <Link to="/admin/review-projects">
+                            <Button variant="outline" size="sm" className="w-full">View Pending Projects</Button>
+                        </Link>
+                    </Card>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <ClipboardCheck className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Project Reviews</h3>
-                                </div>
-                                <p className="font-data text-sm text-brutal-dark/60 mb-4">
-                                    Review pending project submissions from makers. Approve or request changes.
-                                </p>
-                                <Link to="/projects">
-                                    <Button variant="outline" size="sm">View Pending Projects</Button>
-                                </Link>
-                            </Card>
-
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Trophy className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Challenge Verification</h3>
-                                </div>
-                                <p className="font-data text-sm text-brutal-dark/60 mb-4">
-                                    Verify maker challenge completions and award badges.
-                                </p>
-                                <Link to="/challenges">
-                                    <Button variant="outline" size="sm">View Submissions</Button>
-                                </Link>
-                            </Card>
-
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Calendar className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Event Management</h3>
-                                </div>
-                                <p className="font-data text-sm text-brutal-dark/60 mb-4">
-                                    Create and manage makerspace events, handle check-ins.
-                                </p>
-                                <Link to="/events">
-                                    <Button variant="outline" size="sm">Manage Events</Button>
-                                </Link>
-                            </Card>
+                    <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Trophy className="w-5 h-5 text-yellow-600" />
+                            <h3 className="font-heading font-bold text-xl uppercase">Challenge Verification</h3>
                         </div>
-                    </div>
-                )}
+                        <p className="font-data text-sm text-brutal-dark/60 mb-4">
+                            Verify maker challenge completions and award badges.
+                        </p>
+                        <Link to="/admin/review-challenges">
+                            <Button variant="outline" size="sm" className="w-full">View Submissions</Button>
+                        </Link>
+                    </Card>
+
+                    <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Calendar className="w-5 h-5 text-yellow-600" />
+                            <h3 className="font-heading font-bold text-xl uppercase">Event Management</h3>
+                        </div>
+                        <p className="font-data text-sm text-brutal-dark/60 mb-4">
+                            Schedule and manage makerspace events and workshops.
+                        </p>
+                        <Link to="/admin/events">
+                            <Button variant="outline" size="sm" className="w-full">Manage Events</Button>
+                        </Link>
+                    </Card>
+                    
+                    <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Settings className="w-5 h-5 text-yellow-600" />
+                            <h3 className="font-heading font-bold text-xl uppercase">Lab Inventory</h3>
+                        </div>
+                        <p className="font-data text-sm text-brutal-dark/60 mb-4">
+                            Track supplies, adjust consumable quantities.
+                        </p>
+                        <Link to="/admin/inventory">
+                            <Button variant="outline" size="sm" className="w-full">Manage Inventory</Button>
+                        </Link>
+                    </Card>
+                </div>
+            </div>
+        )}
 
                 {/* ── Admin-Specific Section ── */}
                 {role === 'admin' && (
@@ -275,17 +292,17 @@ export function Dashboard() {
                             <h2 className="font-heading text-3xl font-bold uppercase tracking-tight-heading">System Control</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Users className="w-5 h-5 text-brutal-red" />
                                     <h3 className="font-heading font-bold text-lg uppercase">Users</h3>
                                 </div>
-                                <p className="font-data text-xs text-brutal-dark/60 mb-4">
-                                    Manage user accounts, roles, and permissions.
+                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">
+                                    Manage accounts & roles.
                                 </p>
-                                <Link to="/makers">
-                                    <Button variant="outline" size="sm">Manage Users</Button>
+                                <Link to="/admin/users">
+                                    <Button variant="outline" size="sm" className="w-full">Manage Users</Button>
                                 </Link>
                             </Card>
 
@@ -294,24 +311,50 @@ export function Dashboard() {
                                     <Zap className="w-5 h-5 text-brutal-red" />
                                     <h3 className="font-heading font-bold text-lg uppercase">Challenges</h3>
                                 </div>
-                                <p className="font-data text-xs text-brutal-dark/60 mb-4">
-                                    Create, edit, and publish challenges.
+                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">
+                                    Create & publish challenges.
                                 </p>
-                                <Link to="/challenges">
-                                    <Button variant="outline" size="sm">Manage Challenges</Button>
+                                <Link to="/admin/challenges">
+                                    <Button variant="outline" size="sm" className="w-full">Manage Challenges</Button>
+                                </Link>
+                            </Card>
+
+                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Award className="w-5 h-5 text-brutal-red" />
+                                    <h3 className="font-heading font-bold text-lg uppercase">Badges</h3>
+                                </div>
+                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">
+                                    Mint achievement badges.
+                                </p>
+                                <Link to="/admin/badges">
+                                    <Button variant="outline" size="sm" className="w-full">Manage Badges</Button>
                                 </Link>
                             </Card>
 
                             <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Settings className="w-5 h-5 text-brutal-red" />
-                                    <h3 className="font-heading font-bold text-lg uppercase">Store & Inventory</h3>
+                                    <h3 className="font-heading font-bold text-lg uppercase">Store</h3>
                                 </div>
-                                <p className="font-data text-xs text-brutal-dark/60 mb-4">
-                                    Manage products, inventory, and equipment.
+                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">
+                                    Manage store products.
                                 </p>
-                                <Link to="/store">
-                                    <Button variant="outline" size="sm">Manage Store</Button>
+                                <Link to="/admin/store">
+                                    <Button variant="outline" size="sm" className="w-full">Manage Store</Button>
+                                </Link>
+                            </Card>
+
+                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Settings className="w-5 h-5 text-brutal-red" />
+                                    <h3 className="font-heading font-bold text-lg uppercase">Equipment</h3>
+                                </div>
+                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">
+                                    Lab tools & inductions.
+                                </p>
+                                <Link to="/admin/equipment">
+                                    <Button variant="outline" size="sm" className="w-full">Manage Equipment</Button>
                                 </Link>
                             </Card>
                         </div>

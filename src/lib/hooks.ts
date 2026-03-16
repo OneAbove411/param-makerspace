@@ -4,15 +4,16 @@ import { useAuth } from './auth';
 import type {
     Project, Challenge, Event, Badge, StoreProduct,
     MakerProfile, Reaction, ChallengeCompletion,
-    EventRegistration, ProjectImage, ProjectVideo,
+    EventRegistration, ProjectImage, ProjectVideo, ProjectFile,
     ChallengeStep, ChallengeMaterial, ChallengeSkill,
     ChallengeVocabulary, ChallengeLevel, UserBadge,
-    Tag, EntityTag, ReactionType, TargetType, Comment
+    Tag, EntityTag, ReactionType, TargetType, Comment,
+    AppUser, Equipment, Inventory, Role, EventType
 } from './database.types';
 
 // ─── Generic fetch hook ───
 
-function useSupabaseQuery<T>(
+export function useSupabaseQuery<T>(
     queryFn: () => Promise<{ data: T | null; error: any }>,
     deps: any[] = []
 ) {
@@ -39,7 +40,7 @@ export function useProjects(domainFilter?: string) {
     return useSupabaseQuery<Project[]>(async () => {
         let q = supabase
             .from('project')
-            .select('*')
+            .select('id, title, summary, domain, tier, status, visibility, created_at, owner_id')
             .eq('status', 'active')
             .eq('visibility', 'public')
             .order('created_at', { ascending: false });
@@ -57,7 +58,7 @@ export function useMyProjects() {
         if (!user) return { data: [], error: null };
         return supabase
             .from('project')
-            .select('*')
+            .select('id, title, summary, description, domain, tier, github_url, duration, status, visibility, created_at, updated_at, owner_id')
             .eq('owner_id', user.id)
             .order('created_at', { ascending: false }) as any;
     }, [user?.id]);
@@ -66,6 +67,7 @@ export function useMyProjects() {
 interface ProjectWithRelations extends Project {
     images: ProjectImage[];
     videos: ProjectVideo[];
+    files: ProjectFile[];
     tags: string[];
     reactionCounts: { likes: number; upvotes: number; bookmarks: number };
     ownerName: string;
@@ -77,22 +79,19 @@ export function useProject(id: string | undefined) {
 
         const { data: project, error } = await supabase
             .from('project')
-            .select('*')
+            .select('id, title, summary, description, domain, tier, github_url, duration, status, visibility, created_at, updated_at, owner_id')
             .eq('id', id)
             .single();
 
         if (error || !project) return { data: null, error };
 
-        // Fetch related data in parallel
-        const [imagesRes, videosRes, tagsRes, ownerRes] = await Promise.all([
-            supabase.from('project_image').select('*').eq('project_id', id).order('display_order'),
-            supabase.from('project_video').select('*').eq('project_id', id).order('display_order'),
+        // Fetch ALL related data in a single Promise.all batch
+        const [imagesRes, videosRes, tagsRes, ownerRes, filesRes, likesRes, upvotesRes, bookmarksRes] = await Promise.all([
+            supabase.from('project_image').select('id, image_url, caption, display_order').eq('project_id', id).order('display_order'),
+            supabase.from('project_video').select('id, title, video_url, display_order').eq('project_id', id).order('display_order'),
             supabase.from('entity_tag').select('tag_id, tag:tag(name)').eq('target_type', 'project').eq('target_id', id),
             supabase.from('app_user').select('name').eq('id', project.owner_id).single(),
-        ]);
-
-        // Get reaction counts
-        const [likesRes, upvotesRes, bookmarksRes] = await Promise.all([
+            supabase.from('project_file').select('id, file_url, file_name, file_size').eq('project_id', id).order('created_at'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'like'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'upvote'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'bookmark'),
@@ -102,6 +101,7 @@ export function useProject(id: string | undefined) {
             ...project as Project,
             images: (imagesRes.data || []) as ProjectImage[],
             videos: (videosRes.data || []) as ProjectVideo[],
+            files: (filesRes.data || []) as ProjectFile[],
             tags: (tagsRes.data || []).map((t: any) => t.tag?.name).filter(Boolean),
             reactionCounts: {
                 likes: likesRes.count || 0,
@@ -121,7 +121,7 @@ export function useChallenges(tierFilter?: string) {
     return useSupabaseQuery<Challenge[]>(async () => {
         let q = supabase
             .from('challenge')
-            .select('*')
+            .select('id, title, tier, domain, time_estimate, cover_image_url, status, created_at')
             .eq('status', 'published')
             .order('created_at', { ascending: false });
 
@@ -148,22 +148,19 @@ export function useChallenge(id: string | undefined) {
 
         const { data: challenge, error } = await supabase
             .from('challenge')
-            .select('*')
+            .select('id, title, tier, domain, time_estimate, cover_image_url, mystery, core_idea, mission, success_criteria, status, created_by, created_at, updated_at')
             .eq('id', id)
             .single();
 
         if (error || !challenge) return { data: null, error };
 
-        const [stepsRes, matsRes, skillsRes, vocabRes, levelsRes, tagsRes] = await Promise.all([
-            supabase.from('challenge_step').select('*').eq('challenge_id', id).order('display_order'),
-            supabase.from('challenge_material').select('*').eq('challenge_id', id).order('display_order'),
-            supabase.from('challenge_skill').select('*').eq('challenge_id', id),
-            supabase.from('challenge_vocabulary').select('*').eq('challenge_id', id),
-            supabase.from('challenge_level').select('*').eq('challenge_id', id),
+        const [stepsRes, matsRes, skillsRes, vocabRes, levelsRes, tagsRes, likesRes, upvotesRes, bookmarksRes] = await Promise.all([
+            supabase.from('challenge_step').select('step_text, display_order').eq('challenge_id', id).order('display_order'),
+            supabase.from('challenge_material').select('name, display_order').eq('challenge_id', id).order('display_order'),
+            supabase.from('challenge_skill').select('skill_name').eq('challenge_id', id),
+            supabase.from('challenge_vocabulary').select('term, definition').eq('challenge_id', id),
+            supabase.from('challenge_level').select('level_name, description').eq('challenge_id', id),
             supabase.from('entity_tag').select('tag_id, tag:tag(name)').eq('target_type', 'challenge').eq('target_id', id),
-        ]);
-
-        const [likesRes, upvotesRes, bookmarksRes] = await Promise.all([
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'challenge').eq('target_id', id).eq('reaction_type', 'like'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'challenge').eq('target_id', id).eq('reaction_type', 'upvote'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'challenge').eq('target_id', id).eq('reaction_type', 'bookmark'),
@@ -194,7 +191,7 @@ export function useEvents(typeFilter?: string) {
     return useSupabaseQuery<(Event & { registration_count: number })[]>(async () => {
         let q = supabase
             .from('event')
-            .select('*')
+            .select('id, title, event_type, date, end_date, location, capacity, cover_image_url, registration_status, created_at')
             .order('date', { ascending: true });
 
         if (typeFilter && typeFilter !== 'All') {
@@ -203,16 +200,23 @@ export function useEvents(typeFilter?: string) {
         const { data: events, error } = await q;
         if (error || !events) return { data: [], error };
 
-        // Fetch registration counts
-        const enriched = await Promise.all(
-            (events as Event[]).map(async (evt) => {
-                const { count } = await supabase
-                    .from('event_registration')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('event_id', evt.id);
-                return { ...evt, registration_count: count || 0 };
-            })
-        );
+        // Batch fetch registration counts instead of N+1
+        const eventIds = (events as Event[]).map(e => e.id);
+        const { data: regData } = await supabase
+            .from('event_registration')
+            .select('event_id')
+            .in('event_id', eventIds);
+
+        // Count registrations per event
+        const regCounts: Record<string, number> = {};
+        (regData || []).forEach((r: any) => {
+            regCounts[r.event_id] = (regCounts[r.event_id] || 0) + 1;
+        });
+
+        const enriched = (events as Event[]).map(evt => ({
+            ...evt,
+            registration_count: regCounts[evt.id] || 0,
+        }));
 
         return { data: enriched, error: null };
     }, [typeFilter]);
@@ -224,7 +228,7 @@ export function useEvent(id: string | undefined) {
 
         const { data: event, error } = await supabase
             .from('event')
-            .select('*')
+            .select('id, title, description, event_type, date, end_date, location, capacity, cover_image_url, registration_status, auto_badge_id, created_by, created_at, updated_at')
             .eq('id', id)
             .single();
 
@@ -248,33 +252,46 @@ export function useMakers(tagFilter?: string) {
     return useSupabaseQuery<(MakerProfile & { skills: string[]; tags: string[]; badgeIds: string[] })[]>(async () => {
         const { data: profiles, error } = await supabase
             .from('maker_profile')
-            .select('*')
+            .select('id, user_id, display_name, bio, avatar_url, is_public')
             .eq('is_public', true)
             .order('display_name');
 
         if (error || !profiles) return { data: [], error };
 
-        const enriched = await Promise.all(
-            (profiles as MakerProfile[]).map(async (p) => {
-                const [tagsRes, badgesRes] = await Promise.all([
-                    supabase.from('entity_tag').select('tag:tag(name)').eq('target_type', 'maker_profile').eq('target_id', p.id),
-                    supabase.from('user_badge').select('badge_id').eq('user_id', p.user_id),
-                ]);
-                const tags = (tagsRes.data || []).map((t: any) => t.tag?.name).filter(Boolean);
+        // Batch fetch tags and badges for ALL profiles in 2 queries (not N+1)
+        const profileIds = (profiles as MakerProfile[]).map(p => p.id);
+        const userIds = (profiles as MakerProfile[]).map(p => p.user_id);
 
-                // Filter by tag if specified
-                if (tagFilter && tagFilter !== 'All' && !tags.includes(tagFilter)) {
-                    return null;
-                }
+        const [allTagsRes, allBadgesRes] = await Promise.all([
+            supabase.from('entity_tag').select('target_id, tag:tag(name)').eq('target_type', 'maker_profile').in('target_id', profileIds),
+            supabase.from('user_badge').select('user_id, badge_id').in('user_id', userIds),
+        ]);
 
-                return {
-                    ...p,
-                    skills: tags, // skills are stored as tags on profiles
-                    tags,
-                    badgeIds: (badgesRes.data || []).map((b: any) => b.badge_id),
-                };
-            })
-        );
+        // Group tags by profile id
+        const tagsByProfile: Record<string, string[]> = {};
+        (allTagsRes.data || []).forEach((t: any) => {
+            const name = t.tag?.name;
+            if (name) {
+                (tagsByProfile[t.target_id] = tagsByProfile[t.target_id] || []).push(name);
+            }
+        });
+
+        // Group badge ids by user id
+        const badgesByUser: Record<string, string[]> = {};
+        (allBadgesRes.data || []).forEach((b: any) => {
+            (badgesByUser[b.user_id] = badgesByUser[b.user_id] || []).push(b.badge_id);
+        });
+
+        const enriched = (profiles as MakerProfile[]).map(p => {
+            const tags = tagsByProfile[p.id] || [];
+            if (tagFilter && tagFilter !== 'All' && !tags.includes(tagFilter)) return null;
+            return {
+                ...p,
+                skills: tags,
+                tags,
+                badgeIds: badgesByUser[p.user_id] || [],
+            };
+        });
 
         return { data: enriched.filter(Boolean) as any, error: null };
     }, [tagFilter]);
@@ -293,14 +310,14 @@ export function useMaker(id: string | undefined) {
         // id could be maker_profile.id or user_id — try both
         let { data: profile, error } = await supabase
             .from('maker_profile')
-            .select('*')
+            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at')
             .eq('id', id)
             .single();
 
         if (!profile) {
             const res = await supabase
                 .from('maker_profile')
-                .select('*')
+                .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at')
                 .eq('user_id', id)
                 .single();
             profile = res.data;
@@ -312,8 +329,8 @@ export function useMaker(id: string | undefined) {
 
         const [tagsRes, badgesRes, projectsRes, appUserRes] = await Promise.all([
             supabase.from('entity_tag').select('tag:tag(name)').eq('target_type', 'maker_profile').eq('target_id', p.id),
-            supabase.from('user_badge').select('badge:badge(*)').eq('user_id', p.user_id),
-            supabase.from('project').select('*').eq('owner_id', p.user_id).eq('status', 'active').eq('visibility', 'public'),
+            supabase.from('user_badge').select('badge:badge(id, name, description, tier, domain, badge_type, image_url)').eq('user_id', p.user_id),
+            supabase.from('project').select('id, title, summary, domain, tier, status, created_at').eq('owner_id', p.user_id).eq('status', 'active').eq('visibility', 'public'),
             supabase.from('app_user').select('name, email').eq('id', p.user_id).single(),
         ]);
 
@@ -337,7 +354,7 @@ export function useBadges() {
     return useSupabaseQuery<Badge[]>(async () => {
         return supabase
             .from('badge')
-            .select('*')
+            .select('id, name, description, tier, domain, badge_type, criteria, image_url, created_at')
             .order('tier')
             .order('name') as any;
     }, []);
@@ -348,7 +365,7 @@ export function useUserBadges(userId?: string) {
         if (!userId) return { data: [], error: null };
         const { data, error } = await supabase
             .from('user_badge')
-            .select('*, badge:badge(*)')
+            .select('id, user_id, badge_id, awarded_at, awarded_by, badge:badge(id, name, description, tier, domain, badge_type, image_url)')
             .eq('user_id', userId);
         return { data: data as any, error };
     }, [userId]);
@@ -358,24 +375,19 @@ export function useUserBadges(userId?: string) {
 
 export function useProducts() {
     return useSupabaseQuery<(StoreProduct & { requiredBadge: Badge | null })[]>(async () => {
+        // Use FK relation join to fetch required badge in same query (no N+1)
         const { data: products, error } = await supabase
             .from('store_product')
-            .select('*')
+            .select('id, name, description, price, category, image_url, is_active, required_badge_id, created_at, required_badge:badge!required_badge_id(id, name, tier, image_url)')
             .eq('is_active', true)
             .order('name');
 
         if (error || !products) return { data: [], error };
 
-        const enriched = await Promise.all(
-            (products as StoreProduct[]).map(async (p) => {
-                let requiredBadge: Badge | null = null;
-                if (p.required_badge_id) {
-                    const { data } = await supabase.from('badge').select('*').eq('id', p.required_badge_id).single();
-                    requiredBadge = data as Badge | null;
-                }
-                return { ...p, requiredBadge };
-            })
-        );
+        const enriched = (products as any[]).map(p => ({
+            ...p,
+            requiredBadge: p.required_badge || null,
+        }));
 
         return { data: enriched, error: null };
     }, []);
@@ -389,7 +401,7 @@ export function useMyProfile() {
         if (!user) return { data: null, error: null };
         return supabase
             .from('maker_profile')
-            .select('*')
+            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at')
             .eq('user_id', user.id)
             .single() as any;
     }, [user?.id]);
@@ -598,7 +610,7 @@ export function useChallengeCompletion(challengeId: string | undefined) {
         if (!user || !challengeId) { setLoading(false); return; }
         const { data } = await supabase
             .from('challenge_completion')
-            .select('*')
+            .select('id, challenge_id, user_id, status, evidence_url, notes, verified_by, created_at, updated_at')
             .eq('challenge_id', challengeId)
             .eq('user_id', user.id)
             .maybeSingle();
@@ -719,53 +731,46 @@ export function useProfileMutation() {
 
         const { skills, ...profileData } = data;
 
-        // Upsert profile
-        const { error } = await supabase
-            .from('maker_profile')
-            .upsert({
-                user_id: user.id,
-                ...profileData,
-                is_public: true,
-                updated_at: new Date().toISOString(),
-            }, { onConflict: 'user_id' });
-
-        if (error) return { error: error.message };
-
-        // Update name in app_user too
-        await supabase.from('app_user').update({ name: data.display_name }).eq('id', user.id);
-
-        // Handle skills as tags on the profile
-        if (skills && skills.length > 0) {
-            // Get the profile id
-            const { data: profile } = await supabase
+        // Upsert profile + update app_user name in parallel
+        const [profileRes] = await Promise.all([
+            supabase
                 .from('maker_profile')
+                .upsert({
+                    user_id: user.id,
+                    ...profileData,
+                    is_public: true,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'user_id' })
                 .select('id')
-                .eq('user_id', user.id)
-                .single();
+                .single(),
+            supabase.from('app_user').update({ name: data.display_name }).eq('id', user.id),
+        ]);
 
-            if (profile) {
-                // Clear old tags
-                await supabase.from('entity_tag').delete().eq('target_type', 'maker_profile').eq('target_id', (profile as any).id);
+        if (profileRes.error) return { error: profileRes.error.message };
+        const profileId = (profileRes.data as any)?.id;
 
-                // Upsert each skill as a tag, then link
-                for (const skillName of skills) {
-                    const trimmed = skillName.trim();
-                    if (!trimmed) continue;
+        // Handle skills as tags — BATCHED instead of sequential loop
+        if (skills && skills.length > 0 && profileId) {
+            const trimmed = skills.map(s => s.trim()).filter(Boolean);
 
-                    const { data: tag } = await supabase
-                        .from('tag')
-                        .upsert({ name: trimmed }, { onConflict: 'name' })
-                        .select()
-                        .single();
+            // Clear old tags
+            await supabase.from('entity_tag').delete().eq('target_type', 'maker_profile').eq('target_id', profileId);
 
-                    if (tag) {
-                        await supabase.from('entity_tag').insert({
-                            target_type: 'maker_profile',
-                            target_id: (profile as any).id,
-                            tag_id: (tag as any).id,
-                        });
-                    }
-                }
+            // Batch upsert all tags in one call
+            const { data: tags } = await supabase
+                .from('tag')
+                .upsert(trimmed.map(name => ({ name })), { onConflict: 'name' })
+                .select('id, name');
+
+            // Batch insert all entity_tag links in one call
+            if (tags && tags.length > 0) {
+                await supabase.from('entity_tag').insert(
+                    (tags as any[]).map(t => ({
+                        target_type: 'maker_profile' as const,
+                        target_id: profileId,
+                        tag_id: t.id,
+                    }))
+                );
             }
         }
 
@@ -774,4 +779,490 @@ export function useProfileMutation() {
     };
 
     return { saveProfile };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: ALL USERS ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useAllUsers() {
+    return useSupabaseQuery<(AppUser & { profile: MakerProfile | null })[]>(async () => {
+        // Single query with FK join — no separate profile fetch needed
+        const { data, error } = await supabase
+            .from('app_user')
+            .select('id, auth_id, email, name, role, is_active, created_at, updated_at, profile:maker_profile(id, user_id, display_name, avatar_url, is_public)')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return { data: [], error };
+
+        const enriched = (data as any[]).map(u => {
+            const profile = Array.isArray(u.profile) ? u.profile[0] || null : u.profile || null;
+            return { ...u, profile };
+        });
+
+        return { data: enriched, error: null };
+    }, []);
+}
+
+export function useUserMutations() {
+    const updateRole = async (userId: string, role: Role) => {
+        const { error } = await supabase.from('app_user').update({ role }).eq('id', userId);
+        return { error: error?.message || null };
+    };
+
+    const toggleActive = async (userId: string, isActive: boolean) => {
+        const { error } = await supabase.from('app_user').update({ is_active: isActive }).eq('id', userId);
+        return { error: error?.message || null };
+    };
+
+    return { updateRole, toggleActive };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: ALL CHALLENGES (incl. drafts) ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useAllChallenges() {
+    return useSupabaseQuery<Challenge[]>(async () => {
+        return supabase
+            .from('challenge')
+            .select('id, title, tier, domain, time_estimate, cover_image_url, mystery, core_idea, mission, success_criteria, status, created_by, created_at, updated_at')
+            .order('created_at', { ascending: false }) as any;
+    }, []);
+}
+
+export function useChallengeMutations() {
+    const createChallenge = async (data: {
+        title: string;
+        tier?: string;
+        domain?: string;
+        time_estimate?: string;
+        cover_image_url?: string;
+        mystery?: string;
+        core_idea?: string;
+        mission?: string;
+        success_criteria?: string;
+        status?: string;
+        created_by?: string;
+    }) => {
+        const { data: challenge, error } = await supabase
+            .from('challenge')
+            .insert({ ...data, status: data.status || 'draft' })
+            .select()
+            .single();
+        return { data: challenge as Challenge | null, error: error?.message || null };
+    };
+
+    const updateChallenge = async (id: string, updates: Partial<Challenge>) => {
+        const { error } = await supabase.from('challenge').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteChallenge = async (id: string) => {
+        // Delete child rows first
+        await Promise.all([
+            supabase.from('challenge_step').delete().eq('challenge_id', id),
+            supabase.from('challenge_material').delete().eq('challenge_id', id),
+            supabase.from('challenge_skill').delete().eq('challenge_id', id),
+            supabase.from('challenge_vocabulary').delete().eq('challenge_id', id),
+            supabase.from('challenge_level').delete().eq('challenge_id', id),
+            supabase.from('challenge_image').delete().eq('challenge_id', id),
+            supabase.from('challenge_video').delete().eq('challenge_id', id),
+            supabase.from('challenge_completion').delete().eq('challenge_id', id),
+        ]);
+        const { error } = await supabase.from('challenge').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { createChallenge, updateChallenge, deleteChallenge };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: ALL EVENTS ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useAllEvents() {
+    return useSupabaseQuery<Event[]>(async () => {
+        return supabase
+            .from('event')
+            .select('id, title, description, event_type, date, end_date, location, capacity, cover_image_url, registration_status, auto_badge_id, created_by, created_at, updated_at')
+            .order('date', { ascending: false }) as any;
+    }, []);
+}
+
+export function useEventMutations() {
+    const createEvent = async (data: {
+        title: string;
+        event_type: EventType;
+        date: string;
+        end_date?: string;
+        description?: string;
+        location?: string;
+        capacity?: number;
+        cover_image_url?: string;
+        registration_status?: string;
+        created_by?: string;
+    }) => {
+        const { data: event, error } = await supabase
+            .from('event')
+            .insert({ ...data, registration_status: data.registration_status || 'open' })
+            .select()
+            .single();
+        return { data: event as Event | null, error: error?.message || null };
+    };
+
+    const updateEvent = async (id: string, updates: Partial<Event>) => {
+        const { error } = await supabase.from('event').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteEvent = async (id: string) => {
+        await Promise.all([
+            supabase.from('event_registration').delete().eq('event_id', id),
+            supabase.from('event_checkin').delete().eq('event_id', id),
+            supabase.from('event_team_member').delete().eq('team_id', id),
+            supabase.from('event_submission').delete().eq('event_id', id),
+            supabase.from('showcase_slot').delete().eq('event_id', id),
+        ]);
+        await supabase.from('event_team').delete().eq('event_id', id);
+        const { error } = await supabase.from('event').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { createEvent, updateEvent, deleteEvent };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: BADGES ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useBadgeMutations() {
+    const createBadge = async (data: {
+        name: string;
+        description: string;
+        tier: string;
+        domain: string;
+        badge_type: string;
+        criteria: string;
+        image_url?: string;
+    }) => {
+        const { data: badge, error } = await supabase
+            .from('badge')
+            .insert(data)
+            .select()
+            .single();
+        return { data: badge as Badge | null, error: error?.message || null };
+    };
+
+    const updateBadge = async (id: string, updates: Partial<Badge>) => {
+        const { error } = await supabase.from('badge').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteBadge = async (id: string) => {
+        await supabase.from('user_badge').delete().eq('badge_id', id);
+        const { error } = await supabase.from('badge').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const awardBadge = async (userId: string, badgeId: string, awardedBy?: string) => {
+        const { error } = await supabase.from('user_badge').insert({
+            user_id: userId,
+            badge_id: badgeId,
+            awarded_by: awardedBy || null,
+        });
+        return { error: error?.message || null };
+    };
+
+    const revokeBadge = async (userId: string, badgeId: string) => {
+        const { error } = await supabase.from('user_badge').delete()
+            .eq('user_id', userId)
+            .eq('badge_id', badgeId);
+        return { error: error?.message || null };
+    };
+
+    return { createBadge, updateBadge, deleteBadge, awardBadge, revokeBadge };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: STORE PRODUCTS ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useAllProducts() {
+    return useSupabaseQuery<StoreProduct[]>(async () => {
+        return supabase
+            .from('store_product')
+            .select('id, name, description, price, category, image_url, is_active, required_badge_id, created_at')
+            .order('name') as any;
+    }, []);
+}
+
+export function useProductMutations() {
+    const createProduct = async (data: {
+        name: string;
+        description: string;
+        price: number;
+        category?: string;
+        image_url?: string;
+        is_active?: boolean;
+        required_badge_id?: string;
+    }) => {
+        const { data: product, error } = await supabase
+            .from('store_product')
+            .insert({ ...data, is_active: data.is_active !== false })
+            .select()
+            .single();
+        return { data: product as StoreProduct | null, error: error?.message || null };
+    };
+
+    const updateProduct = async (id: string, updates: Partial<StoreProduct>) => {
+        const { error } = await supabase.from('store_product').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteProduct = async (id: string) => {
+        const { error } = await supabase.from('store_product').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { createProduct, updateProduct, deleteProduct };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: EQUIPMENT ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useEquipment() {
+    return useSupabaseQuery<Equipment[]>(async () => {
+        return supabase
+            .from('equipment')
+            .select('id, name, description, image_url, is_active, requires_induction, created_at')
+            .order('name') as any;
+    }, []);
+}
+
+export function useEquipmentMutations() {
+    const createEquipment = async (data: {
+        name: string;
+        description?: string;
+        image_url?: string;
+        requires_induction?: boolean;
+    }) => {
+        const { data: equip, error } = await supabase
+            .from('equipment')
+            .insert(data)
+            .select()
+            .single();
+        return { data: equip as Equipment | null, error: error?.message || null };
+    };
+
+    const updateEquipment = async (id: string, updates: Partial<Equipment>) => {
+        const { error } = await supabase.from('equipment').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteEquipment = async (id: string) => {
+        await Promise.all([
+            supabase.from('equipment_induction').delete().eq('equipment_id', id),
+            supabase.from('equipment_booking').delete().eq('equipment_id', id),
+        ]);
+        const { error } = await supabase.from('equipment').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { createEquipment, updateEquipment, deleteEquipment };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── ADMIN: INVENTORY ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useInventory() {
+    return useSupabaseQuery<Inventory[]>(async () => {
+        return supabase
+            .from('inventory')
+            .select('id, name, description, quantity, unit, location, created_at, updated_at')
+            .order('name') as any;
+    }, []);
+}
+
+export function useInventoryMutations() {
+    const createItem = async (data: {
+        name: string;
+        description?: string;
+        quantity: number;
+        unit?: string;
+        location?: string;
+    }) => {
+        const { data: item, error } = await supabase
+            .from('inventory')
+            .insert(data)
+            .select()
+            .single();
+        return { data: item as Inventory | null, error: error?.message || null };
+    };
+
+    const updateItem = async (id: string, updates: Partial<Inventory>) => {
+        const { error } = await supabase.from('inventory').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteItem = async (id: string) => {
+        const { error } = await supabase.from('inventory').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { createItem, updateItem, deleteItem };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── MENTOR/ADMIN: PENDING PROJECTS REVIEW ───
+// ══════════════════════════════════════════════════════════════════
+
+export function usePendingProjects() {
+    return useSupabaseQuery<(Project & { ownerName: string; ownerEmail: string })[]>(async () => {
+        // Single query with FK join — owner info fetched inline
+        const { data, error } = await supabase
+            .from('project')
+            .select('id, title, summary, description, domain, tier, status, visibility, owner_id, created_at, updated_at, owner:app_user!owner_id(name, email)')
+            .eq('status', 'pending_review')
+            .order('updated_at', { ascending: false });
+
+        if (error || !data) return { data: [], error };
+
+        const enriched = (data as any[]).map(p => ({
+            ...p,
+            ownerName: p.owner?.name || 'Unknown',
+            ownerEmail: p.owner?.email || '',
+        }));
+
+        return { data: enriched, error: null };
+    }, []);
+}
+
+export function useAllProjectsAdmin() {
+    return useSupabaseQuery<(Project & { ownerName: string })[]>(async () => {
+        // Single query with FK join
+        const { data, error } = await supabase
+            .from('project')
+            .select('id, title, summary, domain, tier, status, visibility, owner_id, created_at, updated_at, owner:app_user!owner_id(name)')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return { data: [], error };
+
+        const enriched = (data as any[]).map(p => ({
+            ...p,
+            ownerName: p.owner?.name || 'Unknown',
+        }));
+
+        return { data: enriched, error: null };
+    }, []);
+}
+
+export function useProjectReviewMutations() {
+    const approveProject = async (id: string) => {
+        const { error } = await supabase.from('project').update({
+            status: 'active',
+            visibility: 'public',
+        }).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const rejectProject = async (id: string) => {
+        const { error } = await supabase.from('project').update({
+            status: 'rejected',
+        }).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { approveProject, rejectProject };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── MENTOR/ADMIN: CHALLENGE COMPLETION REVIEW ───
+// ══════════════════════════════════════════════════════════════════
+
+export function usePendingCompletions() {
+    return useSupabaseQuery<(ChallengeCompletion & {
+        challengeTitle: string;
+        userName: string;
+    })[]>(async () => {
+        // Single query with FK joins — challenge title + user name inline
+        const { data, error } = await supabase
+            .from('challenge_completion')
+            .select('id, challenge_id, user_id, status, evidence_url, notes, verified_by, created_at, updated_at, challenge:challenge!challenge_id(title), user:app_user!user_id(name)')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return { data: [], error };
+
+        const enriched = (data as any[]).map(c => ({
+            ...c,
+            challengeTitle: c.challenge?.title || 'Unknown',
+            userName: c.user?.name || 'Unknown',
+        }));
+
+        return { data: enriched, error: null };
+    }, []);
+}
+
+export function useCompletionReviewMutations() {
+    const verifyCompletion = async (id: string, verifiedBy: string) => {
+        const { error } = await supabase.from('challenge_completion').update({
+            status: 'verified',
+            verified_by: verifiedBy,
+        }).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const rejectCompletion = async (id: string) => {
+        const { error } = await supabase.from('challenge_completion').update({
+            status: 'rejected',
+        }).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { verifyCompletion, rejectCompletion };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── MAKER: PROJECT IMAGES / FILES MUTATIONS ───
+// ══════════════════════════════════════════════════════════════════
+
+export function useProjectImageMutations() {
+    const addImage = async (projectId: string, imageUrl: string, caption?: string, order?: number) => {
+        const { data, error } = await supabase.from('project_image').insert({
+            project_id: projectId,
+            image_url: imageUrl,
+            caption: caption || null,
+            display_order: order || 0,
+        }).select().single();
+        return { data: data as ProjectImage | null, error: error?.message || null };
+    };
+
+    const removeImage = async (imageId: string) => {
+        const { error } = await supabase.from('project_image').delete().eq('id', imageId);
+        return { error: error?.message || null };
+    };
+
+    return { addImage, removeImage };
+}
+
+export function useProjectFileMutations() {
+    const addFile = async (projectId: string, fileUrl: string, fileName: string, fileSize?: number) => {
+        const { data, error } = await supabase.from('project_file').insert({
+            project_id: projectId,
+            file_url: fileUrl,
+            file_name: fileName,
+            file_size: fileSize || null,
+        }).select().single();
+        return { data: data as ProjectFile | null, error: error?.message || null };
+    };
+
+    const removeFile = async (fileId: string) => {
+        const { error } = await supabase.from('project_file').delete().eq('id', fileId);
+        return { error: error?.message || null };
+    };
+
+    return { addFile, removeFile };
 }

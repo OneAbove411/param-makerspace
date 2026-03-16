@@ -60,7 +60,7 @@ export function Store() {
                                     <div className="p-6 flex-1 flex flex-col bg-brutal-bg">
                                         <div className="flex justify-between items-start mb-4 gap-4">
                                             <h3 className="font-heading font-bold text-2xl leading-tight">{product.name}</h3>
-                                            <span className="font-data text-xl font-bold bg-brutal-dark text-brutal-bg px-3 py-1 rounded-lg">${Number(product.price).toFixed(2)}</span>
+                                            <span className="font-data text-xl font-bold bg-brutal-dark text-brutal-bg px-3 py-1 rounded-lg">₹{Number(product.price).toFixed(2)}</span>
                                         </div>
                                         <p className="font-data text-sm text-brutal-dark/70 mb-6 flex-1">{product.description}</p>
 
@@ -82,9 +82,9 @@ export function Store() {
                                                 onClick={() => handlePurchase(product.id, Number(product.price))}
                                             >
                                                 {purchasing === product.id ? 'Processing...' :
-                                                 isLocked ? 'Locked' :
-                                                 !user ? 'Log in to Purchase' :
-                                                 'Purchase'}
+                                                    isLocked ? 'Locked' :
+                                                        !user ? 'Log in to Purchase' :
+                                                            'Purchase'}
                                             </Button>
                                         )}
                                     </div>

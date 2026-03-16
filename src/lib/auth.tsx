@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase';
-import type { Session, User as SupaUser } from '@supabase/supabase-js';
-import type { Role, AppUser } from './database.types';
+import type { Session } from '@supabase/supabase-js';
+import type { Role } from './database.types';
 
 export type { Role };
 
@@ -28,42 +28,53 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ─── AUTH-ONLY fetch: only hits app_user table ───
+// No maker_profile join — avatar loads separately after auth is done.
 async function fetchAppUser(authId: string): Promise<User | null> {
     const { data, error } = await supabase
         .from('app_user')
-        .select('*')
+        .select('id, auth_id, email, name, role')
         .eq('auth_id', authId)
         .single();
 
     if (error || !data) return null;
 
-    const appUser = data as AppUser;
+    const u = data as any;
+    return {
+        id: u.id,
+        authId: u.auth_id,
+        email: u.email,
+        name: u.name,
+        role: u.role as Role,
+    };
+}
 
-    // Try to get avatar from maker_profile
-    let { data: profile } = await supabase
+// ─── Lazy avatar loader: runs AFTER auth is resolved ───
+async function fetchAvatar(userId: string): Promise<string | undefined> {
+    const { data } = await supabase
         .from('maker_profile')
         .select('avatar_url')
-        .eq('user_id', appUser.id)
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    // If no maker profile exists yet (e.g. fresh DB/schema), create a basic one so the UI doesn't break
-    if (!profile) {
-        const { data: newProfile } = await supabase.from('maker_profile').insert({
-            user_id: appUser.id,
-            display_name: appUser.name,
-            is_public: true
-        }).select('avatar_url').single();
-        profile = newProfile;
+    return (data as any)?.avatar_url || undefined;
+}
+
+// ─── Ensure maker_profile exists (first login) ───
+async function ensureMakerProfile(userId: string, name: string): Promise<void> {
+    const { data } = await supabase
+        .from('maker_profile')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (!data) {
+        await supabase.from('maker_profile').insert({
+            user_id: userId,
+            display_name: name,
+            is_public: true,
+        });
     }
-
-    return {
-        id: appUser.id,
-        authId: appUser.auth_id,
-        email: appUser.email,
-        name: appUser.name,
-        role: appUser.role as Role,
-        avatar: profile?.avatar_url || undefined,
-    };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -78,18 +89,23 @@ const [isLoading, setIsLoading] = useState(hasStoredSession);
     useEffect(() => {
         let mounted = true;
 
-        // Safety timeout: if auth resolution takes longer than 5s, stop loading
-        // so the UI doesn't get permanently stuck
-        const safetyTimeout = setTimeout(() => {
-            if (mounted) {
-                console.warn('Auth resolution timed out after 5s, forcing isLoading=false');
-                setIsLoading(false);
+        // ─── Proactive Stale Token Check ───
+        const checkInitialSession = async () => {
+            const { error } = await supabase.auth.getSession();
+            if (error) {
+                console.warn('Bad or expired token in storage — wiping it:', error.message);
+                await supabase.auth.signOut().catch(() => {});
+                if (mounted) {
+                    setUser(null);
+                    setSession(null);
+                    setIsLoading(false);
+                }
             }
-        }, 5000);
+        };
 
-        // Use onAuthStateChange as the single source of truth.
-        // It fires INITIAL_SESSION on mount (covers existing sessions),
-        // and SIGNED_IN / SIGNED_OUT for subsequent changes.
+        checkInitialSession();
+
+        // ─── Primary auth listener ───
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, s) => {
                 if (!mounted) return;
@@ -99,13 +115,26 @@ const [isLoading, setIsLoading] = useState(hasStoredSession);
                 if (s?.user) {
                     try {
                         const appUser = await fetchAppUser(s.user.id);
-                        if (mounted) setUser(appUser);
+                        if (mounted) {
+                            setUser(appUser);
+                            if (appUser) {
+                                fetchAvatar(appUser.id).then(avatar => {
+                                    if (mounted && avatar) setUser(prev => prev ? { ...prev, avatar } : prev);
+                                });
+                                if (event === 'SIGNED_IN') {
+                                    ensureMakerProfile(appUser.id, appUser.name);
+                                }
+                            }
+                        }
                     } catch (err) {
                         console.error('Error fetching app user:', err);
                         if (mounted) setUser(null);
+                    } finally {
+                        if (mounted) setIsLoading(false);
                     }
                 } else {
                     setUser(null);
+                    if (mounted) setIsLoading(false);
                 }
 
                 if (mounted) setIsLoading(false);
@@ -114,7 +143,6 @@ const [isLoading, setIsLoading] = useState(hasStoredSession);
 
         return () => {
             mounted = false;
-            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
         };
     }, []);
@@ -146,12 +174,16 @@ const [isLoading, setIsLoading] = useState(hasStoredSession);
         return { error: error?.message || null };
     };
 
-    const refreshUser = async () => {
-        if (session?.user) {
-            const appUser = await fetchAppUser(session.user.id);
-            setUser(appUser);
+    const refreshUser = useCallback(async () => {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s?.user) {
+            const appUser = await fetchAppUser(s.user.id);
+            if (appUser) {
+                const avatar = await fetchAvatar(appUser.id);
+                setUser({ ...appUser, avatar });
+            }
         }
-    };
+    }, []);
 
     return (
         <AuthContext.Provider value={{

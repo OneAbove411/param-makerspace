@@ -26,11 +26,8 @@ export function Login() {
         setLoading(true);
         try {
             const { error: err } = await signIn(email, password);
-            if (err) {
-                setError(err);
-            } else {
-                navigate('/dashboard');
-            }
+            if (err) setError(err);
+            // ✅ Don't navigate here — useEffect watches user and will redirect
         } catch (err: any) {
             setError(err?.message || 'An unexpected error occurred.');
         } finally {

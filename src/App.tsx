@@ -20,6 +20,16 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { Dashboard } from './pages/Dashboard';
 import { ProfileSetup } from './pages/ProfileSetup';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { EditProject } from './pages/EditProject';
+import { ManageUsers } from './pages/admin/ManageUsers';
+import { ManageChallenges } from './pages/admin/ManageChallenges';
+import { ManageEvents } from './pages/admin/ManageEvents';
+import { ManageBadges } from './pages/admin/ManageBadges';
+import { ManageStore } from './pages/admin/ManageStore';
+import { ManageEquipment } from './pages/admin/ManageEquipment';
+import { ManageInventory } from './pages/admin/ManageInventory';
+import { ReviewProjects } from './pages/admin/ReviewProjects';
+import { ReviewChallenges } from './pages/admin/ReviewChallenges';
 
 function App() {
   return (
@@ -47,6 +57,24 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['maker', 'mentor', 'admin']} />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile-setup" element={<ProfileSetup />} />
+              <Route path="/projects/:id/edit" element={<EditProject />} />
+            </Route>
+
+            {/* Mentor & Admin Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['mentor', 'admin']} />}>
+              <Route path="/admin/review-projects" element={<ReviewProjects />} />
+              <Route path="/admin/review-challenges" element={<ReviewChallenges />} />
+              <Route path="/admin/events" element={<ManageEvents />} />
+              <Route path="/admin/inventory" element={<ManageInventory />} />
+            </Route>
+
+            {/* Admin Only Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+              <Route path="/admin/users" element={<ManageUsers />} />
+              <Route path="/admin/challenges" element={<ManageChallenges />} />
+              <Route path="/admin/badges" element={<ManageBadges />} />
+              <Route path="/admin/store" element={<ManageStore />} />
+              <Route path="/admin/equipment" element={<ManageEquipment />} />
             </Route>
 
             <Route path="*" element={<div className="p-20 font-data text-2xl">404 - Not Found</div>} />

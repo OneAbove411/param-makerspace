@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const loadingTimeout = setTimeout(() => {
             if (mounted) setIsLoading(false);
-        }, 5000);
+        }, 100);
 
         // Listen for auth changes (login, logout, token refresh)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(

@@ -67,9 +67,13 @@ async function fetchAppUser(authId: string): Promise<User | null> {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [session, setSession] = useState<Session | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+// Optimistically skip loading if no stored session exists
+const hasStoredSession = typeof window !== 'undefined' &&
+    Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+
+const [user, setUser] = useState<User | null>(null);
+const [session, setSession] = useState<Session | null>(null);
+const [isLoading, setIsLoading] = useState(hasStoredSession);
 
     useEffect(() => {
         let mounted = true;

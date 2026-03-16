@@ -142,7 +142,7 @@ export function ProjectDetails() {
                                         ></iframe>
                                     </div>
                                 )}
-                                {project.videos?.map(vid => (
+                                {project.videos?.length > 0 && project.videos.map(vid => (
                                     <div key={vid.id} className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
                                         <iframe
                                             src={getEmbedUrl(vid.video_url)}

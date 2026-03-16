@@ -39,12 +39,22 @@ async function fetchAppUser(authId: string): Promise<User | null> {
 
     const appUser = data as AppUser;
 
-    // Also try to get avatar from maker_profile
-    const { data: profile } = await supabase
+    // Try to get avatar from maker_profile
+    let { data: profile } = await supabase
         .from('maker_profile')
         .select('avatar_url')
         .eq('user_id', appUser.id)
         .single();
+
+    // If no maker profile exists yet (e.g. fresh DB/schema), create a basic one so the UI doesn't break
+    if (!profile) {
+         const { data: newProfile } = await supabase.from('maker_profile').insert({
+             user_id: appUser.id,
+             display_name: appUser.name,
+             is_public: true
+         }).select('avatar_url').single();
+         profile = newProfile;
+    }
 
     return {
         id: appUser.id,
@@ -93,10 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             async (event, s) => {
                 if (!mounted) return;
                 
-                // Only trigger auth state updates on meaningful events to prevent race conditions
-                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+                if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
                     setSession(s);
-                    setIsLoading(true); // Temporarily show loading while fetching user details
+                    // Only show loading if we are acquiring a new session
+                    if (event === 'SIGNED_IN') setIsLoading(true); 
                     
                     if (s?.user) {
                         const appUser = await fetchAppUser(s.user.id);

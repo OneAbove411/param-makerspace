@@ -47,14 +47,22 @@ async function fetchAppUser(authId: string): Promise<User | null> {
         .single();
 
     // If no maker profile exists yet (e.g. fresh DB/schema), create a basic one so the UI doesn't break
-    if (!profile) {
-        const { data: newProfile } = await supabase.from('maker_profile').insert({
-            user_id: appUser.id,
-            display_name: appUser.name,
-            is_public: true
-        }).select('avatar_url').single();
+if (!profile) {
+    try {
+        const { data: newProfile } = await Promise.race([
+            supabase.from('maker_profile').insert({
+                user_id: appUser.id,
+                display_name: appUser.name,
+                is_public: true
+            }).select('avatar_url').single(),
+            new Promise<{data: null}>((resolve) => 
+                setTimeout(() => resolve({data: null}), 2000))
+        ]) as any;
         profile = newProfile;
+    } catch {
+        profile = null;
     }
+}
 
     return {
         id: appUser.id,

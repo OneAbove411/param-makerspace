@@ -29,67 +29,41 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function fetchAppUser(authId: string): Promise<User | null> {
-    console.log('[Auth] fetchAppUser called for authId:', authId);
-    try {
-        const { data, error } = await supabase
-            .from('app_user')
-            .select('*')
-            .eq('auth_id', authId)
-            .single();
+    const { data, error } = await supabase
+        .from('app_user')
+        .select('*')
+        .eq('auth_id', authId)
+        .single();
 
-        if (error) {
-            console.error('[Auth] Error fetching app_user:', error.message, error.details);
-            return null;
-        }
-        if (!data) {
-            console.warn('[Auth] No app_user found for authId:', authId);
-            return null;
-        }
+    if (error || !data) return null;
 
-        const appUser = data as AppUser;
-        console.log('[Auth] app_user found:', appUser.id, appUser.name, 'role:', appUser.role);
+    const appUser = data as AppUser;
 
-        // Try to get avatar from maker_profile (non-blocking, don't let it stall login)
-        let avatarUrl: string | undefined;
-        try {
-            const { data: profile } = await supabase
-                .from('maker_profile')
-                .select('avatar_url')
-                .eq('user_id', appUser.id)
-                .single();
+    // Try to get avatar from maker_profile
+    let { data: profile } = await supabase
+        .from('maker_profile')
+        .select('avatar_url')
+        .eq('user_id', appUser.id)
+        .single();
 
-            if (profile) {
-                avatarUrl = profile.avatar_url || undefined;
-            } else {
-                // If no maker profile exists yet, create a basic one
-                console.log('[Auth] No maker_profile found, creating one...');
-                const { data: newProfile, error: insertErr } = await supabase.from('maker_profile').insert({
-                    user_id: appUser.id,
-                    display_name: appUser.name,
-                    is_public: true
-                }).select('avatar_url').single();
-                if (insertErr) {
-                    console.warn('[Auth] Could not create maker_profile:', insertErr.message);
-                } else {
-                    avatarUrl = newProfile?.avatar_url || undefined;
-                }
-            }
-        } catch (profileErr) {
-            console.warn('[Auth] Error fetching/creating maker_profile, skipping:', profileErr);
-        }
-
-        return {
-            id: appUser.id,
-            authId: appUser.auth_id,
-            email: appUser.email,
-            name: appUser.name,
-            role: appUser.role as Role,
-            avatar: avatarUrl,
-        };
-    } catch (err) {
-        console.error('[Auth] Unexpected error in fetchAppUser:', err);
-        return null;
+    // If no maker profile exists yet (e.g. fresh DB/schema), create a basic one so the UI doesn't break
+    if (!profile) {
+        const { data: newProfile } = await supabase.from('maker_profile').insert({
+            user_id: appUser.id,
+            display_name: appUser.name,
+            is_public: true
+        }).select('avatar_url').single();
+        profile = newProfile;
     }
+
+    return {
+        id: appUser.id,
+        authId: appUser.auth_id,
+        email: appUser.email,
+        name: appUser.name,
+        role: appUser.role as Role,
+        avatar: profile?.avatar_url || undefined,
+    };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -124,6 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         getInitialSession();
 
+        const loadingTimeout = setTimeout(() => {
+            if (mounted) setIsLoading(false);
+        }, 100);
+
         // Listen for auth changes (login, logout, token refresh)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, s) => {
@@ -145,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             mounted = false;
+            clearTimeout(loadingTimeout);
             subscription.unsubscribe();
         };
     }, []);
@@ -159,27 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signIn = async (email: string, password: string) => {
-        console.log('[Auth] signIn called for:', email);
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-            console.error('[Auth] signIn error:', error.message);
-            return { error: error.message };
-        }
-
-        // Wait for the app user to be fetched so the caller can safely navigate
-        if (data.user) {
-            console.log('[Auth] signIn success, fetching app user...');
-            const appUser = await fetchAppUser(data.user.id);
-            setUser(appUser);
-            setSession(data.session);
-            setIsLoading(false);
-            if (!appUser) {
-                console.error('[Auth] signIn succeeded but no app_user found — user may not exist in app_user table');
-                return { error: 'Account not found in the system. Please contact an admin.' };
-            }
-        }
-
-        return { error: null };
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        return { error: error?.message || null };
     };
 
     const signOut = async () => {

@@ -30,6 +30,7 @@ import { ManageEquipment } from './pages/admin/ManageEquipment';
 import { ManageInventory } from './pages/admin/ManageInventory';
 import { ReviewProjects } from './pages/admin/ReviewProjects';
 import { ReviewChallenges } from './pages/admin/ReviewChallenges';
+import { ReviewEventSubmissions } from './pages/admin/ReviewEventSubmissions';
 
 function App() {
   return (
@@ -54,7 +55,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Protected Routes */}
-            <Route element={<ProtectedRoute allowedRoles={['maker', 'mentor', 'admin']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['viewer', 'maker', 'mentor', 'admin']} />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile-setup" element={<ProfileSetup />} />
               <Route path="/projects/:id/edit" element={<EditProject />} />
@@ -64,6 +65,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['mentor', 'admin']} />}>
               <Route path="/admin/review-projects" element={<ReviewProjects />} />
               <Route path="/admin/review-challenges" element={<ReviewChallenges />} />
+              <Route path="/admin/review-submissions" element={<ReviewEventSubmissions />} />
               <Route path="/admin/events" element={<ManageEvents />} />
               <Route path="/admin/inventory" element={<ManageInventory />} />
             </Route>

@@ -5,17 +5,24 @@ import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/Button';
 import { Clock, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 
+import { getEmbedUrl } from '../lib/videoUtils';
+
 export function ChallengeDetails() {
     const { id } = useParams();
     const { data: challenge, loading } = useChallenge(id);
     const { user } = useAuth();
     const { completion, markComplete } = useChallengeCompletion(id);
     const [submitting, setSubmitting] = useState(false);
+    const [showCompleteForm, setShowCompleteForm] = useState(false);
+    const [notes, setNotes] = useState('');
+    const [evidenceUrl, setEvidenceUrl] = useState('');
 
-    const handleMarkComplete = async () => {
+    const handleMarkComplete = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         setSubmitting(true);
-        await markComplete();
+        await markComplete(notes, evidenceUrl);
         setSubmitting(false);
+        setShowCompleteForm(false);
     };
 
     if (loading) {
@@ -30,7 +37,7 @@ export function ChallengeDetails() {
         <div className="flex-1 w-full bg-brutal-bg pt-24 min-h-screen">
             <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24">
                 <Link to="/challenges" className="inline-flex items-center gap-2 font-data text-sm font-bold uppercase hover:text-brutal-red mb-12 interactive-lift">
-                    <ArrowLeft className="w-4 h-4" /> Back to Database
+                    <ArrowLeft className="w-4 h-4" /> Back to Explorer Hub
                 </Link>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
@@ -100,6 +107,83 @@ export function ChallengeDetails() {
                                     <p className="font-data text-lg font-bold text-brutal-dark">{challenge.success_criteria}</p>
                                 </div>
                             )}
+                            
+                            {challenge.vocabulary.length > 0 && (
+                                <div className="bg-brutal-dark/5 rounded-[2rem] p-8 border border-brutal-dark/10">
+                                    <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Key Concepts</h3>
+                                    <dl className="space-y-6">
+                                        {challenge.vocabulary.map((vocab, idx) => (
+                                            <div key={idx}>
+                                                <dt className="font-heading font-bold text-lg text-brutal-dark">{vocab.term}</dt>
+                                                <dd className="font-data text-sm text-brutal-dark/70 mt-1">{vocab.definition}</dd>
+                                            </div>
+                                        ))}
+                                    </dl>
+                                </div>
+                            )}
+
+                            {challenge.skills.length > 0 && (
+                                <div>
+                                    <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Skills You'll Develop</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {challenge.skills.map((s, i) => (
+                                            <span key={i} className="px-3 py-1 bg-brutal-dark text-brutal-bg rounded-full font-data text-xs font-bold">
+                                                {s}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {challenge.levels.length > 0 && (
+                                <div>
+                                    <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Difficulty Levels</h3>
+                                    <div className="flex flex-col md:flex-row gap-4">
+                                        {challenge.levels.map((lvl, idx) => (
+                                            <div key={idx} className="flex-1 border-2 border-brutal-dark/10 rounded-xl p-4">
+                                                <strong className="block font-heading font-bold text-lg mb-2">{lvl.level_name}</strong>
+                                                <p className="font-data text-sm text-brutal-dark/70">{lvl.description}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {challenge.images.length > 0 && (
+                                <div>
+                                    <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Gallery</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {challenge.images.map((img, idx) => (
+                                            <div key={idx} className="space-y-2">
+                                                <div className="w-full aspect-video rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark/5">
+                                                    <img src={img.image_url} alt={img.caption || `Image ${idx + 1}`} className="w-full h-full object-cover" />
+                                                </div>
+                                                {img.caption && (
+                                                    <p className="font-data text-xs text-brutal-dark/60 text-center">{img.caption}</p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {challenge.videos.length > 0 && (
+                                <div>
+                                    <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Reference Videos</h3>
+                                    <div className="space-y-8">
+                                        {challenge.videos.map((vid, idx) => (
+                                            <div key={idx} className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
+                                                <iframe
+                                                    src={getEmbedUrl(vid.video_url)}
+                                                    className="absolute inset-0 w-full h-full"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen
+                                                ></iframe>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </section>
                     </div>
 
@@ -116,15 +200,61 @@ export function ChallengeDetails() {
                                      '⏳ Pending Verification'}
                                 </div>
                             ) : user ? (
-                                <Button
-                                    size="lg"
-                                    className="w-full shadow-lg shadow-brutal-red/20 mb-8"
-                                    onClick={handleMarkComplete}
-                                    disabled={submitting}
-                                >
-                                    {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                                    {submitting ? 'Submitting...' : 'Mark as Completed'}
-                                </Button>
+                                <div className="space-y-4 mb-8">
+                                    {!showCompleteForm ? (
+                                        <Button
+                                            size="lg"
+                                            className="w-full shadow-lg shadow-brutal-red/20"
+                                            onClick={() => setShowCompleteForm(true)}
+                                        >
+                                            <CheckCircle2 className="w-5 h-5 mr-2" />
+                                            Mark as Completed
+                                        </Button>
+                                    ) : (
+                                        <form onSubmit={handleMarkComplete} className="bg-brutal-dark/5 rounded-[2rem] p-6 border-2 border-brutal-red/30 space-y-4">
+                                            <h4 className="font-heading font-bold text-xl uppercase mb-2">Submit Evidence</h4>
+                                            <div>
+                                                <label className="block font-data text-xs font-bold text-brutal-dark/60 uppercase mb-1">Your build notes / reflection</label>
+                                                <textarea 
+                                                    required
+                                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded-xl font-data min-h-[100px] text-sm"
+                                                    placeholder="What did you make? What did you learn?"
+                                                    value={notes}
+                                                    onChange={(e) => setNotes(e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block font-data text-xs font-bold text-brutal-dark/60 uppercase mb-1">Evidence URL (Optional)</label>
+                                                <input 
+                                                    type="url"
+                                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded-xl font-data text-sm"
+                                                    placeholder="GitHub link, video link, photo URL..."
+                                                    value={evidenceUrl}
+                                                    onChange={(e) => setEvidenceUrl(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowCompleteForm(false)}>Cancel</Button>
+                                                <Button type="submit" className="flex-1" disabled={submitting}>
+                                                    {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                                                    Submit
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    )}
+
+                                    <div className="p-4 rounded-xl border-2 border-brutal-dark/10 text-sm font-data">
+                                        <div className="flex items-center gap-2 font-bold mb-1">
+                                            <span className={`w-3 h-3 rounded-full ${challenge.tier === 'Tier 1' ? 'bg-green-500' : challenge.tier === 'Tier 2' ? 'bg-yellow-500' : 'bg-brutal-red'}`} />
+                                            Tier Access Logic
+                                        </div>
+                                        <p className="text-brutal-dark/70">
+                                            {challenge.tier === 'Tier 1' ? 'Open to all — no prerequisites.' :
+                                             challenge.tier === 'Tier 2' ? 'Requires Tier 1 completion or direct domain experience.' :
+                                             'Requires Tier 2 completion or mentor approval.'}
+                                        </p>
+                                    </div>
+                                </div>
                             ) : (
                                 <Link to="/login">
                                     <Button size="lg" className="w-full shadow-lg shadow-brutal-red/20 mb-8" variant="secondary">
@@ -140,24 +270,6 @@ export function ChallengeDetails() {
                                         <ul className="space-y-2 font-data text-sm">
                                             {challenge.materials.map((m, i) => <li key={i} className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brutal-dark/40" /> {m}</li>)}
                                         </ul>
-                                    </div>
-                                )}
-
-                                {challenge.skills.length > 0 && (
-                                    <div>
-                                        <h4 className="font-data text-xs font-bold text-brutal-dark/50 uppercase tracking-widest mb-3">Skills Targeted</h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {challenge.skills.map((s, i) => <span key={i} className="px-2 py-1 bg-brutal-bg border border-brutal-dark/20 rounded text-xs font-data font-bold">{s}</span>)}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {challenge.vocabulary.length > 0 && (
-                                    <div>
-                                        <h4 className="font-data text-xs font-bold text-brutal-dark/50 uppercase tracking-widest mb-3">Vocabulary</h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {challenge.vocabulary.map((v, i) => <span key={i} className="px-2 py-1 bg-brutal-dark text-brutal-bg rounded text-xs font-data font-bold">{v}</span>)}
-                                        </div>
                                     </div>
                                 )}
                             </div>

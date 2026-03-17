@@ -26,10 +26,13 @@ export function ReviewChallenges() {
         const { error: verifyErr } = await verifyCompletion(completion.id, user.id);
         
         if (!verifyErr) {
-            // Check if there's an auto-badge associated with this challenge
-            // (Note: in a real implementation we would fetch the challenge's badge_id.
-            // For now, we'll just verify the completion.)
-            console.log("Completion verified.");
+            // Auto-award badges for challenge completion
+            try {
+                const { onChallengeVerified } = await import('../../lib/badgeEngine');
+                await onChallengeVerified(completion.user_id, completion.challenge_id);
+            } catch (err) {
+                console.error('Failed to auto-award challenge badges', err);
+            }
         }
         
         await refetch();

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase, clearAppAuth } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { Role } from './database.types';
+import { onUserJoined } from './badgeEngine';
 
 export type { Role };
 
@@ -74,6 +75,13 @@ async function ensureMakerProfile(userId: string, name: string): Promise<void> {
             display_name: name,
             is_public: true,
         });
+        
+        // Award 'Curious' badge on first join
+        try {
+            await onUserJoined(userId);
+        } catch (err) {
+            console.error('Failed to award Curious badge', err);
+        }
     }
 }
 
@@ -264,4 +272,11 @@ export function useAuth() {
         throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;
+}
+
+// Dispatch when rank advances — listened by RootLayout for celebration modal
+export function dispatchRankUp(previousRank: string, newRank: string, newXP: number) {
+  window.dispatchEvent(new CustomEvent('rankup', {
+    detail: { previousRank, newRank, newXP }
+  }))
 }

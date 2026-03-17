@@ -1,34 +1,47 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../lib/auth';
-import { usePendingProjects, useProjectReviewMutations } from '../../lib/hooks';
+import { usePendingProjects, useProjectReviewMutations, useMyProfile, useMaker, useSupabaseQuery } from '../../lib/hooks';
 import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ClipboardCheck, Check, X, Eye } from 'lucide-react';
 
 export function ReviewProjects() {
-    const { role } = useAuth();
+    const { user, role } = useAuth();
     const { data: projects, loading } = usePendingProjects();
+    const { data: profile, loading: profileLoading } = useMyProfile();
+    const { data: makerProfile } = useMaker(user?.id); // Fetch logged-in mentor's profile
     const { approveProject, rejectProject } = useProjectReviewMutations();
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     // Local list for optimistic removal — avoids refetching entire list
     const [localProjects, setLocalProjects] = useState<typeof projects>(null);
 
-    if (role !== 'admin' && role !== 'mentor') {
-        return <div className="p-24 text-center font-data text-2xl">Access Denied</div>;
-    }
-
     // Sync local state when fresh data arrives
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     React.useEffect(() => { if (projects) setLocalProjects(projects); }, [projects]);
 
-    const displayProjects = localProjects ?? projects;
+    const approvalDomains = (makerProfile as any)?.approval_domains
+        ? (makerProfile as any).approval_domains.split(',').map((d: string) => d.trim().toLowerCase())
+        : [];
 
     const handleApprove = async (id: string) => {
         setActionLoading(id);
         // Optimistic: remove from local list immediately
         setLocalProjects(prev => prev?.filter(p => p.id !== id) ?? null);
         await approveProject(id);
+        
+        // Auto-award badges
+        try {
+            const { supabase } = await import('../../lib/supabase');
+            const { onProjectApproved, onProjectActive } = await import('../../lib/badgeEngine');
+            const { data: p } = await supabase.from('project').select('owner_id').eq('id', id).single();
+            if (p?.owner_id) {
+                await onProjectApproved(p.owner_id);
+                await onProjectActive(p.owner_id);
+            }
+        } catch (err) {
+            console.error('Failed to auto-award project badges', err);
+        }
+        
         setActionLoading(null);
     };
 
@@ -41,7 +54,7 @@ export function ReviewProjects() {
         setActionLoading(null);
     };
 
-    if (loading) return <div className="p-24 flex justify-center font-data">Loading queue...</div>;
+    if (loading || profileLoading) return <div className="p-24 flex justify-center font-data">Loading queue...</div>;
 
     return (
         <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
@@ -60,7 +73,13 @@ export function ReviewProjects() {
                     Review pending project submissions from makers. Approve to make them active and public, or reject to request changes.
                 </p>
 
-                {displayProjects?.length === 0 ? (
+                {loading ? (
+                    <div className="py-12 text-center font-data text-brutal-dark/50">Loading projects...</div>
+                ) : (localProjects || []).filter(p => {
+                    if (role === 'admin') return true; // Admins see everything
+                    if (approvalDomains.length === 0) return true; // If mentor has no specific domains, they see all
+                    return approvalDomains.includes((p.domain || '').toLowerCase());
+                }).length === 0 ? (
                     <Card className="p-12 text-center border-2 border-dashed border-brutal-dark/20 bg-transparent shadow-none">
                         <ClipboardCheck className="w-12 h-12 text-brutal-dark/20 mx-auto mb-4" />
                         <h3 className="font-heading font-bold text-2xl text-brutal-dark/50">Queue is Clear</h3>
@@ -68,7 +87,11 @@ export function ReviewProjects() {
                     </Card>
                 ) : (
                     <div className="space-y-6">
-                        {displayProjects?.map(project => (
+                        {(localProjects || []).filter(p => {
+                            if (role === 'admin') return true; // Admins see everything
+                            if (approvalDomains.length === 0) return true; // If mentor has no specific domains, they see all
+                            return approvalDomains.includes((p.domain || '').toLowerCase());
+                        }).map((project) => (
                             <Card key={project.id} className="p-6 border-2 border-brutal-dark/10 flex flex-col md:flex-row gap-6">
                                 <div className="flex-1 space-y-3">
                                     <div className="flex items-center gap-3">

@@ -16,9 +16,22 @@ export interface AppUser {
     email: string;
     name: string;
     role: Role;
+    xp: number;
+    rank: string;
+    rank_override: boolean;
     is_active: boolean;
     created_at: string;
     updated_at: string;
+}
+
+export interface XPEvent {
+    id: string;
+    user_id: string;
+    amount: number;
+    reason: string;
+    reference_id: string | null;
+    reference_type: string | null;
+    created_at: string;
 }
 
 export interface MakerProfile {
@@ -393,6 +406,7 @@ export interface Database {
     public: {
         Tables: {
             app_user: { Row: AppUser & Record<string, unknown>; Insert: (Partial<AppUser> & Pick<AppUser, 'auth_id' | 'email' | 'name'>) & Record<string, unknown>; Update: Partial<AppUser> & Record<string, unknown>; Relationships: [] };
+            xp_event: { Row: XPEvent & Record<string, unknown>; Insert: (Partial<XPEvent> & Pick<XPEvent, 'user_id' | 'amount' | 'reason'>) & Record<string, unknown>; Update: Partial<XPEvent> & Record<string, unknown>; Relationships: [] };
             maker_profile: { Row: MakerProfile & Record<string, unknown>; Insert: (Partial<MakerProfile> & Pick<MakerProfile, 'user_id' | 'display_name'>) & Record<string, unknown>; Update: Partial<MakerProfile> & Record<string, unknown>; Relationships: [] };
             skill: { Row: Skill & Record<string, unknown>; Insert: (Partial<Skill> & Pick<Skill, 'name'>) & Record<string, unknown>; Update: Partial<Skill> & Record<string, unknown>; Relationships: [] };
             badge: { Row: Badge & Record<string, unknown>; Insert: (Partial<Badge> & Pick<Badge, 'name' | 'description' | 'tier' | 'domain' | 'badge_type' | 'criteria'>) & Record<string, unknown>; Update: Partial<Badge> & Record<string, unknown>; Relationships: [] };

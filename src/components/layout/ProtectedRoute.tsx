@@ -12,6 +12,18 @@ export function ProtectedRoute({ allowedRoles }: { allowedRoles: Role[] }) {
     }
 
     if (!allowedRoles.includes(role)) {
+        if (role === 'viewer') {
+            return (
+                <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 min-h-screen flex items-center justify-center">
+                    <div className="max-w-md text-center space-y-4">
+                        <h2 className="font-heading font-bold text-3xl uppercase">Access Restricted</h2>
+                        <p className="font-data text-brutal-dark/70">
+                            Your account is currently set to Viewer. You must be inducted as a Maker to access this page. Please contact a Mentor or Admin.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
         return <Navigate to="/" replace />;
     }
 

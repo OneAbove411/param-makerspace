@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Award, Plus, Trash2, Edit2, X, Image as ImageIcon } from 'lucide-react';
 import type { Badge } from '../../lib/database.types';
+import { PROGRESSION_BADGES, DOMAIN_BADGES } from '../../lib/progressionBadges';
 
 export function ManageBadges() {
     const { user, role } = useAuth();
@@ -96,6 +97,34 @@ export function ManageBadges() {
 
     if (loading) return <div className="p-24 flex justify-center font-data">Loading badges...</div>;
 
+    const progressionNames = ['Curious', 'Tinkerer', 'Builder', 'Maker', 'Innovator', 'Lab Pro'];
+    const missingProgression = progressionNames.filter(name => !badges?.some(b => b.name === name));
+    
+    const domainNames = DOMAIN_BADGES.map(b => b.name);
+    const missingDomain = domainNames.filter(name => !badges?.some(b => b.name === name));
+
+    const handleSeedProgression = async () => {
+        setActionLoading(true);
+        for (const badge of PROGRESSION_BADGES) {
+            if (missingProgression.includes(badge.name)) {
+                await supabase.from('badge').insert(badge);
+            }
+        }
+        await refetch();
+        setActionLoading(false);
+    };
+
+    const handleSeedDomain = async () => {
+        setActionLoading(true);
+        for (const badge of DOMAIN_BADGES) {
+            if (missingDomain.includes(badge.name)) {
+                await supabase.from('badge').insert(badge);
+            }
+        }
+        await refetch();
+        setActionLoading(false);
+    };
+
     const badgeTypes = ['achievement', 'skill', 'role', 'event'];
 
     return (
@@ -119,9 +148,21 @@ export function ManageBadges() {
                         </p>
                     </div>
                     {!isEditing && (
-                        <Button onClick={() => startEdit()}>
-                            <Plus className="w-5 h-5 mr-2" /> New Badge
-                        </Button>
+                        <div className="flex gap-4">
+                            {missingProgression.length > 0 && (
+                                <Button variant="outline" onClick={handleSeedProgression} disabled={actionLoading}>
+                                    Seed {missingProgression.length} Progression Badges
+                                </Button>
+                            )}
+                            {missingDomain.length > 0 && (
+                                <Button variant="outline" onClick={handleSeedDomain} disabled={actionLoading}>
+                                    Seed {missingDomain.length} Domain Badges
+                                </Button>
+                            )}
+                            <Button onClick={() => startEdit()}>
+                                <Plus className="w-5 h-5 mr-2" /> New Badge
+                            </Button>
+                        </div>
                     )}
                 </div>
 

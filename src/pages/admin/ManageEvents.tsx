@@ -1,18 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
-import { useAllEvents, useEventMutations } from '../../lib/hooks';
+import { useAllEvents, useEventMutations, useSupabaseQuery } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
 import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Calendar as CalendarIcon, Plus, Trash2, Edit2, X, Image as ImageIcon } from 'lucide-react';
-import type { Event, EventType } from '../../lib/database.types';
+import type { Event, EventType, Badge } from '../../lib/database.types';
+
+const ShowcaseSlotsAdmin = ({ eventId }: { eventId: string }) => {
+    const [slots, setSlots] = useState<any[]>([]);
+    const fetchSlots = async () => {
+        const { data } = await supabase
+            .from('showcase_slot')
+            .select('id, status, app_user:app_user!user_id(name), project:project!project_id(title)')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: true });
+        setSlots(data || []);
+    };
+    useEffect(() => { fetchSlots(); }, [eventId]);
+
+    const updateStatus = async (id: string, status: string) => {
+        await supabase.from('showcase_slot').update({ status }).eq('id', id);
+        fetchSlots();
+    };
+
+    if (!slots.length) return <div className="p-6 bg-brutal-dark/5 border border-dashed border-brutal-dark/20 text-brutal-dark/60 font-data rounded-xl text-center">No slot requests yet.</div>;
+
+    return (
+        <div className="space-y-4">
+            {slots.map(slot => (
+                <div key={slot.id} className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 p-4 bg-white border border-brutal-dark/10 rounded-xl shadow-sm">
+                    <div>
+                        <div className="font-heading font-bold text-lg leading-tight mb-1">{slot.app_user?.name}</div>
+                        {slot.project && <div className="font-data text-sm text-brutal-dark/60 font-bold uppercase tracking-tight">Project: {slot.project.title}</div>}
+                        <div className={`mt-2 inline-block px-2 py-0.5 text-[10px] font-bold font-data rounded uppercase ${
+                            slot.status === 'approved' ? 'bg-green-100 text-green-700' :
+                            slot.status === 'rejected' ? 'bg-brutal-red/10 text-brutal-red' :
+                            'bg-yellow-500/20 text-yellow-800'
+                        }`}>{slot.status}</div>
+                    </div>
+                    <div className="flex gap-2">
+                        {slot.status === 'pending' && (
+                            <>
+                                <Button size="sm" onClick={() => updateStatus(slot.id, 'approved')} className="bg-green-600 hover:bg-green-700 border-green-700 text-white">Approve</Button>
+                                <Button size="sm" variant="outline" onClick={() => updateStatus(slot.id, 'rejected')} className="border-brutal-red text-brutal-red hover:bg-brutal-red/5">Reject</Button>
+                            </>
+                        )}
+                        {slot.status === 'approved' && (
+                            <Button size="sm" variant="outline" onClick={() => updateStatus(slot.id, 'rejected')} className="border-brutal-red text-brutal-red hover:bg-brutal-red/5">Revoke</Button>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 export function ManageEvents() {
     const { user, role } = useAuth();
     const { data: events, loading, refetch } = useAllEvents();
     const { createEvent, updateEvent, deleteEvent } = useEventMutations();
+    
+    // Fetch badges for the auto-award dropdown
+    const { data: badges } = useSupabaseQuery<Partial<Badge>[]>(async () => {
+        return supabase.from('badge').select('id, name').order('name');
+    }, []);
     
     const [isEditing, setIsEditing] = useState<string | 'new' | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
@@ -20,8 +75,10 @@ export function ManageEvents() {
     // Form state
     const [form, setForm] = useState<Partial<Event>>({
         title: '', event_type: 'maker_meetup', date: new Date().toISOString().slice(0, 16), 
-        description: '', location: '', capacity: 0, registration_status: 'open'
+        description: '', location: '', capacity: 0, registration_status: 'open', auto_badge_id: null
     });
+    const [aboutText, setAboutText] = useState('');
+    const [recapText, setRecapText] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
 
     // Both Admin and Mentor can manage events
@@ -36,12 +93,19 @@ export function ManageEvents() {
                 date: event.date.slice(0, 16), // Format for datetime-local input
                 end_date: event.end_date ? event.end_date.slice(0, 16) : undefined
             });
+            const [about, recap] = event.description?.includes('---RECAP---') 
+                ? event.description.split('---RECAP---') 
+                : [event.description || '', ''];
+            setAboutText(about.trim());
+            setRecapText(recap?.trim() || '');
             setIsEditing(event.id);
         } else {
             setForm({ 
                 title: '', event_type: 'maker_meetup', date: new Date().toISOString().slice(0, 16), 
-                capacity: 0, registration_status: 'open' 
+                capacity: 0, registration_status: 'open', auto_badge_id: null 
             });
+            setAboutText('');
+            setRecapText('');
             setIsEditing('new');
         }
         setImageFile(null);
@@ -50,6 +114,8 @@ export function ManageEvents() {
     const cancelEdit = () => {
         setIsEditing(null);
         setForm({});
+        setAboutText('');
+        setRecapText('');
         setImageFile(null);
     };
 
@@ -67,8 +133,11 @@ export function ManageEvents() {
                 if (url) coverUrl = url;
             }
 
+            const combinedDescription = aboutText.trim() + (recapText.trim() ? '\n---RECAP---\n' + recapText.trim() : '');
+
             const payload = {
                 ...form,
+                description: combinedDescription,
                 cover_image_url: coverUrl,
                 created_by: user?.id,
             } as any;
@@ -178,11 +247,21 @@ export function ManageEvents() {
                                         onChange={e => setForm({...form, end_date: e.target.value})}
                                     />
                                 </div>
-                                <Input 
-                                    label="Location (e.g. Main Lab Room A)" 
-                                    value={form.location || ''} 
-                                    onChange={e => setForm({...form, location: e.target.value})} 
-                                />
+                                <div>
+                                    <Input 
+                                        label="Location (e.g. Main Lab Room A)" 
+                                        value={form.location?.startsWith('rsvp:') ? '' : (form.location || '')} 
+                                        onChange={e => setForm({...form, location: e.target.value})} 
+                                    />
+                                    <div className="mt-4">
+                                        <Input
+                                          label="External RSVP URL (overrides platform tracking)"
+                                          placeholder="https://lu.ma/your-event"
+                                          value={form.location?.startsWith('rsvp:') ? form.location.replace('rsvp:', '') : ''}
+                                          onChange={e => setForm({...form, location: e.target.value ? `rsvp:${e.target.value}` : ''})}
+                                        />
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-4 border-2 border-brutal-dark/10 p-2 rounded-lg bg-brutal-dark/5">
                                     <Input 
                                         type="number" label="Cap (0 = unlmt)" 
@@ -200,6 +279,19 @@ export function ManageEvents() {
                                             <option value="closed">Closed</option>
                                             <option value="waitlist">Waitlist</option>
                                             <option value="invite_only">Invite Only</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Auto-Award Badge on Join (Optional)</label>
+                                        <select 
+                                            className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                            value={form.auto_badge_id || ''}
+                                            onChange={e => setForm({...form, auto_badge_id: e.target.value || null})}
+                                        >
+                                            <option value="">None</option>
+                                            {badges?.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
@@ -230,14 +322,27 @@ export function ManageEvents() {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Description</label>
-                                    <textarea 
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[120px]" 
-                                        value={form.description || ''} 
-                                        placeholder="What will makers do in this event?"
-                                        onChange={e => setForm({...form, description: e.target.value})} 
-                                    />
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="font-data text-sm font-bold text-brutal-dark block mb-1">About this Event</label>
+                                        <textarea 
+                                            className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none" 
+                                            value={aboutText} 
+                                            placeholder="What will makers do in this event?"
+                                            onChange={e => setAboutText(e.target.value)} 
+                                        />
+                                    </div>
+                                    {(form.event_type === 'tech_tuesday' || (form.date && new Date(form.date) < new Date())) && (
+                                        <div>
+                                            <label className="font-data text-sm font-bold text-brutal-red block mb-1">Post-Event Recap (Visible after event)</label>
+                                            <textarea 
+                                                className="w-full bg-brutal-red/5 border-2 border-brutal-red/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none" 
+                                                value={recapText} 
+                                                placeholder="Summarize what happened, output, winners, etc."
+                                                onChange={e => setRecapText(e.target.value)} 
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -248,6 +353,13 @@ export function ManageEvents() {
                                 </Button>
                             </div>
                         </form>
+
+                        {isEditing !== 'new' && form.event_type === 'maker_meetup' && (
+                            <div className="mt-12 pt-8 border-t-4 border-brutal-dark/10">
+                                <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">Showcase Slots Management</h3>
+                                <ShowcaseSlotsAdmin eventId={isEditing as string} />
+                            </div>
+                        )}
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">

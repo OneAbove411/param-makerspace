@@ -8,7 +8,7 @@ import type {
     ChallengeStep, ChallengeMaterial, ChallengeSkill,
     ChallengeVocabulary, ChallengeLevel, UserBadge,
     Tag, EntityTag, ReactionType, TargetType, Comment,
-    AppUser, Equipment, Inventory, Role, EventType
+    AppUser, Equipment, Inventory, Role, EventType, XPEvent
 } from './database.types';
 
 // ─── Generic fetch hook ───
@@ -36,20 +36,25 @@ export function useSupabaseQuery<T>(
 
 // ─── PROJECTS ───
 
-export function useProjects(domainFilter?: string) {
+export function useProjects(domainFilter?: string, sortBy?: 'newest' | 'oldest') {
     return useSupabaseQuery<Project[]>(async () => {
         let q = supabase
             .from('project')
             .select('id, title, summary, domain, tier, status, visibility, created_at, owner_id')
             .eq('status', 'active')
-            .eq('visibility', 'public')
-            .order('created_at', { ascending: false });
+            .eq('visibility', 'public');
+            
+        if (sortBy === 'oldest') {
+            q = q.order('created_at', { ascending: true });
+        } else {
+            q = q.order('created_at', { ascending: false });
+        }
 
         if (domainFilter && domainFilter !== 'All') {
             q = q.eq('domain', domainFilter);
         }
         return q as any;
-    }, [domainFilter]);
+    }, [domainFilter, sortBy]);
 }
 
 export function useMyProjects() {
@@ -71,6 +76,8 @@ interface ProjectWithRelations extends Project {
     tags: string[];
     reactionCounts: { likes: number; upvotes: number; bookmarks: number };
     ownerName: string;
+    milestones: { id: string; title: string; description: string | null; is_complete: boolean; display_order: number }[];
+    members: { id: string; user_id: string; role: string; name: string }[];
 }
 
 export function useProject(id: string | undefined) {
@@ -86,7 +93,7 @@ export function useProject(id: string | undefined) {
         if (error || !project) return { data: null, error };
 
         // Fetch ALL related data in a single Promise.all batch
-        const [imagesRes, videosRes, tagsRes, ownerRes, filesRes, likesRes, upvotesRes, bookmarksRes] = await Promise.all([
+        const [imagesRes, videosRes, tagsRes, ownerRes, filesRes, likesRes, upvotesRes, bookmarksRes, milestonesRes, membersRes] = await Promise.all([
             supabase.from('project_image').select('id, image_url, caption, display_order').eq('project_id', id).order('display_order'),
             supabase.from('project_video').select('id, title, video_url, display_order').eq('project_id', id).order('display_order'),
             supabase.from('entity_tag').select('tag_id, tag:tag(name)').eq('target_type', 'project').eq('target_id', id),
@@ -95,6 +102,8 @@ export function useProject(id: string | undefined) {
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'like'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'upvote'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'bookmark'),
+            supabase.from('project_milestone').select('id, title, description, is_complete, display_order').eq('project_id', id).order('display_order'),
+            supabase.from('project_member').select('id, user_id, role, joined_at, app_user:app_user!user_id(name, email)').eq('project_id', id)
         ]);
 
         const enriched: ProjectWithRelations = {
@@ -109,6 +118,13 @@ export function useProject(id: string | undefined) {
                 bookmarks: bookmarksRes.count || 0,
             },
             ownerName: (ownerRes.data as any)?.name || 'Unknown',
+            milestones: (milestonesRes.data || []),
+            members: (membersRes.data || []).map((m: any) => ({
+                id: m.id,
+                user_id: m.user_id,
+                role: m.role,
+                name: m.app_user?.name || 'Unknown',
+            })),
         };
 
         return { data: enriched, error: null };
@@ -117,28 +133,34 @@ export function useProject(id: string | undefined) {
 
 // ─── CHALLENGES ───
 
-export function useChallenges(tierFilter?: string) {
+export function useChallenges(tierFilter?: string, domainFilter?: string) {
     return useSupabaseQuery<Challenge[]>(async () => {
         let q = supabase
             .from('challenge')
-            .select('id, title, tier, domain, time_estimate, cover_image_url, status, created_at')
+            .select('id, title, tier, domain, time_estimate, cover_image_url, mystery, status, created_at')
             .eq('status', 'published')
             .order('created_at', { ascending: false });
 
         if (tierFilter && tierFilter !== 'All') {
-            q = q.eq('tier', tierFilter);
+            q = q.ilike('tier', tierFilter);
+        }
+        if (domainFilter && domainFilter !== 'All') {
+            console.log('useChallenges domainFilter (hook):', domainFilter);
+            q = q.ilike('domain', domainFilter);
         }
         return q as any;
-    }, [tierFilter]);
+    }, [tierFilter, domainFilter]);
 }
 
 interface ChallengeWithRelations extends Challenge {
     steps: string[];
     materials: string[];
     skills: string[];
-    vocabulary: string[];
-    levels: string;
+    vocabulary: { term: string; definition: string | null }[];
+    levels: { level_name: string; description: string | null }[];
     tags: string[];
+    images: { image_url: string; caption: string | null; display_order: number }[];
+    videos: { title: string; video_url: string }[];
     reactionCounts: { likes: number; upvotes: number; bookmarks: number };
 }
 
@@ -154,13 +176,15 @@ export function useChallenge(id: string | undefined) {
 
         if (error || !challenge) return { data: null, error };
 
-        const [stepsRes, matsRes, skillsRes, vocabRes, levelsRes, tagsRes, likesRes, upvotesRes, bookmarksRes] = await Promise.all([
+        const [stepsRes, matsRes, skillsRes, vocabRes, levelsRes, tagsRes, imagesRes, videosRes, likesRes, upvotesRes, bookmarksRes] = await Promise.all([
             supabase.from('challenge_step').select('step_text, display_order').eq('challenge_id', id).order('display_order'),
             supabase.from('challenge_material').select('name, display_order').eq('challenge_id', id).order('display_order'),
             supabase.from('challenge_skill').select('skill_name').eq('challenge_id', id),
             supabase.from('challenge_vocabulary').select('term, definition').eq('challenge_id', id),
             supabase.from('challenge_level').select('level_name, description').eq('challenge_id', id),
             supabase.from('entity_tag').select('tag_id, tag:tag(name)').eq('target_type', 'challenge').eq('target_id', id),
+            supabase.from('challenge_image').select('image_url, caption, display_order').eq('challenge_id', id).order('display_order'),
+            supabase.from('challenge_video').select('title, video_url').eq('challenge_id', id).order('display_order'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'challenge').eq('target_id', id).eq('reaction_type', 'like'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'challenge').eq('target_id', id).eq('reaction_type', 'upvote'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'challenge').eq('target_id', id).eq('reaction_type', 'bookmark'),
@@ -171,9 +195,11 @@ export function useChallenge(id: string | undefined) {
             steps: (stepsRes.data || []).map((s: any) => s.step_text),
             materials: (matsRes.data || []).map((m: any) => m.name),
             skills: (skillsRes.data || []).map((s: any) => s.skill_name),
-            vocabulary: (vocabRes.data || []).map((v: any) => v.term),
-            levels: (levelsRes.data || []).map((l: any) => l.level_name).join(', ') || '',
+            vocabulary: (vocabRes.data || []).map((v: any) => ({ term: v.term, definition: v.definition })),
+            levels: (levelsRes.data || []).map((l: any) => ({ level_name: l.level_name, description: l.description })),
             tags: (tagsRes.data || []).map((t: any) => t.tag?.name).filter(Boolean),
+            images: (imagesRes.data || []),
+            videos: (videosRes.data || []),
             reactionCounts: {
                 likes: likesRes.count || 0,
                 upvotes: upvotesRes.count || 0,
@@ -248,8 +274,8 @@ export function useEvent(id: string | undefined) {
 
 // ─── MAKERS ───
 
-export function useMakers(tagFilter?: string) {
-    return useSupabaseQuery<(MakerProfile & { skills: string[]; tags: string[]; badgeIds: string[] })[]>(async () => {
+export function useMakers(tagFilter?: string, roleFilter?: string) {
+    return useSupabaseQuery<(MakerProfile & { skills: string[]; tags: string[]; badgeIds: string[]; userRole?: string; userRank: string; userXP: number })[]>(async () => {
         const { data: profiles, error } = await supabase
             .from('maker_profile')
             .select('id, user_id, display_name, bio, avatar_url, is_public')
@@ -262,9 +288,10 @@ export function useMakers(tagFilter?: string) {
         const profileIds = (profiles as MakerProfile[]).map(p => p.id);
         const userIds = (profiles as MakerProfile[]).map(p => p.user_id);
 
-        const [allTagsRes, allBadgesRes] = await Promise.all([
+        const [allTagsRes, allBadgesRes, userRolesRes] = await Promise.all([
             supabase.from('entity_tag').select('target_id, tag:tag(name)').eq('target_type', 'maker_profile').in('target_id', profileIds),
             supabase.from('user_badge').select('user_id, badge_id').in('user_id', userIds),
+            supabase.from('app_user').select('id, role, xp, rank').in('id', userIds),
         ]);
 
         // Group tags by profile id
@@ -282,19 +309,32 @@ export function useMakers(tagFilter?: string) {
             (badgesByUser[b.user_id] = badgesByUser[b.user_id] || []).push(b.badge_id);
         });
 
-        const enriched = (profiles as MakerProfile[]).map(p => {
+        // Map user info (role, xp, rank)
+        const userInfoMap: Record<string, any> = {};
+        (userRolesRes.data || []).forEach((u: any) => { userInfoMap[u.id] = u; });
+
+        let enriched = (profiles as MakerProfile[]).map(p => {
             const tags = tagsByProfile[p.id] || [];
             if (tagFilter && tagFilter !== 'All' && !tags.includes(tagFilter)) return null;
+            const uInfo = userInfoMap[p.user_id] || {};
             return {
                 ...p,
                 skills: tags,
                 tags,
                 badgeIds: badgesByUser[p.user_id] || [],
+                userRole: uInfo.role || 'maker',
+                userRank: uInfo.rank || 'Curious',
+                userXP: uInfo.xp || 0,
             };
-        });
+        }).filter(Boolean);
 
-        return { data: enriched.filter(Boolean) as any, error: null };
-    }, [tagFilter]);
+        // Apply role filter
+        if (roleFilter && roleFilter !== 'All') {
+            enriched = enriched.filter((p: any) => p.userRole === roleFilter.toLowerCase());
+        }
+
+        return { data: enriched as any, error: null };
+    }, [tagFilter, roleFilter]);
 }
 
 export function useMaker(id: string | undefined) {
@@ -303,21 +343,33 @@ export function useMaker(id: string | undefined) {
         tags: string[];
         badges: Badge[];
         projects: Project[];
-        appUser: { name: string; email: string } | null;
+        appUser: { name: string; email: string; role: string; xp: number; rank: string; rank_override: boolean } | null;
+        domainLevels: { domain: string; tier: string }[];
+        eventsAttended: { id: string; title: string; event_type: string; date: string }[];
+        mentoredProjects: { id: string; title: string; domain: string | null }[];
+        // New social fields (nullable — columns may not exist yet)
+        x_url?: string | null;
+        bluesky_url?: string | null;
+        discord_username?: string | null;
+        mentor_domains?: string | null;
+        approval_domains?: string | null;
+        show_email?: boolean;
     }) | null>(async () => {
         if (!id) return { data: null, error: null };
+
+        const profileSelect = 'id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at, x_url, bluesky_url, discord_username, mentor_domains, approval_domains, show_email';
 
         // id could be maker_profile.id or user_id — try both
         let { data: profile, error } = await supabase
             .from('maker_profile')
-            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at')
+            .select(profileSelect)
             .eq('id', id)
             .single();
 
         if (!profile) {
             const res = await supabase
                 .from('maker_profile')
-                .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at')
+                .select(profileSelect)
                 .eq('user_id', id)
                 .single();
             profile = res.data;
@@ -325,14 +377,31 @@ export function useMaker(id: string | undefined) {
         }
 
         if (error || !profile) return { data: null, error };
-        const p = profile as MakerProfile;
+        const p = profile as any;
 
-        const [tagsRes, badgesRes, projectsRes, appUserRes] = await Promise.all([
+        const [tagsRes, badgesRes, projectsRes, appUserRes, completionsRes, eventsRes, mentoredRes] = await Promise.all([
             supabase.from('entity_tag').select('tag:tag(name)').eq('target_type', 'maker_profile').eq('target_id', p.id),
             supabase.from('user_badge').select('badge:badge(id, name, description, tier, domain, badge_type, image_url)').eq('user_id', p.user_id),
             supabase.from('project').select('id, title, summary, domain, tier, status, created_at').eq('owner_id', p.user_id).eq('status', 'active').eq('visibility', 'public'),
-            supabase.from('app_user').select('name, email').eq('id', p.user_id).single(),
+            supabase.from('app_user').select('name, email, role, xp, rank, rank_override').eq('id', p.user_id).single(),
+            supabase.from('challenge_completion').select('challenge:challenge!challenge_id(domain, tier)').eq('user_id', p.user_id).eq('status', 'verified'),
+            supabase.from('event_registration').select('event:event!event_id(id, title, event_type, date)').eq('user_id', p.user_id).order('registered_at', { ascending: false }).limit(10),
+            supabase.from('project_member').select('project:project!project_id(id, title, domain, status)').eq('user_id', p.user_id).eq('role', 'mentor'),
         ]);
+
+        // Derive domain levels from verified challenge completions
+        const tierOrder: Record<string, number> = { 'Tier 1': 1, 'Tier 2': 2, 'Tier 3': 3 };
+        const domainMap: Record<string, string> = {};
+        (completionsRes.data || []).forEach((c: any) => {
+            const domain = c.challenge?.domain;
+            const tier = c.challenge?.tier;
+            if (!domain || !tier) return;
+            const current = domainMap[domain];
+            if (!current || (tierOrder[tier] || 0) > (tierOrder[current] || 0)) {
+                domainMap[domain] = tier;
+            }
+        });
+        const domainLevels = Object.entries(domainMap).map(([domain, tier]) => ({ domain, tier }));
 
         return {
             data: {
@@ -342,6 +411,9 @@ export function useMaker(id: string | undefined) {
                 badges: (badgesRes.data || []).map((b: any) => b.badge).filter(Boolean) as Badge[],
                 projects: (projectsRes.data || []) as Project[],
                 appUser: appUserRes.data as any,
+                domainLevels,
+                eventsAttended: (eventsRes.data || []).map((e: any) => e.event).filter(Boolean),
+                mentoredProjects: (mentoredRes.data || []).map((m: any) => m.project).filter(Boolean),
             },
             error: null,
         };
@@ -401,7 +473,7 @@ export function useMyProfile() {
         if (!user) return { data: null, error: null };
         return supabase
             .from('maker_profile')
-            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at')
+            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, x_url, bluesky_url, discord_username, mentor_domains, approval_domains, show_email, is_public, created_at, updated_at')
             .eq('user_id', user.id)
             .single() as any;
     }, [user?.id]);
@@ -620,13 +692,14 @@ export function useChallengeCompletion(challengeId: string | undefined) {
 
     useEffect(() => { check(); }, [check]);
 
-    const markComplete = async (notes?: string) => {
+    const markComplete = async (notes?: string, evidenceUrl?: string) => {
         if (!user || !challengeId) return;
         const { data } = await supabase.from('challenge_completion').insert({
             challenge_id: challengeId,
             user_id: user.id,
             status: 'pending',
             notes: notes || null,
+            evidence_url: evidenceUrl || null,
         }).select().single();
         setCompletion(data as ChallengeCompletion | null);
     };
@@ -725,6 +798,13 @@ export function useProfileMutation() {
         github_url?: string;
         linkedin_url?: string;
         website_url?: string;
+        avatar_url?: string;
+        x_url?: string;
+        bluesky_url?: string;
+        discord_username?: string;
+        mentor_domains?: string;
+        approval_domains?: string;
+        show_email?: boolean;
         skills?: string[];
     }) => {
         if (!user) return { error: 'Not authenticated' };
@@ -790,7 +870,7 @@ export function useAllUsers() {
         // Single query with FK join — no separate profile fetch needed
         const { data, error } = await supabase
             .from('app_user')
-            .select('id, auth_id, email, name, role, is_active, created_at, updated_at, profile:maker_profile(id, user_id, display_name, avatar_url, is_public)')
+            .select('id, auth_id, email, name, role, xp, rank, rank_override, is_active, created_at, updated_at, profile:maker_profile(id, user_id, display_name, avatar_url, is_public)')
             .order('created_at', { ascending: false });
 
         if (error || !data) return { data: [], error };
@@ -815,7 +895,12 @@ export function useUserMutations() {
         return { error: error?.message || null };
     };
 
-    return { updateRole, toggleActive };
+    const updateXPAndRank = async (userId: string, xp: number, rank: string, rankOverride: boolean) => {
+        const { error } = await supabase.from('app_user').update({ xp, rank, rank_override: rankOverride }).eq('id', userId);
+        return { error: error?.message || null };
+    };
+
+    return { updateRole, toggleActive, updateXPAndRank };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1265,4 +1350,32 @@ export function useProjectFileMutations() {
     };
 
     return { addFile, removeFile };
+}
+
+// ─── RANK & XP ───
+
+export function useRankAccess() {
+    const { user } = useAuth();
+    return useSupabaseQuery<{ xp: number; rank: string; role: Role } | null>(async () => {
+        if (!user) return { data: null, error: null };
+        const { data, error } = await supabase
+            .from('app_user')
+            .select('xp, rank, role')
+            .eq('id', user.id)
+            .single();
+        return { data: data as any, error };
+    }, [user?.id]);
+}
+
+export function useMyXPHistory() {
+    const { user } = useAuth();
+    return useSupabaseQuery<XPEvent[]>(async () => {
+        if (!user) return { data: [], error: null };
+        const { data, error } = await supabase
+            .from('xp_event')
+            .select('id, amount, reason, created_at, reference_id, reference_type')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+        return { data: data as any, error };
+    }, [user?.id]);
 }

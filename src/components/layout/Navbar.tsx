@@ -5,6 +5,8 @@ import { Button } from '../ui/Button';
 import { useAuth } from '../../lib/auth';
 import { LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
 import { ParamLogo } from '../ui/ParamLogo';
+import { useRankAccess } from '../../lib/hooks';
+import { RankBadge } from '../ui/RankBadge';
 
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -13,6 +15,7 @@ export function Navbar() {
     const navigate = useNavigate();
     const isHome = location.pathname === '/';
     const { user, signOut, isLoading } = useAuth();
+    const { data: rankAccess } = useRankAccess();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -35,7 +38,7 @@ export function Navbar() {
 
     const navLinks = [
         { to: '/projects', label: 'Projects' },
-        { to: '/challenges', label: 'Challenges' },
+        { to: '/challenges', label: 'Explorer Hub' },
         { to: '/events', label: 'Events' },
         { to: '/makers', label: 'Makers' },
         { to: '/badges', label: 'Badges' },
@@ -75,12 +78,23 @@ export function Navbar() {
                 <div className="flex items-center gap-3">
                     {!isLoading && user ? (
                         <>
+                            {rankAccess?.rank && (
+                                <RankBadge rank={rankAccess.rank} xp={rankAccess.xp} variant="pill" className="hidden md:inline-flex" />
+                            )}
                             <Link
                                 to="/dashboard"
                                 className="hidden sm:flex items-center gap-2 font-data text-sm font-bold hover:text-brutal-red interactive-lift"
                             >
-                                <LayoutDashboard className="w-4 h-4" />
-                                Dashboard
+                                <div className="w-7 h-7 rounded-full overflow-hidden bg-brutal-dark border-2 border-brutal-dark/20 flex items-center justify-center flex-shrink-0">
+                                    {user.avatar ? (
+                                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="font-data text-[10px] font-bold text-brutal-bg">
+                                            {user.name?.[0]?.toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                                {user.name?.split(' ')[0]}
                             </Link>
                             <button
                                 onClick={handleSignOut}

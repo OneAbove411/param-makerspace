@@ -5,20 +5,7 @@ import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/Button';
 import { Heart, ArrowUpCircle, Bookmark, Github, ArrowLeft, Send } from 'lucide-react';
 
-// Utility to convert YouTube/Vimeo links to embeds
-const getEmbedUrl = (url: string) => {
-    if (url.includes('youtube.com/watch?v=')) {
-        return url.replace('watch?v=', 'embed/');
-    }
-    if (url.includes('youtu.be/')) {
-        const id = url.split('youtu.be/')[1]?.split('?')[0];
-        return `https://www.youtube.com/embed/${id}`;
-    }
-    if (url.includes('vimeo.com/')) {
-        return url.replace('vimeo.com/', 'player.vimeo.com/video/');
-    }
-    return url;
-};
+import { getEmbedUrl } from '../lib/videoUtils';
 
 export function ProjectDetails() {
     const { id } = useParams();
@@ -61,6 +48,16 @@ export function ProjectDetails() {
 
                     <div className="max-w-5xl mx-auto bg-brutal-bg border-2 border-brutal-dark/10 rounded-[2rem] p-8 md:p-12 shadow-2xl">
                         <div className="flex flex-wrap gap-2 items-center mb-6">
+                            {/* TODO: replace project.tier with project.category once DB column is added */}
+                            {project.tier === 'Tier 3' ? (
+                                <span className="bg-brutal-red text-brutal-bg px-3 py-1 font-data text-xs font-bold rounded-full uppercase">
+                                    T3 Architect
+                                </span>
+                            ) : (
+                                <span className="bg-brutal-dark/10 text-brutal-dark/60 border border-brutal-dark/10 px-3 py-1 font-data text-xs font-bold rounded-full uppercase">
+                                    Independent
+                                </span>
+                            )}
                             {project.tier && <span className="bg-brutal-dark text-brutal-bg px-3 py-1 font-data text-xs font-bold rounded-full">{project.tier}</span>}
                             {project.domain && <span className="border border-brutal-dark/20 text-brutal-dark px-3 py-1 font-data text-xs font-bold rounded-full">{project.domain}</span>}
                             <div className="h-4 w-[1px] bg-brutal-dark/20 mx-2" />
@@ -113,6 +110,45 @@ export function ProjectDetails() {
                             {project.description}
                         </p>
                     </section>
+
+                    {project.milestones && project.milestones.length > 0 && (
+                        <section>
+                            <div className="flex items-center justify-between border-b-2 border-brutal-dark/10 pb-4 mb-6">
+                                <h3 className="font-heading font-bold text-2xl uppercase">Build Milestones</h3>
+                                <span className="font-data text-xs text-brutal-dark/50 font-bold uppercase">
+                                    {project.milestones.filter((m: any) => m.is_complete).length} of {project.milestones.length} Complete
+                                </span>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="w-full h-1 bg-brutal-dark/10 rounded-full mb-8 overflow-hidden relative">
+                                <div 
+                                    className="absolute top-0 left-0 h-full bg-brutal-red rounded-full transition-all duration-1000 ease-out"
+                                    style={{ width: `${(project.milestones.filter((m: any) => m.is_complete).length / project.milestones.length) * 100}%` }}
+                                />
+                            </div>
+
+                            <div className="space-y-4">
+                                {project.milestones.map((milestone: any) => (
+                                    <div key={milestone.id} className={`flex gap-4 ${milestone.is_complete ? 'opacity-50' : ''}`}>
+                                        <div className="mt-1 flex-shrink-0 text-brutal-dark">
+                                            {milestone.is_complete ? '●' : '○'}
+                                        </div>
+                                        <div>
+                                            <h4 className={`font-heading font-bold text-lg ${milestone.is_complete ? 'line-through' : ''}`}>
+                                                {milestone.title}
+                                            </h4>
+                                            {milestone.description && (
+                                                <p className="font-data text-sm text-brutal-dark/60 mt-1">
+                                                    {milestone.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
 
                     {project.images && project.images.length > 0 && (
                         <section>
@@ -204,6 +240,108 @@ export function ProjectDetails() {
                         </ul>
                     </section>
 
+                    {user?.id === project.owner_id && (
+                        <section className="bg-brutal-dark/5 rounded-[2rem] p-8 border border-brutal-dark/10">
+                            <h3 className="font-heading font-bold text-xl mb-6 uppercase text-brutal-dark">Approval Status</h3>
+                            <div className="relative pl-6 space-y-6">
+                                {/* Connecting timeline line */}
+                                <div className="absolute left-[11px] top-2 bottom-4 w-px bg-brutal-dark/20 z-0" />
+                                
+                                <div className="relative z-10 flex items-center gap-3">
+                                    <div className={`w-3 h-3 rounded-full ${project.status === 'draft' ? 'bg-brutal-red ring-4 ring-brutal-red/20' : 'bg-brutal-dark'} -ml-[18px]`} />
+                                    <span className={`font-data text-sm font-bold uppercase ${project.status === 'draft' ? 'text-brutal-red' : 'text-brutal-dark/50'}`}>Drafting</span>
+                                </div>
+                                
+                                <div className="relative z-10 flex items-center gap-3">
+                                    <div className={`w-3 h-3 rounded-full ${project.status === 'pending_review' ? 'bg-brutal-red ring-4 ring-brutal-red/20' : (['active', 'rejected'].includes(project.status) ? 'bg-brutal-dark' : 'bg-brutal-dark/20')} -ml-[18px]`} />
+                                    <span className={`font-data text-sm font-bold uppercase ${project.status === 'pending_review' ? 'text-brutal-red' : 'text-brutal-dark/50'}`}>Under Review</span>
+                                </div>
+
+                                {project.status === 'rejected' ? (
+                                    <div className="relative z-10 flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full bg-brutal-red ring-4 ring-brutal-red/20 -ml-[18px]" />
+                                        <span className="font-data text-sm font-bold uppercase text-brutal-red">Rejected — Needs Revision</span>
+                                    </div>
+                                ) : (
+                                    <div className="relative z-10 flex items-center gap-3">
+                                        <div className={`w-3 h-3 rounded-full ${project.status === 'active' ? 'bg-brutal-red ring-4 ring-brutal-red/20' : 'bg-brutal-dark/20'} -ml-[18px]`} />
+                                        <span className={`font-data text-sm font-bold uppercase ${project.status === 'active' ? 'text-brutal-red' : 'text-brutal-dark/50'}`}>Active / Approved</span>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    )}
+
+                    {(project.members && project.members.length > 0) ? (
+                        <section className="bg-brutal-dark/5 rounded-[2rem] p-8 border border-brutal-dark/10">
+                            <h3 className="font-heading font-bold text-xl mb-6 uppercase text-brutal-dark">Team</h3>
+                            
+                            {/* Mentors go first */}
+                            {project.members.filter((m: any) => m.role === 'mentor').length > 0 && (
+                                <div className="mb-6">
+                                    <h4 className="font-data font-bold text-[10px] text-brutal-dark/50 uppercase tracking-widest mb-3 border-b border-brutal-dark/10 pb-1">Mentors</h4>
+                                    <div className="space-y-3">
+                                        {project.members.filter((m: any) => m.role === 'mentor').map((m: any) => (
+                                            <div key={m.id} className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading flex items-center justify-center text-sm">
+                                                    {m.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-data text-sm font-bold flex items-center gap-2">
+                                                        {m.name}
+                                                        <span className="bg-brutal-dark text-brutal-bg text-[8px] px-1.5 py-0.5 rounded font-bold">MENTOR</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <h4 className="font-data font-bold text-[10px] text-brutal-dark/50 uppercase tracking-widest mb-3 border-b border-brutal-dark/10 pb-1">Contributors</h4>
+                                <div className="space-y-3">
+                                    {/* Owner block */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading flex items-center justify-center text-sm">
+                                            {project.ownerName.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <div className="font-data text-sm font-bold">{project.ownerName}</div>
+                                            <div className="font-data text-xs font-bold text-brutal-red uppercase">Owner</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Other contributors */}
+                                    {project.members.filter((m: any) => m.role !== 'mentor' && m.user_id !== project.owner_id).map((m: any) => (
+                                        <div key={m.id} className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading flex items-center justify-center text-sm">
+                                                {m.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div className="font-data text-sm font-bold">{m.name}</div>
+                                                <div className="font-data text-xs text-brutal-dark/50 uppercase">{m.role}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </section>
+                    ) : (
+                        <section className="bg-brutal-dark/5 rounded-[2rem] p-8 border border-brutal-dark/10">
+                            <h3 className="font-heading font-bold text-xl mb-6 uppercase text-brutal-dark">Team</h3>
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading flex items-center justify-center text-sm">
+                                    {project.ownerName.charAt(0)}
+                                </div>
+                                <div>
+                                    <div className="font-data text-sm font-bold">{project.ownerName}</div>
+                                    <div className="font-data text-xs font-bold text-brutal-red uppercase">Owner</div>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
                     {project.tags && project.tags.length > 0 && (
                         <section>
                             <h3 className="font-heading font-bold text-xl mb-4 uppercase">Tags</h3>
@@ -215,6 +353,26 @@ export function ProjectDetails() {
                                 ))}
                             </div>
                         </section>
+                    )}
+
+                    {project.github_url && (
+                        <div className="mt-8 p-6 bg-brutal-dark/5 rounded-[2rem] border border-brutal-dark/10">
+                            <div className="flex items-center justify-between mb-3 border-b border-brutal-dark/10 pb-2">
+                                <span className="font-data text-xs font-bold uppercase text-brutal-dark">README</span>
+                                <span className="font-data text-[10px] text-brutal-dark/40 font-bold tracking-wider">GitHub Sync Coming Soon</span>
+                            </div>
+                            <p className="font-data text-xs text-brutal-dark/50 italic mb-4">
+                                README preview will display here once the GitHub API integration is enabled natively in Phase 2.
+                            </p>
+                            <a 
+                                href={`${project.github_url}/blob/main/README.md`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 font-data text-xs font-bold text-brutal-dark hover:text-brutal-red transition-colors"
+                            >
+                                <Github className="w-3 h-3" /> View README.md on GitHub directly →
+                            </a>
+                        </div>
                     )}
                 </div>
             </div>

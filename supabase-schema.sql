@@ -12,6 +12,26 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 1. CORE TABLES
 -- ─────────────────────────────────────────────────────────────
 
+-- [MIGRATION NOTE: For existing databases, run the following to add the Rank & XP System]
+/*
+ALTER TABLE app_user ADD COLUMN xp INT NOT NULL DEFAULT 0;
+ALTER TABLE app_user ADD COLUMN rank TEXT NOT NULL DEFAULT 'Curious';
+ALTER TABLE app_user ADD COLUMN rank_override BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE xp_event (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    amount INT NOT NULL,
+    reason TEXT NOT NULL,
+    reference_id UUID,
+    reference_type TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE xp_event ENABLE ROW LEVEL SECURITY;
+CREATE POLICY xp_event_admin_all ON xp_event FOR ALL USING (get_my_role() = 'admin');
+CREATE POLICY xp_event_read_own ON xp_event FOR SELECT USING (user_id = auth.uid());
+*/
+
 CREATE TABLE app_user (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     auth_id     UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

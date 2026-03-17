@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMyProjects, useMyStats, useProjectMutations } from '../lib/hooks';
+import { useMyProjects, useMyStats, useProjectMutations, useMyProfile, useUserBadges, useRankAccess, useMyXPHistory } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
+import { RankBadge } from '../components/ui/RankBadge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award } from 'lucide-react';
+import { BadgeIcon } from '../components/ui/BadgeIcon';
 
 export function Dashboard() {
     const { user, role } = useAuth();
@@ -18,6 +20,19 @@ export function Dashboard() {
     const [showNewProject, setShowNewProject] = useState(false);
     const [newProjectForm, setNewProjectForm] = useState({ title: '', summary: '', description: '', domain: '', tier: '' });
     const [creating, setCreating] = useState(false);
+    const [bannerDismissed, setBannerDismissed] = useState(false);
+    const { data: myProfile } = useMyProfile();
+    const { data: myBadges } = useUserBadges(user?.id);
+    const { data: rankAccess } = useRankAccess();
+    const { data: xpHistory } = useMyXPHistory();
+
+
+    const profileComplete = !!(
+        myProfile?.bio &&
+        (myProfile as any)?.avatar_url &&
+        myProfile?.display_name &&
+        ((myProfile as any)?.github_url || (myProfile as any)?.linkedin_url)
+    );
 
     const activeProjects = stats?.activeProjects || 0;
     const upcomingEvents = stats?.upcomingEvents || 0;
@@ -57,36 +72,85 @@ export function Dashboard() {
                 </div>
 
                 {/* Telemetry/Stats row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 border-b-2 border-brutal-dark/10 pb-8 mb-8">
                     <Card className="p-6 bg-brutal-dark text-brutal-bg border-none shadow-xl">
                         <div className="flex items-center gap-2 text-brutal-bg/60 font-data text-xs uppercase font-bold tracking-widest mb-4">
                             <Zap className="w-4 h-4" /> Active Projects
                         </div>
-                        <div className="text-5xl font-heading font-bold">{activeProjects}</div>
+                        <div className="text-4xl md:text-5xl font-heading font-bold">{activeProjects}</div>
                     </Card>
 
                     <Card className="p-6 border-2 border-brutal-dark/10">
                         <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4">
                             <Calendar className="w-4 h-4" /> Upcoming Events
                         </div>
-                        <div className="text-5xl font-heading font-bold">{upcomingEvents}</div>
+                        <div className="text-4xl md:text-5xl font-heading font-bold">{upcomingEvents}</div>
                     </Card>
 
                     <Card className="p-6 border-2 border-brutal-dark/10">
                         <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4">
-                            <Trophy className="w-4 h-4" /> Completed Challenges
+                            <Trophy className="w-4 h-4" /> Challenges
                         </div>
-                        <div className="text-5xl font-heading font-bold">{completedChallenges}</div>
+                        <div className="text-4xl md:text-5xl font-heading font-bold">{completedChallenges}</div>
                     </Card>
-
+                    
                     <Card
-                        className="p-6 bg-brutal-red/10 border-2 border-brutal-red/20 text-brutal-red content-center flex flex-col justify-center items-center text-center cursor-pointer hover:bg-brutal-red hover:text-brutal-bg transition-colors interactive-lift"
-                        onClick={() => setShowNewProject(true)}
+                        className={`p-6 bg-brutal-red/10 border-2 border-brutal-red/20 text-brutal-red content-center flex flex-col justify-center items-center text-center transition-colors ${role === 'viewer' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-brutal-red hover:text-brutal-bg interactive-lift'}`}
+                        onClick={() => { if (role !== 'viewer') setShowNewProject(true); }}
                     >
-                        <Plus className="w-8 h-8 mb-2" />
-                        <span className="font-data text-sm font-bold uppercase tracking-wider">Propose New Project</span>
+                        <Plus className="w-6 h-6 md:w-8 md:h-8 mb-2" />
+                        <span className="font-data text-xs md:text-sm font-bold uppercase tracking-wider">Propose Project</span>
                     </Card>
                 </div>
+
+                {role === 'viewer' && (
+                    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r mb-8 font-data">
+                        <p className="font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> View-Only Access</p>
+                        <p className="text-sm mt-1">Your account is currently pending maker induction. You can set up your profile, but cannot join projects or challenges yet. Speak to a mentor to get inducted!</p>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div>
+                        <RankBadge rank={rankAccess?.rank || 'Curious'} xp={rankAccess?.xp || 0} variant="full" />
+                    </div>
+                    <Card className="p-6 border-2 border-brutal-dark/10 flex flex-col max-h-[250px]">
+                        <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4 flex-shrink-0">
+                            <Zap className="w-4 h-4" /> Recent Experience
+                        </div>
+                        <div className="overflow-y-auto pr-2 space-y-3 flex-1 font-data text-sm">
+                            {(xpHistory || []).slice(0, 5).map(event => (
+                                <div key={event.id} className="flex justify-between items-center border-b border-brutal-dark/5 pb-2 last:border-0 last:pb-0">
+                                    <div className="font-medium text-brutal-dark">{event.reason}</div>
+                                    <div className="font-bold text-green-600">+{event.amount} XP</div>
+                                </div>
+                            ))}
+                            {(!xpHistory || xpHistory.length === 0) && (
+                                <div className="text-brutal-dark/40 italic">Complete challenges or projects to earn XP!</div>
+                            )}
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Profile Completion Banner */}
+                {!profileComplete && !bannerDismissed && (
+                    <div className="flex items-center justify-between p-4 bg-brutal-dark text-brutal-bg rounded-2xl border border-brutal-dark/20">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 rounded-full bg-brutal-red animate-pulse" />
+                            <span className="font-data text-sm font-bold">Your profile is incomplete — add a bio, avatar, and social links to appear in the Makers Directory.</span>
+                        </div>
+                        <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                            <Link to="/profile-setup">
+                                <Button size="sm" variant="secondary" className="bg-brutal-bg text-brutal-dark hover:bg-brutal-red hover:text-brutal-bg">
+                                    Complete Profile
+                                </Button>
+                            </Link>
+                            <button onClick={() => setBannerDismissed(true)} className="text-brutal-bg/50 hover:text-brutal-bg">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* New Project Modal */}
                 {showNewProject && (
@@ -96,6 +160,33 @@ export function Dashboard() {
                         </button>
                         <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">New Project Proposal</h3>
                         <form onSubmit={handleCreateProject} className="space-y-4">
+                            <div className="flex gap-3 mb-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setNewProjectForm(prev => ({ ...prev, tier: 'Tier 3' }))}
+                                    className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
+                                        newProjectForm.tier === 'Tier 3'
+                                            ? 'border-brutal-red bg-brutal-red/5'
+                                            : 'border-brutal-dark/20 hover:border-brutal-dark/40'
+                                    }`}
+                                >
+                                    <span className="font-heading font-bold text-sm uppercase block">T3 Architect Project</span>
+                                    <span className="font-data text-xs text-brutal-dark/60">Part of Explorer Hub — originates from a Tier 3 challenge</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setNewProjectForm(prev => ({ ...prev, tier: '' }))}
+                                    className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
+                                        newProjectForm.tier !== 'Tier 3'
+                                            ? 'border-brutal-red bg-brutal-red/5'
+                                            : 'border-brutal-dark/20 hover:border-brutal-dark/40'
+                                    }`}
+                                >
+                                    <span className="font-heading font-bold text-sm uppercase block">Independent Project</span>
+                                    <span className="font-data text-xs text-brutal-dark/60">Open-ended — self-initiated or community-driven</span>
+                                </button>
+                            </div>
+
                             <Input
                                 label="Project Title"
                                 value={newProjectForm.title}
@@ -128,7 +219,7 @@ export function Dashboard() {
                                     placeholder="e.g. Software & Robotics"
                                 />
                                 <Input
-                                    label="Tier"
+                                    label="Tier (Optional override)"
                                     value={newProjectForm.tier}
                                     onChange={(e) => setNewProjectForm(prev => ({ ...prev, tier: e.target.value }))}
                                     placeholder="e.g. Tier 2"
@@ -252,6 +343,19 @@ export function Dashboard() {
                         </p>
                         <Link to="/admin/review-challenges">
                             <Button variant="outline" size="sm" className="w-full">View Submissions</Button>
+                        </Link>
+                    </Card>
+
+                    <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Trophy className="w-5 h-5 text-yellow-600" />
+                            <h3 className="font-heading font-bold text-xl uppercase">Event Submissions</h3>
+                        </div>
+                        <p className="font-data text-sm text-brutal-dark/60 mb-4">
+                            Review and shortlist Build Challenge submissions.
+                        </p>
+                        <Link to="/admin/review-submissions">
+                            <Button variant="outline" size="sm" className="w-full">Review Submissions</Button>
                         </Link>
                     </Card>
 

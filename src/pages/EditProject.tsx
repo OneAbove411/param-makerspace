@@ -7,7 +7,7 @@ import { uploadFile, deleteFile } from '../lib/storage';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Settings, Save, ArrowLeft, Image as ImageIcon, FileText, Trash2, Send } from 'lucide-react';
+import { Settings, Save, ArrowLeft, Image as ImageIcon, FileText, Trash2, Send, Plus, Users, Search, CheckCircle2, Circle, X } from 'lucide-react';
 import type { Project } from '../lib/database.types';
 
 export function EditProject() {
@@ -26,6 +26,18 @@ export function EditProject() {
     const [uploadingImage, setUploadingImage] = useState(false);
     const [uploadingFile, setUploadingFile] = useState(false);
 
+    // Milestones state
+    const [milestones, setMilestones] = useState<any[]>([]);
+    const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+    const [newMilestoneDesc, setNewMilestoneDesc] = useState('');
+    
+    // Contributors state
+    const [members, setMembers] = useState<any[]>([]);
+    const [addingRole, setAddingRole] = useState<'collaborator' | 'mentor'>('collaborator');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     useEffect(() => {
         if (project) {
             setForm({
@@ -37,8 +49,23 @@ export function EditProject() {
                 github_url: project.github_url,
                 duration: project.duration,
             });
+            fetchMilestones();
+            fetchMembers();
         }
     }, [project]);
+
+    // Data fetchers that don't depend on the hook
+    const fetchMilestones = async () => {
+        if (!id) return;
+        const { data } = await supabase.from('project_milestone').select('id, title, description, is_complete, display_order').eq('project_id', id).order('display_order');
+        setMilestones(data || []);
+    };
+
+    const fetchMembers = async () => {
+        if (!id) return;
+        const { data } = await supabase.from('project_member').select('id, user_id, role, joined_at, app_user:app_user!user_id(name, email)').eq('project_id', id);
+        setMembers(data || []);
+    };
 
     if (loading) return <div className="p-24 flex justify-center font-data">Loading project...</div>;
     
@@ -159,6 +186,83 @@ export function EditProject() {
         setActionLoading(false);
     };
 
+    // --- Milestones Handlers ---
+    const handleAddMilestone = async () => {
+        if (!id || !newMilestoneTitle.trim()) return;
+        setActionLoading(true);
+        const order = milestones.length > 0 ? Math.max(...milestones.map(m => m.display_order)) + 1 : 1;
+        await supabase.from('project_milestone').insert({
+            project_id: id,
+            title: newMilestoneTitle.trim(),
+            description: newMilestoneDesc.trim() || null,
+            display_order: order
+        });
+        setNewMilestoneTitle('');
+        setNewMilestoneDesc('');
+        await fetchMilestones();
+        setActionLoading(false);
+    };
+
+    const handleToggleMilestone = async (milestoneId: string, currentVal: boolean) => {
+        await supabase.from('project_milestone').update({ is_complete: !currentVal }).eq('id', milestoneId);
+        await fetchMilestones();
+    };
+
+    const handleDeleteMilestone = async (milestoneId: string) => {
+        await supabase.from('project_milestone').delete().eq('id', milestoneId);
+        await fetchMilestones();
+    };
+
+    // --- Contributors Handlers ---
+    useEffect(() => {
+        const bounce = setTimeout(async () => {
+            if (searchQuery.length < 2) {
+                setSearchResults([]);
+                return;
+            }
+            setIsSearching(true);
+            const { data } = await supabase
+                .from('app_user')
+                .select('id, name, email')
+                .or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+                .limit(5);
+            setSearchResults(data || []);
+            setIsSearching(false);
+        }, 300);
+        return () => clearTimeout(bounce);
+    }, [searchQuery]);
+
+    const handleAddMember = async (selectedUser: any) => {
+        if (!id) return;
+        // Check if already member
+        if (members.some(m => m.user_id === selectedUser.id)) {
+            alert('Already a contributor');
+            setSearchQuery('');
+            return;
+        }
+        setActionLoading(true);
+        await supabase.from('project_member').insert({
+            project_id: id,
+            user_id: selectedUser.id,
+            role: addingRole
+        });
+        setSearchQuery('');
+        setSearchResults([]);
+        await fetchMembers();
+        setActionLoading(false);
+    };
+
+    const handleRemoveMember = async (memberId: string) => {
+        if (!window.confirm("Remove this member?")) return;
+        await supabase.from('project_member').delete().eq('id', memberId);
+        await fetchMembers();
+    };
+
+    const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
+        await supabase.from('project_member').update({ role: newRole }).eq('id', memberId);
+        await fetchMembers();
+    };
+
     return (
         <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
             <div className="max-w-4xl mx-auto space-y-8">
@@ -190,17 +294,27 @@ export function EditProject() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
                     {/* Main Form */}
-                    <Card className="md:col-span-2 p-8 border-2 border-brutal-dark/20 relative">
-                        {project.status === 'pending_review' && (
-                            <div className="absolute inset-0 bg-brutal-bg/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-2xl">
-                                <div className="bg-white p-6 border-2 border-yellow-500 text-center max-w-sm rounded-xl shadow-xl">
-                                    <h3 className="font-heading font-bold text-xl text-yellow-600 uppercase mb-2">Under Review</h3>
-                                    <p className="font-data text-sm text-brutal-dark/80">
-                                        Your project is currently locked for mentor review. You can't edit core details right now.
-                                    </p>
-                                </div>
+                    <Card className="md:col-span-2 border-none bg-transparent shadow-none relative">
+                        {project.status === 'rejected' && (
+                            <div className="p-4 bg-brutal-red/10 border-2 border-brutal-red/30 rounded-xl mb-6">
+                                <strong className="font-data text-sm uppercase text-brutal-red block mb-1">Project Rejected</strong>
+                                <p className="font-data text-sm text-brutal-dark/70">
+                                    Your project was not approved in its current form. Review your description and documentation, then resubmit.
+                                </p>
                             </div>
                         )}
+                        <Card className="p-8 border-2 border-brutal-dark/20 relative">
+                            {project.status === 'pending_review' && (
+                                <div className="absolute inset-0 bg-brutal-bg/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-2xl">
+                                    <div className="bg-white p-6 border-2 border-yellow-500 text-center max-w-sm rounded-xl shadow-xl">
+                                        <h3 className="font-heading font-bold text-xl text-yellow-600 uppercase mb-2">Under Review</h3>
+                                        <p className="font-data text-sm text-brutal-dark/80">
+                                            Your project is currently locked for mentor review. You can't edit core details right now.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </Card>
                         
                         <h2 className="font-heading font-bold text-2xl uppercase border-b-2 border-brutal-dark/10 pb-4 mb-6">Core Details</h2>
                         <form onSubmit={handleSave} className="space-y-6">
@@ -360,6 +474,158 @@ export function EditProject() {
                                 </span>
                                 <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploadingFile} />
                             </label>
+                        </section>
+
+                        {/* Contributors Management */}
+                        <section className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10">
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
+                                <Users className="w-5 h-5" /> Contributors
+                            </h3>
+
+                            <div className="mb-6 relative">
+                                <div className="flex gap-2 mb-3 bg-white p-1 rounded-lg border border-brutal-dark/10">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setAddingRole('collaborator')}
+                                        className={`flex-1 py-1 px-2 rounded font-data text-xs font-bold uppercase transition-colors ${addingRole === 'collaborator' ? 'bg-brutal-dark text-brutal-bg' : 'text-brutal-dark/50 hover:bg-brutal-dark/5'}`}
+                                    >
+                                        Contributor
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setAddingRole('mentor')}
+                                        className={`flex-1 py-1 px-2 rounded font-data text-xs font-bold uppercase transition-colors ${addingRole === 'mentor' ? 'bg-brutal-dark text-brutal-bg' : 'text-brutal-dark/50 hover:bg-brutal-dark/5'}`}
+                                    >
+                                        Mentor
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                        <Search className="w-4 h-4 text-brutal-dark/40" />
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder={`Search name or email...`}
+                                        className="w-full bg-white border border-brutal-dark/20 pl-9 pr-4 py-2 rounded-xl font-data text-sm focus:outline-none focus:border-brutal-dark"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                    {isSearching && <div className="absolute right-3 top-3 w-3 h-3 border-2 border-brutal-dark border-t-transparent rounded-full animate-spin" />}
+                                </div>
+                                
+                                {searchResults.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-brutal-dark/10 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto">
+                                        {searchResults.map(res => (
+                                            <div key={res.id} className="flex items-center justify-between p-3 hover:bg-brutal-dark/5 border-b border-brutal-dark/5 last:border-0">
+                                                <div className="overflow-hidden">
+                                                    <div className="font-data text-sm font-bold truncate">{res.name}</div>
+                                                    <div className="font-data text-xs text-brutal-dark/50 truncate">{res.email}</div>
+                                                </div>
+                                                <Button size="sm" variant="ghost" className="text-brutal-red" onClick={() => handleAddMember(res)}>Add</Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                {/* Owner showing */}
+                                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-brutal-dark/10">
+                                    <div>
+                                        <div className="font-data text-sm font-bold truncate">{(project as any).ownerName || 'You (Owner)'}</div>
+                                        <div className="font-data text-[10px] font-bold text-brutal-red uppercase">Owner</div>
+                                    </div>
+                                </div>
+                                
+                                {members.filter((m: any) => m.user_id !== project.owner_id).map((m: any) => (
+                                    <div key={m.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-brutal-dark/10 group">
+                                        <div className="overflow-hidden flex-1 mr-2">
+                                            <div className="font-data text-sm font-bold truncate">{m.app_user?.name}</div>
+                                            <select 
+                                                className="font-data text-[10px] uppercase bg-transparent text-brutal-dark/60 border-none p-0 focus:ring-0 cursor-pointer"
+                                                value={m.role}
+                                                onChange={(e) => handleUpdateMemberRole(m.id, e.target.value)}
+                                                disabled={project.owner_id !== user?.id}
+                                            >
+                                                <option value="collaborator">Collaborator</option>
+                                                <option value="co-lead">Co-Lead</option>
+                                                <option value="mentor">Mentor</option>
+                                            </select>
+                                        </div>
+                                        {project.owner_id === user?.id && (
+                                            <button 
+                                                onClick={() => handleRemoveMember(m.id)}
+                                                className="text-brutal-red p-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                                title="Remove Contributor"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                {members.length === 0 && (
+                                    <div className="text-center font-data text-xs text-brutal-dark/40 py-2">
+                                        No team members added yet.
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Milestones Management */}
+                        <section className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10">
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
+                                <CheckCircle2 className="w-5 h-5" /> Build Milestones
+                            </h3>
+
+                            <div className="flex flex-col gap-2 mb-6">
+                                <input 
+                                    type="text"
+                                    placeholder="Milestone Title"
+                                    className="w-full bg-white border border-brutal-dark/20 px-3 py-2 rounded-lg font-data text-sm focus:outline-none focus:border-brutal-dark"
+                                    value={newMilestoneTitle}
+                                    onChange={e => setNewMilestoneTitle(e.target.value)}
+                                />
+                                <input 
+                                    type="text"
+                                    placeholder="Description (optional)"
+                                    className="w-full bg-white border border-brutal-dark/20 px-3 py-2 rounded-lg font-data text-sm focus:outline-none focus:border-brutal-dark"
+                                    value={newMilestoneDesc}
+                                    onChange={e => setNewMilestoneDesc(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddMilestone()}
+                                />
+                                <Button size="sm" onClick={handleAddMilestone} disabled={actionLoading || !newMilestoneTitle.trim()} className="mt-1">
+                                    <Plus className="w-4 h-4 mr-1" /> Add Milestone
+                                </Button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {milestones.map((m: any) => (
+                                    <div key={m.id} className="flex items-start gap-3 bg-white p-3 rounded-xl border border-brutal-dark/10 group">
+                                        <button 
+                                            onClick={() => handleToggleMilestone(m.id, m.is_complete)}
+                                            className={`mt-0.5 flex-shrink-0 transition-colors ${m.is_complete ? 'text-green-600' : 'text-brutal-dark/30 hover:text-brutal-dark/60'}`}
+                                        >
+                                            {m.is_complete ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                                        </button>
+                                        <div className={`overflow-hidden flex-1 ${m.is_complete ? 'opacity-50 line-through' : ''}`}>
+                                            <div className="font-data text-sm font-bold truncate">{m.title}</div>
+                                            {m.description && <div className="font-data text-xs text-brutal-dark/60 truncate mt-0.5">{m.description}</div>}
+                                        </div>
+                                        <button 
+                                            onClick={() => handleDeleteMilestone(m.id)}
+                                            className="text-brutal-red p-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                            title="Delete Milestone"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                {milestones.length === 0 && (
+                                    <div className="text-center font-data text-xs text-brutal-dark/40 py-4 border-2 border-dashed border-brutal-dark/10 rounded-xl">
+                                        Break your build into trackable steps.
+                                    </div>
+                                )}
+                            </div>
                         </section>
                     </div>
 

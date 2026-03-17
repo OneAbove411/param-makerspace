@@ -48,9 +48,11 @@ export function ManageInventory() {
             const payload = { ...form } as any;
 
             if (isEditing === 'new') {
-                await createItem(payload);
+                const { error } = await createItem(payload);
+                if (error) throw new Error(error);
             } else if (isEditing) {
-                await updateItem(isEditing, payload);
+                const { error } = await updateItem(isEditing, payload);
+                if (error) throw new Error(error);
             }
 
             await refetch();

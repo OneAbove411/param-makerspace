@@ -67,9 +67,11 @@ export function ManageChallenges() {
             } as any;
 
             if (isEditing === 'new') {
-                await createChallenge(payload);
+                const { error } = await createChallenge(payload);
+                if (error) throw new Error(error);
             } else if (isEditing) {
-                await updateChallenge(isEditing, payload);
+                const { error } = await updateChallenge(isEditing, payload);
+                if (error) throw new Error(error);
             }
 
             await refetch();

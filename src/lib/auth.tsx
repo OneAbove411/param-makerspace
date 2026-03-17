@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from './supabase';
+import { supabase, clearAppAuth } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { Role } from './database.types';
 
@@ -77,31 +77,84 @@ async function ensureMakerProfile(userId: string, name: string): Promise<void> {
     }
 }
 
+// ─── Toast notification for stale session cleanup ───
+function SessionToast({ onDismiss }: { onDismiss: () => void }) {
+    useEffect(() => {
+        const timer = setTimeout(onDismiss, 5000);
+        return () => clearTimeout(timer);
+    }, [onDismiss]);
+
+    return (
+        <div style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 9999, padding: '12px 24px', borderRadius: 12,
+            background: '#1a1a2e', color: '#fff', fontFamily: 'system-ui, sans-serif',
+            fontSize: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            display: 'flex', alignItems: 'center', gap: 12, maxWidth: '90vw',
+        }}>
+            <span style={{ fontSize: 18 }}>🔄</span>
+            <span>Your session expired and was refreshed. Please <strong>log in again</strong>.</span>
+            <button
+                onClick={onDismiss}
+                style={{
+                    background: 'none', border: 'none', color: '#888',
+                    cursor: 'pointer', fontSize: 18, padding: '0 4px',
+                }}
+            >×</button>
+        </div>
+    );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 // Optimistically skip loading if no stored session exists
 const hasStoredSession = typeof window !== 'undefined' &&
-    Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    Object.keys(localStorage).some(k => k.startsWith('sb-') || k === 'param-makerspace-auth');
 
 const [user, setUser] = useState<User | null>(null);
 const [session, setSession] = useState<Session | null>(null);
 const [isLoading, setIsLoading] = useState(hasStoredSession);
+const [sessionCleared, setSessionCleared] = useState(false);
 
     useEffect(() => {
         let mounted = true;
 
         // ─── Proactive Stale Token Check ───
         const checkInitialSession = async () => {
-            const { error } = await supabase.auth.getSession();
-            if (error) {
-                console.warn('Bad or expired token in storage — wiping it:', error.message);
-                await supabase.auth.signOut().catch(() => {});
-                if (mounted) {
-                    setUser(null);
-                    setSession(null);
-                    setIsLoading(false);
+            try {
+                // getSession only checks local storage validity (e.g., expiry)
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                let isBadToken = false;
+                
+                if (sessionError) {
+                    isBadToken = true;
+                } else if (session) {
+                    // Proactively ping the server to ensure the token isn't revoked/bad
+                    const { error: userError } = await supabase.auth.getUser();
+                    if (userError) {
+                        isBadToken = true;
+                    }
                 }
+
+                if (isBadToken) {
+                    console.warn('Bad or expired token detected — wiping it completely.');
+                    clearAppAuth();
+                    // Fire-and-forget signOut to clear internal state, ignoring network errors
+                    supabase.auth.signOut().catch(() => {});
+                    
+                    if (mounted) {
+                        setUser(null);
+                        setSession(null);
+                        setIsLoading(false);
+                        setSessionCleared(true);
+                    }
+                }
+            } catch (err) {
+                console.error('Session check failed', err);
+                if (mounted) setIsLoading(false);
             }
         };
+
 
         checkInitialSession();
 
@@ -197,6 +250,9 @@ const [isLoading, setIsLoading] = useState(hasStoredSession);
             resetPassword,
             refreshUser,
         }}>
+            {sessionCleared && (
+                <SessionToast onDismiss={() => setSessionCleared(false)} />
+            )}
             {children}
         </AuthContext.Provider>
     );

@@ -70,9 +70,11 @@ export function ManageBadges() {
             } as any;
 
             if (isEditing === 'new') {
-                await createBadge(payload);
+                const { error } = await createBadge(payload);
+                if (error) throw new Error(error);
             } else if (isEditing) {
-                await updateBadge(isEditing, payload);
+                const { error } = await updateBadge(isEditing, payload);
+                if (error) throw new Error(error);
             }
 
             await refetch();

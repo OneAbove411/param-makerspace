@@ -67,9 +67,11 @@ export function ManageStore() {
             } as any;
 
             if (isEditing === 'new') {
-                await createProduct(payload);
+                const { error } = await createProduct(payload);
+                if (error) throw new Error(error);
             } else if (isEditing) {
-                await updateProduct(isEditing, payload);
+                const { error } = await updateProduct(isEditing, payload);
+                if (error) throw new Error(error);
             }
 
             await refetch();

@@ -64,9 +64,11 @@ export function ManageEquipment() {
             } as any;
 
             if (isEditing === 'new') {
-                await createEquipment(payload);
+                const { error } = await createEquipment(payload);
+                if (error) throw new Error(error);
             } else if (isEditing) {
-                await updateEquipment(isEditing, payload);
+                const { error } = await updateEquipment(isEditing, payload);
+                if (error) throw new Error(error);
             }
 
             await refetch();

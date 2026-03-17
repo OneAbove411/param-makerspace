@@ -74,9 +74,11 @@ export function ManageEvents() {
             } as any;
 
             if (isEditing === 'new') {
-                await createEvent(payload);
+                const { error } = await createEvent(payload);
+                if (error) throw new Error(error);
             } else if (isEditing) {
-                await updateEvent(isEditing, payload);
+                const { error } = await updateEvent(isEditing, payload);
+                if (error) throw new Error(error);
             }
 
             await refetch();

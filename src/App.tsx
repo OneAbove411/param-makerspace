@@ -31,6 +31,7 @@ import { ManageInventory } from './pages/admin/ManageInventory';
 import { ReviewProjects } from './pages/admin/ReviewProjects';
 import { ReviewChallenges } from './pages/admin/ReviewChallenges';
 import { ReviewEventSubmissions } from './pages/admin/ReviewEventSubmissions';
+import { ManageProjects } from './pages/admin/ManageProjects';
 
 function App() {
   return (
@@ -77,6 +78,7 @@ function App() {
               <Route path="/admin/badges" element={<ManageBadges />} />
               <Route path="/admin/store" element={<ManageStore />} />
               <Route path="/admin/equipment" element={<ManageEquipment />} />
+              <Route path="/admin/projects" element={<ManageProjects />} />
             </Route>
 
             <Route path="*" element={<div className="p-20 font-data text-2xl">404 - Not Found</div>} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useInventory, useInventoryMutations } from '../../lib/hooks';
 import { Link } from 'react-router-dom';
@@ -15,6 +15,13 @@ export function ManageInventory() {
     
     const [isEditing, setIsEditing] = useState<string | 'new' | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const formRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isEditing && formRef.current) {
+            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [isEditing]);
     
     // Form state
     const [form, setForm] = useState<Partial<Inventory>>({
@@ -133,7 +140,7 @@ export function ManageInventory() {
                 )}
 
                 {isEditing ? (
-                    <Card className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
                                 {isEditing === 'new' ? 'Add Inventory Item' : 'Edit Item'}

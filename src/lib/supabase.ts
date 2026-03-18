@@ -9,23 +9,23 @@ export const STORAGE_KEY = 'param-makerspace-auth';
 
 // ─── Bump this on each deploy to auto-clear stale tokens ───
 // When the stored version doesn't match, we wipe old auth data.
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1'; // <-- increment this on each deploy
 
 // ─── Targeted cleanup: only removes THIS app's auth keys ───
-// Never touches other sites' localStorage data.
 export function clearAppAuth(): void {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (
-            key === STORAGE_KEY ||
-            key.startsWith('sb-') ||              // Supabase default keys
-            key === 'param-makerspace-version'     // Our version marker
-        )) {
+        if (
+            key &&
+            (key === STORAGE_KEY ||
+                key.startsWith('sb-') ||
+                key === 'param-makerspace-version')
+        ) {
             keysToRemove.push(key);
         }
     }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
 }
 
 // ─── Version-based auto-cleanup ───
@@ -35,18 +35,60 @@ export function clearAppAuth(): void {
     if (typeof window === 'undefined') return;
     const storedVersion = localStorage.getItem('param-makerspace-version');
     if (storedVersion !== APP_VERSION) {
-        console.info(`App version changed (${storedVersion} → ${APP_VERSION}), clearing stale auth tokens`);
+        console.info(
+            `App version changed (${storedVersion} → ${APP_VERSION}), clearing stale auth tokens`
+        );
         clearAppAuth();
         localStorage.setItem('param-makerspace-version', APP_VERSION);
     }
 })();
+
+// ─── Custom storage adapter ───
+// Wraps localStorage with try/catch to gracefully handle:
+// 1. Safari ITP / private browsing (throws on write)
+// 2. localStorage being full
+// Falls back to an in-memory Map so the app still works.
+const memoryFallback = new Map<string, string>();
+
+const robustStorage = {
+    getItem: (key: string): string | null => {
+        try {
+            return localStorage.getItem(key);
+        } catch {
+            return memoryFallback.get(key) ?? null;
+        }
+    },
+    setItem: (key: string, value: string): void => {
+        try {
+            localStorage.setItem(key, value);
+        } catch {
+            memoryFallback.set(key, value);
+        }
+    },
+    removeItem: (key: string): void => {
+        try {
+            localStorage.removeItem(key);
+        } catch {
+            memoryFallback.delete(key);
+        }
+    },
+};
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storage: globalThis.localStorage,
+        storage: robustStorage,
         storageKey: STORAGE_KEY,
+        // Reduce the window during which a stale token causes 400s.
+        // Token refresh happens 60s before expiry by default; bumping this
+        // to 120s gives more buffer on slow/flaky Netlify edge connections.
+        flowType: 'pkce',
+    },
+    global: {
+        headers: {
+            'x-app-version': APP_VERSION,
+        },
     },
 });

@@ -1263,6 +1263,33 @@ export function useProjectReviewMutations() {
     return { approveProject, rejectProject };
 }
 
+export function useAdminProjectMutations() {
+    const adminDeleteProject = async (id: string) => {
+        // Delete child records first (no FK cascade assumed)
+        await Promise.all([
+            supabase.from('project_video').delete().eq('project_id', id),
+            supabase.from('project_image').delete().eq('project_id', id),
+            supabase.from('project_file').delete().eq('project_id', id),
+            supabase.from('project_milestone').delete().eq('project_id', id),
+            supabase.from('project_member').delete().eq('project_id', id),
+            supabase.from('reaction').delete().eq('target_type', 'project').eq('target_id', id),
+            supabase.from('comment').delete().eq('target_type', 'project').eq('target_id', id),
+            supabase.from('entity_tag').delete().eq('target_type', 'project').eq('target_id', id),
+        ]);
+        const { error } = await supabase.from('project').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const adminUpdateStatus = async (id: string, status: string, visibility?: string) => {
+        const updates: any = { status };
+        if (visibility) updates.visibility = visibility;
+        const { error } = await supabase.from('project').update(updates).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { adminDeleteProject, adminUpdateStatus };
+}
+
 // ══════════════════════════════════════════════════════════════════
 // ─── MENTOR/ADMIN: CHALLENGE COMPLETION REVIEW ───
 // ══════════════════════════════════════════════════════════════════

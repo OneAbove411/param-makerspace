@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useSupabaseQuery, useBadgeMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
@@ -20,6 +20,13 @@ export function ManageBadges() {
     
     const [isEditing, setIsEditing] = useState<string | 'new' | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const formRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isEditing && formRef.current) {
+            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [isEditing]);
     
     // Form state
     const [form, setForm] = useState<Partial<Badge>>({
@@ -167,7 +174,7 @@ export function ManageBadges() {
                 </div>
 
                 {isEditing ? (
-                    <Card className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
                                 {isEditing === 'new' ? 'Mint New Badge' : 'Edit Badge'}

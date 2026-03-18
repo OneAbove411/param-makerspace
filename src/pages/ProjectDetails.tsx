@@ -3,9 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { useProject, useReaction, useComments } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/Button';
-import { Heart, ArrowUpCircle, Bookmark, Github, ArrowLeft, Send } from 'lucide-react';
+import { Heart, ArrowUpCircle, Bookmark, Github, ArrowLeft, Send, Play } from 'lucide-react';
 
-import { getEmbedUrl } from '../lib/videoUtils';
+import { getEmbedUrl, getYoutubeThumbnail } from '../lib/videoUtils';
 
 export function ProjectDetails() {
     const { id } = useParams();
@@ -14,6 +14,7 @@ export function ProjectDetails() {
     const { counts, myReactions, toggle } = useReaction('project', id);
     const { comments, addComment, deleteComment } = useComments('project', id);
     const [commentText, setCommentText] = useState('');
+    const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
     const handleComment = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -166,13 +167,42 @@ export function ProjectDetails() {
                             <h3 className="font-heading font-bold text-2xl border-b-2 border-brutal-dark/10 pb-4 mb-6 uppercase">Video Content</h3>
                             <div className="space-y-8">
                                 {project.videos.map(vid => (
-                                    <div key={vid.id} className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
-                                        <iframe
-                                            src={getEmbedUrl(vid.video_url)}
-                                            className="absolute inset-0 w-full h-full"
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowFullScreen
-                                        ></iframe>
+                                    <div key={vid.id}>
+                                        {playingVideoId === vid.id ? (
+                                            <div className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
+                                                <iframe
+                                                    src={getEmbedUrl(vid.video_url)}
+                                                    className="absolute inset-0 w-full h-full"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen
+                                                ></iframe>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setPlayingVideoId(vid.id)}
+                                                className="relative w-full aspect-video rounded-3xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark/5 group cursor-pointer block"
+                                            >
+                                                {getYoutubeThumbnail(vid.video_url) ? (
+                                                    <img
+                                                        src={getYoutubeThumbnail(vid.video_url)!}
+                                                        alt={vid.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-brutal-dark/10">
+                                                        <Play className="w-16 h-16 text-brutal-dark/30" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+                                                    <div className="w-20 h-20 rounded-full bg-brutal-red/90 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                                        <Play className="w-9 h-9 text-white fill-white ml-1" />
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        )}
+                                        {vid.title && (
+                                            <div className="mt-2 font-data text-sm font-bold text-brutal-dark/80">{vid.title}</div>
+                                        )}
                                     </div>
                                 ))}
                             </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,8 +7,9 @@ import { Card } from '../components/ui/Card';
 import { RankBadge } from '../components/ui/RankBadge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award } from 'lucide-react';
+import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award, Play, Image as ImageIcon } from 'lucide-react';
 import { BadgeIcon } from '../components/ui/BadgeIcon';
+import { isValidVideoUrl, getYoutubeThumbnail } from '../lib/videoUtils';
 
 export function Dashboard() {
     const { user, role } = useAuth();
@@ -20,7 +21,24 @@ export function Dashboard() {
     const [showNewProject, setShowNewProject] = useState(false);
     const [newProjectForm, setNewProjectForm] = useState({ title: '', summary: '', description: '', domain: '', tier: '' });
     const [creating, setCreating] = useState(false);
+    const [createStep, setCreateStep] = useState<1 | 2>(1);
+    const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
+    
+    // Video step state
+    const [videos, setVideos] = useState<any[]>([]);
+    const [newVideoUrl, setNewVideoUrl] = useState('');
+    const [newVideoTitle, setNewVideoTitle] = useState('');
+    const [videoUrlError, setVideoUrlError] = useState('');
+    const [addingVideo, setAddingVideo] = useState(false);
+
+    const formRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (showNewProject && formRef.current) {
+            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [showNewProject]);
     const { data: myProfile } = useMyProfile();
     const { data: myBadges } = useUserBadges(user?.id);
     const { data: rankAccess } = useRankAccess();
@@ -41,13 +59,74 @@ export function Dashboard() {
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         setCreating(true);
-        const { data: project, error } = await createProject(newProjectForm);
-        setCreating(false);
-        if (!error && project) {
-            setShowNewProject(false);
-            setNewProjectForm({ title: '', summary: '', description: '', domain: '', tier: '' });
+        try {
+            const { data: project, error } = await createProject(newProjectForm);
+            if (error || !project) {
+                alert('Failed to create project: ' + (error || 'Unknown error'));
+                setCreating(false);
+                return;
+            }
+            setCreatedProjectId(project.id);
+
+            // If a video URL was entered in Step 1, insert it now
+            const trimmedUrl = newVideoUrl.trim();
+            if (trimmedUrl && isValidVideoUrl(trimmedUrl)) {
+                const vTitle = newVideoTitle.trim() || 'Project Video';
+                const { data: vid } = await supabase.from('project_video').insert({
+                    project_id: project.id,
+                    title: vTitle,
+                    video_url: trimmedUrl,
+                    display_order: 1,
+                }).select().single();
+                if (vid) setVideos([vid]);
+                setNewVideoUrl('');
+                setNewVideoTitle('');
+            }
+
+            setCreateStep(2);
             refetchProjects();
+        } catch (err: any) {
+            alert('Error: ' + err.message);
         }
+        setCreating(false);
+    };
+
+    const handleCloseModal = () => {
+        setShowNewProject(false);
+        setNewProjectForm({ title: '', summary: '', description: '', domain: '', tier: '' });
+        setCreateStep(1);
+        setCreatedProjectId(null);
+        setVideos([]);
+        refetchProjects();
+    };
+
+    const handleAddVideo = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setVideoUrlError('');
+        const trimmed = newVideoUrl.trim();
+        if (!trimmed) return;
+        if (!isValidVideoUrl(trimmed)) {
+            setVideoUrlError('Please enter a valid YouTube or Vimeo URL');
+            return;
+        }
+        if (!createdProjectId) return;
+        setAddingVideo(true);
+        const title = newVideoTitle.trim() || 'Project Video';
+        const { error, data } = await supabase.from('project_video').insert({
+            project_id: createdProjectId,
+            title,
+            video_url: trimmed,
+            display_order: videos.length + 1,
+        }).select().single();
+        
+        if (error) {
+            alert(error.message);
+        } else if (data) {
+            setVideos(prev => [...prev, data]);
+            setNewVideoUrl('');
+            setNewVideoTitle('');
+        }
+        setAddingVideo(false);
     };
 
     return (
@@ -96,7 +175,14 @@ export function Dashboard() {
                     
                     <Card
                         className={`p-6 bg-brutal-red/10 border-2 border-brutal-red/20 text-brutal-red content-center flex flex-col justify-center items-center text-center transition-colors ${role === 'viewer' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-brutal-red hover:text-brutal-bg interactive-lift'}`}
-                        onClick={() => { if (role !== 'viewer') setShowNewProject(true); }}
+                        onClick={() => { 
+                            if (role !== 'viewer') {
+                                setShowNewProject(true);
+                                setCreateStep(1);
+                                setCreatedProjectId(null);
+                                setVideos([]);
+                            }
+                        }}
                     >
                         <Plus className="w-6 h-6 md:w-8 md:h-8 mb-2" />
                         <span className="font-data text-xs md:text-sm font-bold uppercase tracking-wider">Propose Project</span>
@@ -154,84 +240,225 @@ export function Dashboard() {
 
                 {/* New Project Modal */}
                 {showNewProject && (
-                    <Card className="p-8 border-2 border-brutal-red/30 shadow-2xl relative">
-                        <button onClick={() => setShowNewProject(false)} className="absolute top-4 right-4 text-brutal-dark/50 hover:text-brutal-dark">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-red/30 shadow-2xl relative scroll-mt-32">
+                        <button onClick={handleCloseModal} className="absolute top-4 right-4 text-brutal-dark/50 hover:text-brutal-dark">
                             <X className="w-5 h-5" />
                         </button>
-                        <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">New Project Proposal</h3>
-                        <form onSubmit={handleCreateProject} className="space-y-4">
-                            <div className="flex gap-3 mb-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setNewProjectForm(prev => ({ ...prev, tier: 'Tier 3' }))}
-                                    className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
-                                        newProjectForm.tier === 'Tier 3'
-                                            ? 'border-brutal-red bg-brutal-red/5'
-                                            : 'border-brutal-dark/20 hover:border-brutal-dark/40'
-                                    }`}
-                                >
-                                    <span className="font-heading font-bold text-sm uppercase block">T3 Architect Project</span>
-                                    <span className="font-data text-xs text-brutal-dark/60">Part of Explorer Hub — originates from a Tier 3 challenge</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setNewProjectForm(prev => ({ ...prev, tier: '' }))}
-                                    className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
-                                        newProjectForm.tier !== 'Tier 3'
-                                            ? 'border-brutal-red bg-brutal-red/5'
-                                            : 'border-brutal-dark/20 hover:border-brutal-dark/40'
-                                    }`}
-                                >
-                                    <span className="font-heading font-bold text-sm uppercase block">Independent Project</span>
-                                    <span className="font-data text-xs text-brutal-dark/60">Open-ended — self-initiated or community-driven</span>
-                                </button>
-                            </div>
+                        <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">
+                            {createStep === 1 ? 'New Project Proposal' : 'Add Videos (Optional)'}
+                        </h3>
 
-                            <Input
-                                label="Project Title"
-                                value={newProjectForm.title}
-                                onChange={(e) => setNewProjectForm(prev => ({ ...prev, title: e.target.value }))}
-                                required
-                            />
-                            <Input
-                                label="Summary"
-                                value={newProjectForm.summary}
-                                onChange={(e) => setNewProjectForm(prev => ({ ...prev, summary: e.target.value }))}
-                                placeholder="A one-line pitch for your project"
-                                required
-                            />
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">Description</label>
-                                <textarea
-                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded text-brutal-dark font-data focus:outline-none focus:border-brutal-dark focus:ring-1 focus:ring-brutal-dark transition-colors"
-                                    rows={4}
-                                    value={newProjectForm.description}
-                                    onChange={(e) => setNewProjectForm(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Detailed description of your project..."
+                        {createStep === 1 ? (
+                            <form onSubmit={handleCreateProject} className="space-y-4">
+                                <div className="flex gap-3 mb-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewProjectForm(prev => ({ ...prev, tier: 'Tier 3' }))}
+                                        className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
+                                            newProjectForm.tier === 'Tier 3'
+                                                ? 'border-brutal-red bg-brutal-red/5'
+                                                : 'border-brutal-dark/20 hover:border-brutal-dark/40'
+                                        }`}
+                                    >
+                                        <span className="font-heading font-bold text-sm uppercase block">T3 Architect Project</span>
+                                        <span className="font-data text-xs text-brutal-dark/60">Part of Explorer Hub — originates from a Tier 3 challenge</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewProjectForm(prev => ({ ...prev, tier: '' }))}
+                                        className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
+                                            newProjectForm.tier !== 'Tier 3'
+                                                ? 'border-brutal-red bg-brutal-red/5'
+                                                : 'border-brutal-dark/20 hover:border-brutal-dark/40'
+                                        }`}
+                                    >
+                                        <span className="font-heading font-bold text-sm uppercase block">Independent Project</span>
+                                        <span className="font-data text-xs text-brutal-dark/60">Open-ended — self-initiated or community-driven</span>
+                                    </button>
+                                </div>
+
+                                <Input
+                                    label="Project Title"
+                                    value={newProjectForm.title}
+                                    onChange={(e) => setNewProjectForm(prev => ({ ...prev, title: e.target.value }))}
                                     required
                                 />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
                                 <Input
-                                    label="Domain"
-                                    value={newProjectForm.domain}
-                                    onChange={(e) => setNewProjectForm(prev => ({ ...prev, domain: e.target.value }))}
-                                    placeholder="e.g. Software & Robotics"
+                                    label="Summary"
+                                    value={newProjectForm.summary}
+                                    onChange={(e) => setNewProjectForm(prev => ({ ...prev, summary: e.target.value }))}
+                                    placeholder="A one-line pitch for your project"
+                                    required
                                 />
-                                <Input
-                                    label="Tier (Optional override)"
-                                    value={newProjectForm.tier}
-                                    onChange={(e) => setNewProjectForm(prev => ({ ...prev, tier: e.target.value }))}
-                                    placeholder="e.g. Tier 2"
-                                />
+                                <div>
+                                    <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">Description</label>
+                                    <textarea
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded text-brutal-dark font-data focus:outline-none focus:border-brutal-dark focus:ring-1 focus:ring-brutal-dark transition-colors"
+                                        rows={4}
+                                        value={newProjectForm.description}
+                                        onChange={(e) => setNewProjectForm(prev => ({ ...prev, description: e.target.value }))}
+                                        placeholder="Detailed description of your project..."
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Domain"
+                                        value={newProjectForm.domain}
+                                        onChange={(e) => setNewProjectForm(prev => ({ ...prev, domain: e.target.value }))}
+                                        placeholder="e.g. Software & Robotics"
+                                    />
+                                    <Input
+                                        label="Tier (Optional override)"
+                                        value={newProjectForm.tier}
+                                        onChange={(e) => setNewProjectForm(prev => ({ ...prev, tier: e.target.value }))}
+                                        placeholder="e.g. Tier 2"
+                                    />
+                                </div>
+
+                                {/* Inline primary video addition on Step 1 */}
+                                <div className="mt-6 border-t border-brutal-dark/10 pt-6">
+                                    <label className="font-data text-sm font-bold text-brutal-dark mb-2 flex items-center gap-2">
+                                        <Play className="w-4 h-4 text-brutal-red" />
+                                        Primary Video (Optional)
+                                    </label>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="flex-1 space-y-3">
+                                            <Input
+                                                label=""
+                                                value={newVideoTitle}
+                                                onChange={(e) => setNewVideoTitle(e.target.value)}
+                                                placeholder="Video Title (e.g. Demo, Assembly)"
+                                            />
+                                            <div>
+                                                <input
+                                                    type="url"
+                                                    placeholder="YouTube or Vimeo URL"
+                                                    className={`w-full bg-white border-2 px-3 py-2.5 rounded text-brutal-dark font-data focus:outline-none focus:border-brutal-dark transition-colors ${
+                                                        videoUrlError ? 'border-brutal-red bg-brutal-red/5' : 'border-brutal-dark/20'
+                                                    }`}
+                                                    value={newVideoUrl}
+                                                    onChange={(e) => {
+                                                        setNewVideoUrl(e.target.value);
+                                                        if (e.target.value.trim() && !isValidVideoUrl(e.target.value)) {
+                                                            setVideoUrlError('Invalid URL format');
+                                                        } else {
+                                                            setVideoUrlError('');
+                                                        }
+                                                    }}
+                                                />
+                                                {videoUrlError && (
+                                                    <p className="font-data text-xs text-brutal-red mt-1 font-bold">{videoUrlError}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Live Preview Thumbnail */}
+                                        <div className="w-40 h-28 hidden md:flex flex-shrink-0 bg-brutal-dark/5 border-2 border-brutal-dark/10 rounded-lg overflow-hidden items-center justify-center relative group">
+                                            {newVideoUrl.trim() && isValidVideoUrl(newVideoUrl) && getYoutubeThumbnail(newVideoUrl) ? (
+                                                <>
+                                                    <img 
+                                                        src={getYoutubeThumbnail(newVideoUrl)!} 
+                                                        alt="Video Thumbnail" 
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                                        <div className="w-10 h-10 bg-brutal-red rounded-full flex items-center justify-center">
+                                                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="text-center p-2 text-brutal-dark/30">
+                                                    <Play className="w-8 h-8 mx-auto mb-1 opacity-50" />
+                                                    <span className="font-data text-[10px] font-bold uppercase block">Preview</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="font-data text-xs text-brutal-dark/60 mt-2 italic">
+                                        You can add more videos in the next step.
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-end gap-4 pt-6 mt-4 border-t border-brutal-dark/10">
+                                    <Button type="button" variant="secondary" onClick={handleCloseModal}>Cancel</Button>
+                                    <Button type="submit" disabled={creating}>
+                                        {creating ? 'Creating...' : 'Create Draft Project'}
+                                    </Button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div className="space-y-6">
+                                <div className="bg-green-50 border-2 border-green-500/30 p-4 rounded-xl text-green-800 mb-6">
+                                    <p className="font-bold flex items-center gap-2">Project created successfully!</p>
+                                    <p className="text-sm font-data mt-1">You can attach videos now to demonstrate your work, or do it later.</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex gap-2 mb-4">
+                                        <div className="flex-1 space-y-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Video Title (e.g. Demo, Assembly)"
+                                                className="w-full bg-white border border-brutal-dark/20 px-3 py-2 rounded-lg font-data text-sm focus:outline-none focus:border-brutal-dark"
+                                                value={newVideoTitle}
+                                                onChange={(e) => setNewVideoTitle(e.target.value)}
+                                            />
+                                            <input
+                                                type="url"
+                                                placeholder="YouTube or Vimeo URL"
+                                                className={`w-full bg-white border px-3 py-2 rounded-lg font-data text-sm focus:outline-none focus:border-brutal-dark ${
+                                                    videoUrlError ? 'border-brutal-red bg-brutal-red/5' : 'border-brutal-dark/20'
+                                                }`}
+                                                value={newVideoUrl}
+                                                onChange={(e) => {
+                                                    setNewVideoUrl(e.target.value);
+                                                    setVideoUrlError('');
+                                                }}
+                                            />
+                                            {videoUrlError && (
+                                                <p className="font-data text-xs text-brutal-red mt-1 font-bold">{videoUrlError}</p>
+                                            )}
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleAddVideo}
+                                            disabled={addingVideo || !newVideoUrl.trim()}
+                                            className="mt-1 h-[88px]"
+                                        >
+                                            <Plus className="w-5 h-5 mb-1" /> Add
+                                        </Button>
+                                    </div>
+
+                                    {videos.length > 0 && (
+                                        <div className="space-y-2 mt-4 max-h-[250px] overflow-y-auto">
+                                            {videos.map(v => {
+                                                const thumb = getYoutubeThumbnail(v.video_url);
+                                                return (
+                                                    <div key={v.id} className="flex items-center gap-3 bg-white p-2 rounded-xl border border-brutal-dark/10">
+                                                        <div className="w-16 h-10 bg-brutal-dark/5 rounded overflow-hidden flex-shrink-0 relative group cursor-pointer border border-brutal-dark/10 flex items-center justify-center">
+                                                            {thumb ? (
+                                                                <img src={thumb} alt={v.title} className="w-full h-full object-cover opacity-80" />
+                                                            ) : (
+                                                                <Play className="w-4 h-4 text-brutal-dark/40" />
+                                                            )}
+                                                        </div>
+                                                        <div className="overflow-hidden flex-1">
+                                                            <div className="font-data text-sm font-bold truncate">{v.title}</div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex justify-end pt-4 mt-6 border-t border-brutal-dark/10">
+                                    <Button onClick={handleCloseModal}>Done</Button>
+                                </div>
                             </div>
-                            <div className="flex justify-end gap-4 pt-4">
-                                <Button type="button" variant="secondary" onClick={() => setShowNewProject(false)}>Cancel</Button>
-                                <Button type="submit" disabled={creating}>
-                                    {creating ? 'Creating...' : 'Create Draft Project'}
-                                </Button>
-                            </div>
-                        </form>
+                        )}
                     </Card>
                 )}
 
@@ -459,6 +686,19 @@ export function Dashboard() {
                                 </p>
                                 <Link to="/admin/equipment">
                                     <Button variant="outline" size="sm" className="w-full">Manage Equipment</Button>
+                                </Link>
+                            </Card>
+
+                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Zap className="w-5 h-5 text-brutal-red" />
+                                    <h3 className="font-heading font-bold text-lg uppercase">Projects</h3>
+                                </div>
+                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">
+                                    View, manage & delete projects.
+                                </p>
+                                <Link to="/admin/projects">
+                                    <Button variant="outline" size="sm" className="w-full">Manage Projects</Button>
                                 </Link>
                             </Card>
                         </div>

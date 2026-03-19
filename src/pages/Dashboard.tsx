@@ -69,16 +69,35 @@ export function Dashboard() {
             setCreatedProjectId(project.id);
 
             // If a video URL was entered in Step 1, insert it now
+            // Done in a separate try/catch so video failure doesn't block project creation
+            // NOTE: avoid .select().single() after insert — it can hang when RLS
+            // blocks the RETURNING clause even though the INSERT itself succeeds.
             const trimmedUrl = newVideoUrl.trim();
             if (trimmedUrl && isValidVideoUrl(trimmedUrl)) {
-                const vTitle = newVideoTitle.trim() || 'Project Video';
-                const { data: vid } = await supabase.from('project_video').insert({
-                    project_id: project.id,
-                    title: vTitle,
-                    video_url: trimmedUrl,
-                    display_order: 1,
-                }).select().single();
-                if (vid) setVideos([vid]);
+                try {
+                    const vTitle = newVideoTitle.trim() || 'Project Video';
+                    const { error: vidError } = await supabase
+                        .from('project_video')
+                        .insert({
+                            project_id: project.id,
+                            title: vTitle,
+                            video_url: trimmedUrl,
+                            display_order: 1,
+                        });
+                    if (vidError) {
+                        console.error('Video insert error:', vidError);
+                    } else {
+                        // Fetch the inserted video separately to populate the list
+                        const { data: vids } = await supabase
+                            .from('project_video')
+                            .select('id, title, video_url, display_order')
+                            .eq('project_id', project.id)
+                            .order('display_order');
+                        if (vids) setVideos(vids);
+                    }
+                } catch (vidErr) {
+                    console.error('Video insert exception:', vidErr);
+                }
                 setNewVideoUrl('');
                 setNewVideoTitle('');
             }
@@ -86,6 +105,7 @@ export function Dashboard() {
             setCreateStep(2);
             refetchProjects();
         } catch (err: any) {
+            console.error('Project creation error:', err);
             alert('Error: ' + err.message);
         }
         setCreating(false);
@@ -111,20 +131,32 @@ export function Dashboard() {
         }
         if (!createdProjectId) return;
         setAddingVideo(true);
-        const title = newVideoTitle.trim() || 'Project Video';
-        const { error, data } = await supabase.from('project_video').insert({
-            project_id: createdProjectId,
-            title,
-            video_url: trimmed,
-            display_order: videos.length + 1,
-        }).select().single();
-        
-        if (error) {
-            alert(error.message);
-        } else if (data) {
-            setVideos(prev => [...prev, data]);
-            setNewVideoUrl('');
-            setNewVideoTitle('');
+        try {
+            const title = newVideoTitle.trim() || 'Project Video';
+            const { error } = await supabase.from('project_video').insert({
+                project_id: createdProjectId,
+                title,
+                video_url: trimmed,
+                display_order: videos.length + 1,
+            });
+
+            if (error) {
+                console.error('Video insert error:', error);
+                setVideoUrlError('Failed to add video: ' + error.message);
+            } else {
+                // Fetch all videos separately instead of relying on INSERT RETURNING
+                const { data: vids } = await supabase
+                    .from('project_video')
+                    .select('id, title, video_url, display_order')
+                    .eq('project_id', createdProjectId)
+                    .order('display_order');
+                if (vids) setVideos(vids);
+                setNewVideoUrl('');
+                setNewVideoTitle('');
+            }
+        } catch (err: any) {
+            console.error('Video insert exception:', err);
+            setVideoUrlError('Failed to add video: ' + (err.message || 'Unknown error'));
         }
         setAddingVideo(false);
     };

@@ -298,19 +298,27 @@ export function EditProject() {
         }
         if (!id) return;
         setAddingVideo(true);
-        const title = newVideoTitle.trim() || 'Project Video';
-        const { error } = await supabase.from('project_video').insert({
-            project_id: id,
-            title,
-            video_url: trimmed,
-            display_order: videos.length + 1,
-        });
-        if (error) {
-            alert(error.message);
-        } else {
-            setNewVideoUrl('');
-            setNewVideoTitle('');
-            await fetchVideos();
+        try {
+            const title = newVideoTitle.trim() || 'Project Video';
+            // Avoid .select().single() after insert — can hang when RLS
+            // blocks the RETURNING clause even though the INSERT succeeds.
+            const { error } = await supabase.from('project_video').insert({
+                project_id: id,
+                title,
+                video_url: trimmed,
+                display_order: videos.length + 1,
+            });
+            if (error) {
+                console.error('Video insert error:', error);
+                setVideoUrlError('Failed to add video: ' + error.message);
+            } else {
+                setNewVideoUrl('');
+                setNewVideoTitle('');
+                await fetchVideos();
+            }
+        } catch (err: any) {
+            console.error('Video insert exception:', err);
+            setVideoUrlError('Failed to add video: ' + (err.message || 'Unknown error'));
         }
         setAddingVideo(false);
     };

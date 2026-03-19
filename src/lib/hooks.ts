@@ -490,22 +490,22 @@ export function useMyStats() {
     }>(async () => {
         if (!user) return { data: { activeProjects: 0, upcomingEvents: 0, completedChallenges: 0 }, error: null };
 
+        // Use simple SELECT + .length instead of HEAD+count which causes 503 on free tier
         const [projectsRes, eventsRes, challengesRes] = await Promise.all([
-            supabase.from('project').select('id', { count: 'exact', head: true }).eq('owner_id', user.id).in('status', ['active', 'draft', 'pending_review']),
-            supabase.from('event_registration').select('event:event(date)', { count: 'exact' }).eq('user_id', user.id),
-            supabase.from('challenge_completion').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'verified'),
+            supabase.from('project').select('id').eq('owner_id', user.id).in('status', ['active', 'draft', 'pending_review']),
+            supabase.from('event_registration').select('event:event(date)').eq('user_id', user.id),
+            supabase.from('challenge_completion').select('id').eq('user_id', user.id).eq('status', 'verified'),
         ]);
 
-        // Count upcoming events (date in future)
         const upcomingEvents = (eventsRes.data || []).filter((r: any) =>
             r.event?.date && new Date(r.event.date) > new Date()
         ).length;
 
         return {
             data: {
-                activeProjects: projectsRes.count || 0,
+                activeProjects: (projectsRes.data || []).length,
                 upcomingEvents,
-                completedChallenges: challengesRes.count || 0,
+                completedChallenges: (challengesRes.data || []).length,
             },
             error: null,
         };
@@ -723,9 +723,26 @@ export function useProjectMutations() {
     }) => {
         if (!user) return { data: null, error: 'Not authenticated' };
 
-        const { data: inserted, error: insertError } = await supabase
-            .from('project')
-            .insert({
+        // Direct fetch bypasses Supabase JS client's internal session lock
+        // which adds 10-20s overhead. Read token from localStorage directly.
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_DATABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        let token: string | null = null;
+        try {
+            const raw = localStorage.getItem('param-makerspace-auth');
+            if (raw) token = JSON.parse(raw)?.access_token;
+        } catch { /* ignore */ }
+        if (!token) return { data: null, error: 'No auth token' };
+
+        const res = await fetch(`${supabaseUrl}/rest/v1/project?select=*`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': anonKey,
+                'Authorization': `Bearer ${token}`,
+                'Prefer': 'return=representation',
+            },
+            body: JSON.stringify({
                 title: input.title,
                 summary: input.summary || input.title,
                 description: input.description || '',
@@ -736,13 +753,18 @@ export function useProjectMutations() {
                 owner_id: user.id,
                 status: 'draft',
                 visibility: 'private',
-            })
-            .select()
-            .single();
+            }),
+        });
 
+        if (!res.ok) {
+            const err = await res.text();
+            return { data: null, error: `Insert failed (${res.status}): ${err}` };
+        }
+
+        const rows = await res.json();
         return {
-            data: (inserted ?? null) as Project | null,
-            error: insertError?.message || null,
+            data: (rows?.[0] ?? null) as Project | null,
+            error: null,
         };
     };
 

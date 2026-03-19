@@ -72,25 +72,22 @@ export function Dashboard() {
             return;
         }
 
-        // 2. Insert video — await it just like EditProject.handleAddVideo does
-        //    so we catch RLS / validation errors instead of silently swallowing them.
+        // 2. Insert video in background — don't block the UI.
+        //    The project is already created; video is best-effort.
         if (videoUrl && isValidVideoUrl(videoUrl)) {
-            const { error: videoError } = await supabase.from('project_video').insert({
+            supabase.from('project_video').insert({
                 project_id: project.id,
                 title: 'Project Video',
                 video_url: videoUrl,
                 display_order: 1,
+            }).then(({ error: videoError }) => {
+                if (videoError) console.warn('Video insert failed:', videoError.message);
             });
-            if (videoError) {
-                // Project was created but video failed — let the user know
-                console.error('Video insert failed:', videoError.message);
-                alert('Project created, but video could not be saved: ' + videoError.message);
-            }
         }
 
         handleCloseModal();
-        await refetchProjects();
         setCreating(false);
+        refetchProjects();
     };
 
     const handleCloseModal = () => {

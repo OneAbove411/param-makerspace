@@ -4,73 +4,89 @@ import type { Database } from './database.types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_DATABASE_URL || 'https://YOUR_PROJECT.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY';
 
-// ─── App-scoped storage key ───
 export const STORAGE_KEY = 'param-makerspace-auth';
 
-// ─── Bump this on each deploy to auto-clear stale tokens ───
-export const APP_VERSION = '1.0.2';
+// ─── BUMP THIS on every deploy that changes DB schema or auth logic ───
+// When the stored version doesn't match, ALL auth tokens are wiped
+// automatically on page load. This is the "automatic localStorage.clear()"
+// that works on Netlify, localhost, everywhere — no manual console needed.
+export const APP_VERSION = '2.0.1';
 
-// ─── Targeted cleanup: only removes THIS app's auth keys ───
+// ─── Wipe all Supabase auth keys from localStorage ───
 export function clearAppAuth(): void {
     try {
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (
-                key &&
-                (key === STORAGE_KEY ||
-                    key.startsWith('sb-') ||
-                    key === 'param-makerspace-version')
-            ) {
+            if (key && (key === STORAGE_KEY || key.startsWith('sb-') || key === 'param-makerspace-version')) {
                 keysToRemove.push(key);
             }
         }
         keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch {
-        // Safari private mode — nothing to clear
-    }
+    } catch { /* Safari private mode */ }
 }
 
-// ─── Version-based auto-cleanup ───
+// ─── Auto-clear on deploy/version change ───
+// Runs ONCE synchronously before any React renders.
+// If version changed (new deploy), wipe stale tokens so the user
+// gets a clean login instead of cryptic 401s.
 (function autoCleanOnDeploy() {
     if (typeof window === 'undefined') return;
     try {
-        const storedVersion = localStorage.getItem('param-makerspace-version');
-        if (storedVersion !== APP_VERSION) {
+        const stored = localStorage.getItem('param-makerspace-version');
+        if (stored !== APP_VERSION) {
+            console.info(`[param] Version changed ${stored} → ${APP_VERSION}, clearing stale auth`);
             clearAppAuth();
             localStorage.setItem('param-makerspace-version', APP_VERSION);
         }
+    } catch { /* ignore */ }
+})();
+
+// ─── Validate stored session shape ───
+// If localStorage has a corrupted or old-format token, nuke it
+// BEFORE Supabase tries to parse it (which would cause silent failures).
+(function validateStoredSession() {
+    if (typeof window === 'undefined') return;
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return; // no session stored, that's fine
+        const parsed = JSON.parse(raw);
+        // Must have access_token and user.id to be valid
+        if (!parsed?.access_token || !parsed?.user?.id) {
+            console.warn('[param] Corrupted session in storage, clearing');
+            clearAppAuth();
+        }
     } catch {
-        // ignore
+        // JSON parse failed = corrupted data
+        console.warn('[param] Unparseable session in storage, clearing');
+        clearAppAuth();
     }
 })();
 
-// ─── Custom storage adapter ───
+// ─── Storage adapter with fallback ───
 const memoryFallback = new Map<string, string>();
 
 const robustStorage = {
     getItem: (key: string): string | null => {
-        try {
-            return localStorage.getItem(key);
-        } catch {
-            return memoryFallback.get(key) ?? null;
-        }
+        try { return localStorage.getItem(key); }
+        catch { return memoryFallback.get(key) ?? null; }
     },
     setItem: (key: string, value: string): void => {
-        try {
-            localStorage.setItem(key, value);
-        } catch {
-            memoryFallback.set(key, value);
-        }
+        try { localStorage.setItem(key, value); }
+        catch { memoryFallback.set(key, value); }
     },
     removeItem: (key: string): void => {
-        try {
-            localStorage.removeItem(key);
-        } catch {
-            memoryFallback.delete(key);
-        }
+        try { localStorage.removeItem(key); }
+        catch { memoryFallback.delete(key); }
     },
 };
+
+// No-op lock: navigator.locks deadlocks in dev (HMR) and custom mutexes
+// can also deadlock if the internal Supabase promise chain stalls.
+// The safest option: skip locking entirely. The Supabase client handles
+// concurrent session access internally via _useSession deduplication.
+// The only downside is a harmless "Lock broken" console warning on HMR.
+const noopLock = (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn();
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -79,26 +95,18 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: true,
         storage: robustStorage,
         storageKey: STORAGE_KEY,
-        // Use implicit flow — avoids the navigator.locks issue in React Strict Mode
-        // that causes "Lock was not released within 5000ms" warnings and stale sessions.
-        // PKCE is only needed for server-side auth; for SPAs, implicit is simpler and reliable.
         flowType: 'implicit',
+        lock: noopLock,
     },
     global: {
-        headers: {
-            'x-app-version': APP_VERSION,
-        },
+        headers: { 'x-app-version': APP_VERSION },
     },
 });
 
-// ─── Auth error handler ───
-// ONLY react to 401 (Unauthorized) — that means the JWT is truly dead.
-// Do NOT react to 400 (Bad Request) — that's a query/schema error, not auth.
-// The old code treated 400 as auth failure which caused logout on every
-// page that queried a missing/renamed table.
+// ─── Auth error handler (used by auth.tsx) ───
 export function handleAuthError(status: number): void {
     if (status === 401) {
-        console.warn('Got 401 from Supabase — session expired, clearing auth.');
+        console.warn('[param] 401 from Supabase — session dead, clearing auth');
         clearAppAuth();
         supabase.auth.signOut().catch(() => {});
         window.location.replace('/login');

@@ -1,35 +1,36 @@
+// ─── Extract YouTube video ID from any YouTube URL format ───
+function extractYoutubeId(url: string): string | null {
+    // youtube.com/watch?v=VIDEO_ID (with optional extra params)
+    const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (watchMatch) return watchMatch[1];
+    // youtu.be/VIDEO_ID
+    const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (shortMatch) return shortMatch[1];
+    // youtube.com/shorts/VIDEO_ID
+    const shortsMatch = url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (shortsMatch) return shortsMatch[1];
+    // youtube.com/embed/VIDEO_ID
+    const embedMatch = url.match(/embed\/([a-zA-Z0-9_-]{11})/);
+    if (embedMatch) return embedMatch[1];
+    return null;
+}
+
 export function getEmbedUrl(url: string): string {
-    if (url.includes('youtube.com/watch?v=')) {
-        return url.replace('watch?v=', 'embed/');
-    }
-    if (url.includes('youtu.be/')) {
-        const id = url.split('youtu.be/')[1]?.split('?')[0];
-        return `https://www.youtube.com/embed/${id}`;
-    }
-    if (url.includes('vimeo.com/')) {
-        return url.replace('vimeo.com/', 'player.vimeo.com/video/');
-    }
+    // YouTube — always extract ID and build a clean embed URL
+    const ytId = extractYoutubeId(url);
+    if (ytId) return `https://www.youtube.com/embed/${ytId}`;
+    // Vimeo
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
     return url;
 }
 
 export function isValidVideoUrl(url: string): boolean {
-    return (
-        url.includes('youtube.com/watch') ||
-        url.includes('youtu.be/') ||
-        url.includes('youtube.com/shorts/') ||
-        url.includes('vimeo.com/')
-    );
+    return extractYoutubeId(url) !== null || /vimeo\.com\/\d+/.test(url);
 }
 
 export function getYoutubeThumbnail(url: string): string | null {
-    // youtu.be/VIDEO_ID
-    const shortMatch = url.match(/youtu\.be\/([^?&]+)/);
-    if (shortMatch) return `https://img.youtube.com/vi/${shortMatch[1]}/hqdefault.jpg`;
-    // youtube.com/watch?v=VIDEO_ID
-    const longMatch = url.match(/[?&]v=([^?&]+)/);
-    if (longMatch) return `https://img.youtube.com/vi/${longMatch[1]}/hqdefault.jpg`;
-    // youtube.com/shorts/VIDEO_ID
-    const shortsMatch = url.match(/shorts\/([^?&]+)/);
-    if (shortsMatch) return `https://img.youtube.com/vi/${shortsMatch[1]}/hqdefault.jpg`;
+    const id = extractYoutubeId(url);
+    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
     return null;
 }

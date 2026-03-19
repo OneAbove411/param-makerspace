@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { DiagnosticShuffler } from '../components/home/DiagnosticShuffler';
 import { TelemetryTypewriter } from '../components/home/TelemetryTypewriter';
@@ -11,6 +12,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 
 export function Home() {
+    const navigate = useNavigate();
     const heroRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -53,7 +55,11 @@ export function Home() {
                         The Param Makerspace is a community-driven platform designed to equally support structured learning, community event participation, and collaborative project execution.
                     </p>
                     <div className="hero-text mt-10">
-                        <Button size="lg" className="w-full sm:w-auto uppercase font-bold text-sm tracking-widest shadow-[0_0_40px_rgba(230,59,46,0.3)] hover:shadow-[0_0_60px_rgba(230,59,46,0.5)]">
+                        <Button
+                            size="lg"
+                            className="w-full sm:w-auto uppercase font-bold text-sm tracking-widest shadow-[0_0_40px_rgba(230,59,46,0.3)] hover:shadow-[0_0_60px_rgba(230,59,46,0.5)]"
+                            onClick={() => navigate('/register')}
+                        >
                             Start As Curious
                         </Button>
                     </div>

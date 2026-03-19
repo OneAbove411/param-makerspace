@@ -43,7 +43,7 @@ export function useProjects(domainFilter?: string, sortBy?: 'newest' | 'oldest')
             .select('id, title, summary, domain, tier, status, visibility, created_at, owner_id')
             .eq('status', 'active')
             .eq('visibility', 'public');
-            
+
         if (sortBy === 'oldest') {
             q = q.order('created_at', { ascending: true });
         } else {
@@ -712,7 +712,7 @@ export function useChallengeCompletion(challengeId: string | undefined) {
 export function useProjectMutations() {
     const { user } = useAuth();
 
-    const createProject = async (data: {
+    const createProject = async (input: {
         title: string;
         summary: string;
         description: string;
@@ -722,17 +722,28 @@ export function useProjectMutations() {
         duration?: string;
     }) => {
         if (!user) return { data: null, error: 'Not authenticated' };
-        const { data: project, error } = await supabase
+
+        const { data: inserted, error: insertError } = await supabase
             .from('project')
             .insert({
-                ...data,
+                title: input.title,
+                summary: input.summary || input.title,
+                description: input.description || '',
+                domain: input.domain || null,
+                tier: input.tier || null,
+                github_url: input.github_url || null,
+                duration: input.duration || null,
                 owner_id: user.id,
                 status: 'draft',
                 visibility: 'private',
             })
             .select()
             .single();
-        return { data: project as Project | null, error: error?.message || null };
+
+        return {
+            data: (inserted ?? null) as Project | null,
+            error: insertError?.message || null,
+        };
     };
 
     const updateProject = async (id: string, updates: Partial<Project>) => {

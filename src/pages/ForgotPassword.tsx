@@ -9,7 +9,7 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 export function ForgotPassword() {
     const { resetPassword } = useAuth();
-    const pageRef = useRef(null);
+    const pageRef = useRef<HTMLDivElement>(null);
     const [email, setEmail] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState('');

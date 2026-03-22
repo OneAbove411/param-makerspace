@@ -10,7 +10,7 @@ import { CheckCircle2 } from 'lucide-react';
 export function Register() {
     const { signUp } = useAuth();
     const navigate = useNavigate();
-    const pageRef = useRef(null);
+    const pageRef = useRef<HTMLDivElement>(null);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

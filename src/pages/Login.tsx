@@ -9,7 +9,7 @@ import { Input } from '../components/ui/Input';
 export function Login() {
     const { signIn, user, isLoading } = useAuth();
     const navigate = useNavigate();
-    const pageRef = useRef(null);
+    const pageRef = useRef<HTMLDivElement>(null);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');

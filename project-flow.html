@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Param Makerspace — Complete Project Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Space+Mono:wght@400;700&family=DM+Serif+Display&display=swap');
+
+  :root {
+    --bg: #F5F3EE;
+    --paper: #E8E4DD;
+    --dark: #111111;
+    --red: #C4291E;
+    --white: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--dark);
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid rgba(17,17,17,0.08);
+    padding: 16px 48px;
+    display: flex; align-items: center; gap: 32px;
+    backdrop-filter: blur(12px);
+  }
+  .nav-brand { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: -0.02em; }
+  .nav-brand span { color: var(--red); }
+  .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .nav-links a {
+    font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 6px 12px; border-radius: 999px;
+    text-decoration: none; color: rgba(17,17,17,0.4);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .nav-links a:hover, .nav-links a.active {
+    color: var(--dark); border-color: rgba(17,17,17,0.15); background: var(--white);
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 100px 48px 60px;
+    max-width: 1200px; margin: 0 auto;
+  }
+  .hero-label {
+    font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--red); margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: clamp(42px, 6vw, 80px); text-transform: uppercase;
+    letter-spacing: -0.03em; line-height: 0.9; margin-bottom: 24px;
+  }
+  .hero-desc {
+    font-family: 'Space Mono', monospace; font-size: 13px;
+    color: rgba(17,17,17,0.5); max-width: 600px;
+    border-left: 2px solid var(--red); padding-left: 16px; line-height: 1.8;
+  }
+
+  /* ── SECTION ── */
+  .section {
+    padding: 80px 48px;
+    max-width: 1200px; margin: 0 auto;
+    scroll-margin-top: 80px;
+  }
+  .section-dark {
+    background: var(--dark); color: var(--bg);
+    max-width: 100%; padding: 80px 48px;
+  }
+  .section-dark .inner { max-width: 1200px; margin: 0 auto; }
+  .section-red {
+    background: var(--red); color: var(--white);
+    max-width: 100%; padding: 80px 48px;
+  }
+  .section-red .inner { max-width: 1200px; margin: 0 auto; }
+  .section-alt { background: var(--paper); max-width: 100%; padding: 80px 48px; }
+  .section-alt .inner { max-width: 1200px; margin: 0 auto; }
+
+  .section-num {
+    font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.2em;
+    color: rgba(17,17,17,0.25); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-dark .section-num { color: rgba(245,243,238,0.25); }
+  .section-red .section-num { color: rgba(255,255,255,0.4); }
+  .section-alt .section-num { color: rgba(17,17,17,0.25); }
+
+  .section-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: clamp(24px, 3vw, 36px); margin-bottom: 40px;
+  }
+  .section-dark .section-title { color: var(--bg); }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-step {
+    display: flex; align-items: stretch; gap: 0;
+  }
+  .flow-line {
+    width: 48px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .flow-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--red); flex-shrink: 0;
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 0 2px var(--red);
+  }
+  .flow-connector {
+    width: 2px; flex: 1; background: rgba(196,41,30,0.2); min-height: 20px;
+  }
+  .flow-content {
+    flex: 1; padding: 0 0 32px 16px;
+  }
+  .flow-content h4 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: 16px; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .flow-content p {
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: rgba(17,17,17,0.5); line-height: 1.7;
+  }
+  .flow-content .why {
+    margin-top: 8px; padding: 10px 14px;
+    background: rgba(196,41,30,0.04); border-left: 3px solid var(--red);
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: rgba(17,17,17,0.6); line-height: 1.7;
+  }
+
+  /* ── CARDS GRID ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+  .card {
+    background: var(--white); border: 1px solid rgba(17,17,17,0.06);
+    border-radius: 16px; padding: 28px; transition: all 0.2s;
+  }
+  .card:hover { border-color: rgba(17,17,17,0.15); box-shadow: 0 4px 20px rgba(17,17,17,0.04); }
+  .card-tag {
+    font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--red); margin-bottom: 10px; display: block;
+  }
+  .card h3 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: 16px; margin-bottom: 8px;
+  }
+  .card p {
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: rgba(17,17,17,0.5); line-height: 1.7;
+  }
+
+  .card-dark {
+    background: rgba(245,243,238,0.04); border: 1px solid rgba(245,243,238,0.08);
+    border-radius: 16px; padding: 28px;
+  }
+  .card-dark h3 { color: var(--bg); font-family: 'Space Grotesk'; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+  .card-dark p { color: rgba(245,243,238,0.4); font-family: 'Space Mono'; font-size: 11px; line-height: 1.7; }
+  .card-dark .card-tag { color: var(--red); }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-family: 'Space Mono', monospace; font-size: 11px; }
+  th {
+    text-align: left; padding: 12px 16px;
+    font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em;
+    color: rgba(17,17,17,0.3); border-bottom: 2px solid rgba(17,17,17,0.08);
+  }
+  td { padding: 12px 16px; border-bottom: 1px solid rgba(17,17,17,0.04); color: rgba(17,17,17,0.7); }
+  tr:hover td { background: rgba(196,41,30,0.02); }
+
+  .table-dark th { color: rgba(245,243,238,0.3); border-bottom-color: rgba(245,243,238,0.08); }
+  .table-dark td { color: rgba(245,243,238,0.6); border-bottom-color: rgba(245,243,238,0.04); }
+  .table-dark tr:hover td { background: rgba(245,243,238,0.03); }
+
+  /* ── BADGE / TAG ── */
+  .tag {
+    display: inline-block; font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .tag-red { background: rgba(196,41,30,0.1); color: var(--red); }
+  .tag-dark { background: rgba(17,17,17,0.06); color: rgba(17,17,17,0.5); }
+  .tag-green { background: rgba(5,150,105,0.1); color: #059669; }
+  .tag-blue { background: rgba(37,99,235,0.1); color: #2563EB; }
+  .tag-purple { background: rgba(124,58,237,0.1); color: #7C3AED; }
+
+  /* ── RANK TIMELINE ── */
+  .rank-timeline {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    position: relative; padding: 0 20px;
+  }
+  .rank-timeline::before {
+    content: ''; position: absolute; top: 28px; left: 40px; right: 40px;
+    height: 2px; background: rgba(245,243,238,0.1);
+  }
+  .rank-node {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; position: relative; z-index: 1; flex: 1;
+  }
+  .rank-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; margin-bottom: 12px;
+    border: 2px solid rgba(245,243,238,0.15);
+    background: rgba(245,243,238,0.04);
+    color: rgba(245,243,238,0.3);
+  }
+  .rank-icon.active { background: var(--red); border-color: var(--red); color: var(--white); }
+  .rank-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 11px; text-transform: uppercase; color: rgba(245,243,238,0.5); }
+  .rank-xp { font-family: 'Space Mono'; font-size: 9px; color: rgba(245,243,238,0.25); margin-top: 4px; }
+
+  /* ── DIVIDER ── */
+  .divider { width: 64px; height: 3px; background: var(--red); margin: 0 0 40px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .nav { padding: 12px 20px; gap: 16px; flex-wrap: wrap; }
+    .hero, .section { padding-left: 20px; padding-right: 20px; }
+    .section-dark, .section-red, .section-alt { padding-left: 20px; padding-right: 20px; }
+    .cards { grid-template-columns: 1fr; }
+    .rank-timeline { flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .rank-timeline::before { display: none; }
+  }
+
+  /* ── TOC ── */
+  .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .toc a {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: rgba(17,17,17,0.5); text-decoration: none;
+    padding: 10px 14px; border-radius: 8px;
+    transition: all 0.15s;
+  }
+  .toc a:hover { background: var(--white); color: var(--dark); }
+  .toc-num { font-weight: 700; color: var(--red); min-width: 24px; }
+
+  /* ── Q&A ── */
+  .qa { display: flex; flex-direction: column; gap: 4px; }
+  .qa-item {
+    border: 1px solid rgba(17,17,17,0.05); border-radius: 12px;
+    overflow: hidden; transition: all 0.2s;
+  }
+  .qa-item:hover { border-color: rgba(17,17,17,0.1); }
+  .qa-q {
+    padding: 16px 20px; cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Space Grotesk'; font-weight: 600; font-size: 14px;
+    background: var(--white);
+  }
+  .qa-q::before { content: 'Q'; font-family: 'Space Mono'; font-size: 10px; font-weight: 700; color: var(--red); background: rgba(196,41,30,0.08); padding: 2px 8px; border-radius: 4px; }
+  .qa-a {
+    padding: 0 20px 0 54px; max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: rgba(17,17,17,0.6); line-height: 1.8;
+    background: var(--white);
+  }
+  .qa-item.open .qa-a { max-height: 600px; padding: 0 20px 16px 54px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ NAV ═══════════ -->
+<nav class="nav">
+  <div class="nav-brand">Param<span>.</span> Flow</div>
+  <div class="nav-links">
+    <a href="#overview">Overview</a>
+    <a href="#tech">Tech Stack</a>
+    <a href="#auth">Auth</a>
+    <a href="#roles">Roles</a>
+    <a href="#xp">XP System</a>
+    <a href="#pages">Pages</a>
+    <a href="#data">Data</a>
+    <a href="#user-journey">User Journey</a>
+    <a href="#admin">Admin</a>
+    <a href="#faq">FAQ</a>
+  </div>
+</nav>
+
+<!-- ═══════════ HERO ═══════════ -->
+<div class="hero">
+  <div class="hero-label">System Documentation v2.0.1</div>
+  <h1>Project<br>Flow</h1>
+  <div class="divider"></div>
+  <p class="hero-desc">
+    Complete architectural flow of the Param Makerspace platform.
+    Covers every system, every decision, and every "why" — so any
+    team member, contributor, or auditor can understand the full picture
+    without reading a single line of code.
+  </p>
+</div>
+
+<!-- ═══════════ TABLE OF CONTENTS ═══════════ -->
+<div class="section" style="padding-top: 0;">
+  <div class="section-num"><span>00</span> — <span>Index</span></div>
+  <h2 class="section-title">Table of Contents</h2>
+  <div class="toc">
+    <a href="#overview"><span class="toc-num">01</span> Platform Overview</a>
+    <a href="#tech"><span class="toc-num">02</span> Tech Stack & Why</a>
+    <a href="#design"><span class="toc-num">03</span> Design System</a>
+    <a href="#auth"><span class="toc-num">04</span> Authentication</a>
+    <a href="#roles"><span class="toc-num">05</span> Roles & Permissions</a>
+    <a href="#xp"><span class="toc-num">06</span> XP & Rank System</a>
+    <a href="#badges"><span class="toc-num">07</span> Badge System</a>
+    <a href="#pages"><span class="toc-num">08</span> All Pages & Routes</a>
+    <a href="#data"><span class="toc-num">09</span> Database Schema</a>
+    <a href="#projects"><span class="toc-num">10</span> Projects Flow</a>
+    <a href="#challenges"><span class="toc-num">11</span> Challenges Flow</a>
+    <a href="#events"><span class="toc-num">12</span> Events Flow</a>
+    <a href="#store"><span class="toc-num">13</span> Store Flow</a>
+    <a href="#user-journey"><span class="toc-num">14</span> User Journey</a>
+    <a href="#admin"><span class="toc-num">15</span> Admin & Mentor</a>
+    <a href="#files"><span class="toc-num">16</span> File Structure</a>
+    <a href="#faq"><span class="toc-num">17</span> FAQ</a>
+  </div>
+</div>
+
+<!-- ═══════════ 01 · OVERVIEW ═══════════ -->
+<div class="section" id="overview">
+  <div class="section-num"><span>01</span> — <span>Platform Overview</span></div>
+  <h2 class="section-title">What Is This?</h2>
+  <p class="hero-desc" style="margin-bottom: 40px;">
+    Param Makerspace is a community-driven digital platform for a physical makerspace.
+    It connects makers, mentors, and administrators through a progression-based system
+    where users earn XP, unlock ranks, complete challenges, build projects, attend events,
+    earn badges, and purchase tools from the store.
+  </p>
+  <div class="cards">
+    <div class="card">
+      <span class="card-tag">Core Purpose</span>
+      <h3>Structured Learning</h3>
+      <p>Challenges in 3 tiers (Explorer → Solver → Architect) guide makers from beginner to advanced skills across 7 domains.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Core Purpose</span>
+      <h3>Project Documentation</h3>
+      <p>Makers document builds with images, videos, files, milestones, and team members. Projects go through a review pipeline (draft → pending → active).</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Core Purpose</span>
+      <h3>Community Events</h3>
+      <p>Build challenges, maker meetups, and tech tuesday sessions — with team formation, submissions, and showcasing capabilities.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Core Purpose</span>
+      <h3>Progression System</h3>
+      <p>XP → Ranks → Badges → Feature Unlocks → Store Access. Every action contributes to a maker's growth path through 6 ranks.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 02 · TECH STACK ═══════════ -->
+<div class="section-dark" id="tech">
+  <div class="inner">
+    <div class="section-num"><span>02</span> — <span>Tech Stack</span></div>
+    <h2 class="section-title">Technology Choices & Why</h2>
+    <div class="table-wrap">
+      <table class="table-dark">
+        <thead>
+          <tr><th>Technology</th><th>Version</th><th>Role</th><th>Why This Choice</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>React</td><td>19.2</td><td>UI Framework</td><td>Component model fits the page-by-page structure. Hooks API enables clean data fetching patterns. Largest ecosystem for UI components.</td></tr>
+          <tr><td>TypeScript</td><td>5.9</td><td>Type Safety</td><td>The database has 30+ tables with complex relationships. TypeScript prevents mismatched field names, wrong types, and missing properties at compile time rather than runtime.</td></tr>
+          <tr><td>Vite</td><td>8.0</td><td>Build Tool</td><td>Near-instant HMR in development. ESbuild-based bundling is 10-100x faster than Webpack. Native ESM support.</td></tr>
+          <tr><td>Tailwind CSS</td><td>3.4</td><td>Styling</td><td>Utility-first approach matches the brutalist design system perfectly. Custom tokens (brutal-red, brutal-dark, etc.) are defined once and used everywhere. No CSS file sprawl.</td></tr>
+          <tr><td>Supabase</td><td>2.99</td><td>Backend</td><td>Auth + PostgreSQL + Storage + Realtime in one service. Row Level Security (RLS) handles permissions at the database level. No custom backend needed.</td></tr>
+          <tr><td>GSAP</td><td>3.14</td><td>Animations</td><td>ScrollTrigger plugin enables scroll-based reveal animations. More performant than CSS animations for complex sequences. Hardware-accelerated transforms.</td></tr>
+          <tr><td>React Router</td><td>7.13</td><td>Routing</td><td>Nested routes with outlet-based layouts. ProtectedRoute wrapper enables role-based access control at the route level.</td></tr>
+          <tr><td>Lucide React</td><td>0.577</td><td>Icons</td><td>Tree-shakeable — only icons used are bundled. 300+ consistent icons. Lighter than FontAwesome.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top: 40px;">
+      <h3 style="font-size: 16px; text-transform: uppercase; margin-bottom: 16px; color: var(--bg);">Deployment</h3>
+      <div class="cards" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="card-dark"><span class="card-tag">Hosting</span><h3>Netlify</h3><p>Auto-deploys on git push. Free SSL, CDN, and preview deploys for PRs.</p></div>
+        <div class="card-dark"><span class="card-tag">Database</span><h3>Supabase (AWS ap-south-1)</h3><p>Hosted PostgreSQL in Mumbai region for low latency. Free tier covers makerspace scale.</p></div>
+        <div class="card-dark"><span class="card-tag">Storage</span><h3>Supabase Storage</h3><p>8 buckets for avatars, project media, challenge images, etc. 1-hour CDN cache. 10MB file limit.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 03 · DESIGN SYSTEM ═══════════ -->
+<div class="section" id="design">
+  <div class="section-num"><span>03</span> — <span>Visual Language</span></div>
+  <h2 class="section-title">Design System</h2>
+  <div class="cards">
+    <div class="card">
+      <span class="card-tag">Aesthetic</span>
+      <h3>Brutalist Industrial</h3>
+      <p>Inspired by hardware documentation, technical manuals, and industrial registry systems. Bold type, minimal color, high contrast borders, and raw data presentation.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Colors</span>
+      <h3>4-Color Palette</h3>
+      <p>
+        <span class="tag tag-red">Red #C4291E</span> accent/CTA&nbsp;
+        <span class="tag tag-dark">Dark #111111</span> text/headers&nbsp;
+        <span class="tag" style="background:#F5F3EE;border:1px solid rgba(17,17,17,0.1);">Bg #F5F3EE</span>&nbsp;
+        <span class="tag" style="background:#E8E4DD;border:1px solid rgba(17,17,17,0.1);">Paper #E8E4DD</span>
+      </p>
+      <p style="margin-top:8px;">Why: Constraining to 2 real colors (red + near-black) creates a distinctive identity. Every accent means something — red = action, dark = information.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Typography</span>
+      <h3>3-Font Stack</h3>
+      <p><strong>Space Grotesk</strong> — headings. Geometric, technical, uppercase. Feels like equipment labels.<br>
+      <strong>DM Serif Display</strong> — dramatic emphasis. Used sparingly for hero text.<br>
+      <strong>Space Mono</strong> — data, labels, metadata. Monospace = "system readout" aesthetic.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Animations</span>
+      <h3>GSAP + CSS Keyframes</h3>
+      <p>Hero/entrance animations use CSS @keyframes (immune to React Strict Mode double-mount). Scroll-triggered elements use GSAP ScrollTrigger with useRef guards to prevent double-animation. MagneticCard adds 3D tilt on hover.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 04 · AUTH ═══════════ -->
+<div class="section-alt" id="auth">
+  <div class="inner">
+    <div class="section-num"><span>04</span> — <span>Authentication</span></div>
+    <h2 class="section-title">Auth System Flow</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content">
+          <h4>1. User Registers</h4>
+          <p>Email + password + display name → Supabase Auth creates auth user → app inserts a row in <code>app_user</code> table with role='viewer'.</p>
+          <div class="why"><strong>Why viewer?</strong> New accounts start as viewers until they set up their profile. This prevents empty ghost profiles from cluttering the makers directory.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content">
+          <h4>2. First Sign-In Detection</h4>
+          <p>On login, the system checks if a <code>maker_profile</code> exists. If not → auto-creates one, awards "Curious" badge + 10 XP, and triggers the rank engine.</p>
+          <div class="why"><strong>Why auto-create?</strong> Reduces friction. The user doesn't need to "set up" before browsing. The profile exists immediately with sensible defaults.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content">
+          <h4>3. Session Management</h4>
+          <p>Supabase manages JWTs with auto-refresh. The app stores tokens in localStorage with a version tag (APP_VERSION = 2.0.1). On app update, stale tokens are wiped to prevent auth errors from schema changes.</p>
+          <div class="why"><strong>Why version-tag tokens?</strong> When the database schema changes (new columns, renamed fields), old tokens may cause mismatched queries. Auto-wiping forces a fresh login with current schema expectations.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content">
+          <h4>4. Role Sync</h4>
+          <p>The app fetches the user's role from <code>app_user</code> on every auth state change. The AuthContext provides: user object, session, role, and all auth methods (signIn, signOut, resetPassword, refreshUser).</p>
+          <div class="why"><strong>Why re-fetch on every auth change?</strong> Admins can change a user's role at any time. Re-fetching ensures the UI reflects current permissions without requiring a logout.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 05 · ROLES ═══════════ -->
+<div class="section" id="roles">
+  <div class="section-num"><span>05</span> — <span>Access Control</span></div>
+  <h2 class="section-title">Roles & Permissions</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Can Do</th><th>Cannot Do</th><th>Why This Role Exists</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag tag-dark">Viewer</span></td>
+          <td>Browse all public pages, view projects, challenges, events, makers, badges, store</td>
+          <td>Create projects, complete challenges, register for events, purchase items</td>
+          <td>Default role for new signups. Prevents spam accounts from submitting content before setting up a real profile.</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-blue">Maker</span></td>
+          <td>Everything viewer can + create projects, complete challenges, register for events, purchase from store, edit own profile</td>
+          <td>Review others' work, manage users, create challenges</td>
+          <td>The core user. Once a viewer completes profile setup, they become a maker. Most users stay at this level.</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-purple">Mentor</span></td>
+          <td>Everything maker can + review/approve projects, verify challenge completions, review event submissions, manage events, manage inventory</td>
+          <td>Manage users, create challenges, manage store/badges/equipment</td>
+          <td>Experienced community members who guide others. They validate work quality without full admin access.</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-red">Admin</span></td>
+          <td>Full access to everything including user management, challenge creation, badge management, store management, equipment management</td>
+          <td>Nothing — full access</td>
+          <td>Makerspace staff who configure the platform. Should be 1-3 people maximum.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="why" style="margin-top: 24px;">
+    <strong>Why this hierarchy?</strong> It mirrors how a physical makerspace works. New visitors (viewers) can look around. Members (makers) can use equipment and build things. Senior members (mentors) help newcomers and validate safety/quality. Staff (admins) manage the space.
+  </div>
+</div>
+
+<!-- ═══════════ 06 · XP SYSTEM ═══════════ -->
+<div class="section-dark" id="xp">
+  <div class="inner">
+    <div class="section-num"><span>06</span> — <span>Progression Engine</span></div>
+    <h2 class="section-title">XP & Rank System</h2>
+
+    <div class="rank-timeline" style="margin-bottom: 48px;">
+      <div class="rank-node"><div class="rank-icon active">C</div><div class="rank-name">Curious</div><div class="rank-xp">0 XP</div></div>
+      <div class="rank-node"><div class="rank-icon">T</div><div class="rank-name">Tinkerer</div><div class="rank-xp">60 XP</div></div>
+      <div class="rank-node"><div class="rank-icon">B</div><div class="rank-name">Builder</div><div class="rank-xp">250 XP</div></div>
+      <div class="rank-node"><div class="rank-icon">M</div><div class="rank-name">Maker</div><div class="rank-xp">600 XP</div></div>
+      <div class="rank-node"><div class="rank-icon">I</div><div class="rank-name">Innovator</div><div class="rank-xp">1200 XP</div></div>
+      <div class="rank-node"><div class="rank-icon">L</div><div class="rank-name">Lab Pro</div><div class="rank-xp">2500 XP<br>(Mentor only)</div></div>
+    </div>
+
+    <h3 style="font-size: 16px; text-transform: uppercase; margin-bottom: 20px; color: var(--bg);">XP Rewards Table</h3>
+    <table class="table-dark">
+      <thead><tr><th>Action</th><th>XP Earned</th><th>Why This Amount</th></tr></thead>
+      <tbody>
+        <tr><td>First login (profile creation)</td><td>10 XP</td><td>Small reward to get the counter moving. Creates psychological momentum.</td></tr>
+        <tr><td>Profile completed (bio + avatar + link)</td><td>50 XP</td><td>Encourages real profiles over empty ones. Combined with first login = 60 XP = Tinkerer rank.</td></tr>
+        <tr><td>Tier 1 challenge completed</td><td>50 XP</td><td>Beginner challenges. One T1 challenge + profile = Tinkerer.</td></tr>
+        <tr><td>Tier 2 challenge completed</td><td>150 XP</td><td>Intermediate. Requires real skill demonstration.</td></tr>
+        <tr><td>Tier 3 challenge completed</td><td>400 XP</td><td>Advanced. Significant effort = significant reward.</td></tr>
+        <tr><td>Project approved (pending → active)</td><td>100 XP</td><td>Mentor-verified quality. Not just "submitted" but "reviewed and accepted."</td></tr>
+        <tr><td>Project becomes active</td><td>200 XP</td><td>Full project lifecycle completion. The maker has built something real.</td></tr>
+        <tr><td>Event registration</td><td>25 XP</td><td>Showing up matters. Low bar to encourage participation.</td></tr>
+        <tr><td>Event presentation/showcase</td><td>75 XP</td><td>Active participation > passive attendance.</td></tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top: 40px;">
+      <h3 style="font-size: 16px; text-transform: uppercase; margin-bottom: 20px; color: var(--bg);">Rank-Gated Features</h3>
+      <table class="table-dark">
+        <thead><tr><th>Feature</th><th>Required Rank</th><th>Why Gated</th></tr></thead>
+        <tbody>
+          <tr><td>Browse platform, view content</td><td>Curious (all users)</td><td>No barriers to exploration. Anyone can look around.</td></tr>
+          <tr><td>Create a project</td><td>Tinkerer</td><td>Must have completed at least one challenge first. Proves minimum engagement.</td></tr>
+          <tr><td>Submit to build challenges</td><td>Tinkerer</td><td>Same reasoning — must have done a basic challenge before entering competitions.</td></tr>
+          <tr><td>View Tier 3 challenges</td><td>Builder</td><td>Advanced content shouldn't overwhelm beginners. Unlocking it feels like progression.</td></tr>
+          <tr><td>Book showcase slots</td><td>Builder</td><td>Presentation slots are limited. Builders have proven commitment.</td></tr>
+          <tr><td>Propose Tier 3 projects</td><td>Maker</td><td>Complex projects need experienced makers who understand the space.</td></tr>
+          <tr><td>Request mentor role</td><td>Innovator</td><td>Must demonstrate deep involvement before guiding others.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 07 · BADGES ═══════════ -->
+<div class="section" id="badges">
+  <div class="section-num"><span>07</span> — <span>Achievement System</span></div>
+  <h2 class="section-title">Badge System</h2>
+  <div class="cards">
+    <div class="card">
+      <span class="card-tag">Type 1</span>
+      <h3>Progression Badges (6)</h3>
+      <p>One per rank: Curious, Tinkerer, Builder, Maker, Innovator, Lab Pro. Auto-awarded when you reach the rank. These are the "main quest" badges.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Type 2</span>
+      <h3>Domain Badges (7 domains × 3 tiers = 21)</h3>
+      <p>Electronics, Robotics, AI, Design, Fabrication, Bio, Interdisciplinary — each with Tier 1/2/3. Earned by completing domain-specific challenges. These are the "skill tree."</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Type 3</span>
+      <h3>Special / Event Badges</h3>
+      <p>Custom badges for achievements, events, or community contributions. Events can auto-award a badge on registration. These are the "side quests" — collectible, optional, fun.</p>
+    </div>
+    <div class="card">
+      <span class="card-tag">Store Integration</span>
+      <h3>Badge-Gated Products</h3>
+      <p>Store products can require a specific badge to purchase. Example: advanced tools locked behind domain T3 badges. Creates a tangible reward for badge collection.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 08 · PAGES ═══════════ -->
+<div class="section-alt" id="pages">
+  <div class="inner">
+    <div class="section-num"><span>08</span> — <span>Navigation Map</span></div>
+    <h2 class="section-title">All Pages & Routes</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Route</th><th>Page</th><th>Access</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code></td><td>Home</td><td>Public</td><td>Landing page with philosophy, featured projects, rank path, maker loop visualization.</td></tr>
+          <tr><td><code>/projects</code></td><td>Project Archive</td><td>Public</td><td>Browse all active projects. Filter by domain, sort by date/reactions.</td></tr>
+          <tr><td><code>/projects/:id</code></td><td>Project Details</td><td>Public</td><td>Full project page with gallery, videos, files, milestones, team, reactions, comments.</td></tr>
+          <tr><td><code>/projects/:id/edit</code></td><td>Edit Project</td><td>Owner only</td><td>Edit own project details, upload media, manage milestones and team.</td></tr>
+          <tr><td><code>/challenges</code></td><td>Explorer Hub</td><td>Public</td><td>Browse challenges by tier and domain. Tier 3 content gated behind Builder rank.</td></tr>
+          <tr><td><code>/challenges/:id</code></td><td>Challenge Details</td><td>Public</td><td>Challenge brief: mission, steps, materials, vocabulary, skills. Submit completion evidence.</td></tr>
+          <tr><td><code>/events</code></td><td>Events</td><td>Public</td><td>Upcoming and past events. Filter by type (build challenge, meetup, tech tuesday).</td></tr>
+          <tr><td><code>/events/:id</code></td><td>Event Details</td><td>Public</td><td>Event info, registration, team formation, submissions.</td></tr>
+          <tr><td><code>/makers</code></td><td>Makers Directory</td><td>Public</td><td>Browse all public maker profiles. Filter by role, search by name/skill/domain.</td></tr>
+          <tr><td><code>/makers/:id</code></td><td>Maker Profile</td><td>Public</td><td>Full profile with bio, badges, projects, domain mastery levels, events attended.</td></tr>
+          <tr><td><code>/badges</code></td><td>Badge Catalog</td><td>Public</td><td>All badges: progression journey, domain mastery grid, special achievements.</td></tr>
+          <tr><td><code>/store</code></td><td>Store</td><td>Public</td><td>Products for purchase. Badge-gated items shown locked with unlock requirements.</td></tr>
+          <tr><td><code>/dashboard</code></td><td>Dashboard</td><td>Auth</td><td>Personal hub: stats, XP history, projects, upcoming events, challenge progress.</td></tr>
+          <tr><td><code>/profile-setup</code></td><td>Profile Setup</td><td>Auth</td><td>Edit display name, bio, avatar, social links, mentor configuration, privacy.</td></tr>
+          <tr><td><code>/login</code></td><td>Login</td><td>Public</td><td>Email/password sign-in.</td></tr>
+          <tr><td><code>/register</code></td><td>Register</td><td>Public</td><td>Email/password/name sign-up.</td></tr>
+          <tr><td><code>/forgot-password</code></td><td>Forgot Password</td><td>Public</td><td>Password reset via email.</td></tr>
+          <tr><td><code>/admin/*</code></td><td>Admin Panel</td><td>Mentor/Admin</td><td>Management pages for users, projects, challenges, events, badges, store, equipment, inventory.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 09 · DATABASE ═══════════ -->
+<div class="section-dark" id="data">
+  <div class="inner">
+    <div class="section-num"><span>09</span> — <span>Data Architecture</span></div>
+    <h2 class="section-title">Database Schema</h2>
+    <p style="color: rgba(245,243,238,0.4); font-family: 'Space Mono'; font-size: 12px; margin-bottom: 40px; max-width: 600px;">
+      PostgreSQL on Supabase. Row Level Security (RLS) enforces access at the database level — even if the frontend is compromised, unauthorized data access is blocked.
+    </p>
+    <div class="cards" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+      <div class="card-dark"><span class="card-tag">Users</span><h3>app_user</h3><p>id, auth_id, email, name, role, xp, rank, is_active. Core identity table linked to Supabase Auth.</p></div>
+      <div class="card-dark"><span class="card-tag">Users</span><h3>maker_profile</h3><p>display_name, bio, avatar, social links (github, linkedin, x, bluesky, discord, website), mentor_domains, privacy flags.</p></div>
+      <div class="card-dark"><span class="card-tag">Users</span><h3>xp_event</h3><p>Audit log of every XP change. user_id, amount, reason, reference_id, reference_type. Full traceability.</p></div>
+      <div class="card-dark"><span class="card-tag">Projects</span><h3>project</h3><p>title, summary, description, domain, tier, status (draft/pending/active/rejected), github_url, duration.</p></div>
+      <div class="card-dark"><span class="card-tag">Projects</span><h3>project_image/video/file</h3><p>Media attachments with display_order for gallery sequencing.</p></div>
+      <div class="card-dark"><span class="card-tag">Projects</span><h3>project_member + milestone</h3><p>Team members with roles. Milestones with completion tracking.</p></div>
+      <div class="card-dark"><span class="card-tag">Challenges</span><h3>challenge</h3><p>title, tier (1-3), domain, time_estimate, mystery flag, core_idea, mission, success_criteria.</p></div>
+      <div class="card-dark"><span class="card-tag">Challenges</span><h3>challenge_step/material/skill/vocab</h3><p>Structured content: ordered steps, required materials, skills taught, vocabulary terms with definitions.</p></div>
+      <div class="card-dark"><span class="card-tag">Challenges</span><h3>challenge_completion</h3><p>User submissions with evidence_url, notes. Status: pending → verified/rejected by mentor.</p></div>
+      <div class="card-dark"><span class="card-tag">Events</span><h3>event</h3><p>title, type (build_challenge/meetup/tech_tuesday), date, location, capacity, auto_badge_id.</p></div>
+      <div class="card-dark"><span class="card-tag">Events</span><h3>event_registration/checkin/team</h3><p>Registration tracking, check-in by mentors, team formation with lead.</p></div>
+      <div class="card-dark"><span class="card-tag">Badges</span><h3>badge + user_badge</h3><p>badge: name, tier, domain, type, criteria. user_badge: who earned what, when, awarded_by.</p></div>
+      <div class="card-dark"><span class="card-tag">Store</span><h3>store_product + order</h3><p>Products with optional badge requirement. Orders with line items and status tracking.</p></div>
+      <div class="card-dark"><span class="card-tag">Community</span><h3>comment + reaction</h3><p>Polymorphic: target_type (project/challenge/event) + target_id. Reactions: like/upvote/bookmark.</p></div>
+      <div class="card-dark"><span class="card-tag">Operations</span><h3>equipment + inventory</h3><p>Equipment with induction tracking (safety training). Inventory for consumable materials.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 10 · PROJECTS ═══════════ -->
+<div class="section" id="projects">
+  <div class="section-num"><span>10</span> — <span>Build Pipeline</span></div>
+  <h2 class="section-title">Projects Flow</h2>
+  <div class="flow">
+    <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+      <div class="flow-content"><h4>Draft</h4><p>Maker creates project with title, summary, domain. Can add images, videos, files, milestones, team members. Visible only to owner.</p></div></div>
+    <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+      <div class="flow-content"><h4>Submit for Review</h4><p>Maker clicks "Submit for Review." Status changes to <code>pending_review</code>. Appears in mentor/admin review queue.</p></div></div>
+    <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+      <div class="flow-content"><h4>Review</h4><p>Mentor or admin reviews the project. They can approve (→ active) or reject (→ rejected with feedback).</p></div></div>
+    <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+      <div class="flow-content"><h4>Active</h4><p>Project appears in public archive. Owner gets 100 XP (first approval) + 200 XP (active). May unlock Builder badge.</p>
+      <div class="why"><strong>Why require review?</strong> Quality control. The makerspace's public portfolio should only contain properly documented, real builds — not test posts or spam.</div></div></div>
+  </div>
+</div>
+
+<!-- ═══════════ 11 · CHALLENGES ═══════════ -->
+<div class="section-red" id="challenges">
+  <div class="inner">
+    <div class="section-num"><span>11</span> — <span>Learning Paths</span></div>
+    <h2 class="section-title" style="color: var(--white);">Challenges Flow</h2>
+    <div class="cards" style="grid-template-columns: repeat(3, 1fr);">
+      <div style="background: rgba(255,255,255,0.08); border-radius: 16px; padding: 28px;">
+        <span style="font-family:'Space Mono';font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:rgba(255,255,255,0.5);display:block;margin-bottom:10px;">Tier 1 — Explorer</span>
+        <h3 style="color:white;font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:8px;">Beginner</h3>
+        <p style="color:rgba(255,255,255,0.5);font-family:'Space Mono';font-size:11px;line-height:1.7;">Entry-level tasks across any domain. Introduces tools, safety, basic concepts. Reward: 50 XP + domain T1 badge.</p>
+      </div>
+      <div style="background: rgba(255,255,255,0.08); border-radius: 16px; padding: 28px;">
+        <span style="font-family:'Space Mono';font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:rgba(255,255,255,0.5);display:block;margin-bottom:10px;">Tier 2 — Solver</span>
+        <h3 style="color:white;font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:8px;">Intermediate</h3>
+        <p style="color:rgba(255,255,255,0.5);font-family:'Space Mono';font-size:11px;line-height:1.7;">Real problem-solving. Multiple steps, materials lists, vocabulary. Requires demonstrated skill. Reward: 150 XP + domain T2 badge.</p>
+      </div>
+      <div style="background: rgba(255,255,255,0.08); border-radius: 16px; padding: 28px;">
+        <span style="font-family:'Space Mono';font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:rgba(255,255,255,0.5);display:block;margin-bottom:10px;">Tier 3 — Architect</span>
+        <h3 style="color:white;font-family:'Space Grotesk';font-weight:700;font-size:16px;margin-bottom:8px;">Advanced</h3>
+        <p style="color:rgba(255,255,255,0.5);font-family:'Space Mono';font-size:11px;line-height:1.7;">Complex multi-step projects. Visible only to Builder rank+. Reward: 400 XP + domain T3 badge. May gate store products.</p>
+      </div>
+    </div>
+    <div style="margin-top: 40px; background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; font-family: 'Space Mono'; font-size: 11px; color: rgba(255,255,255,0.5); line-height: 1.8;">
+      <strong style="color: white;">Completion Flow:</strong> Maker views challenge → clicks "Mark Complete" → uploads evidence (photo/link) + notes → submission goes to <code>pending</code> → Mentor verifies → on verification: XP awarded, domain badge checked, rank recalculated.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 12 · EVENTS ═══════════ -->
+<div class="section" id="events">
+  <div class="section-num"><span>12</span> — <span>Community Gatherings</span></div>
+  <h2 class="section-title">Events Flow</h2>
+  <div class="cards">
+    <div class="card"><span class="card-tag">Type</span><h3>Build Challenge</h3><p>Competitive build events with teams, submissions, and judging. Think hackathons. Teams form, build, submit, get reviewed.</p></div>
+    <div class="card"><span class="card-tag">Type</span><h3>Maker Meetup</h3><p>Informal community gatherings. Show & tell, networking, knowledge sharing. Low barrier, high social value.</p></div>
+    <div class="card"><span class="card-tag">Type</span><h3>Tech Tuesday</h3><p>Weekly educational sessions. Workshops, demos, skill-building. Regular cadence builds habit and community rhythm.</p></div>
+  </div>
+  <div class="why" style="margin-top: 24px;">
+    <strong>Event lifecycle:</strong> Admin creates event → Makers register (25 XP) → Optional: team formation → Event happens → Optional: submissions reviewed → Optional: auto-badge awarded to registrants. Events can have <code>auto_badge_id</code> — registering auto-awards a specific badge.
+  </div>
+</div>
+
+<!-- ═══════════ 13 · STORE ═══════════ -->
+<div class="section-alt" id="store">
+  <div class="inner">
+    <div class="section-num"><span>13</span> — <span>Marketplace</span></div>
+    <h2 class="section-title">Store Flow</h2>
+    <div class="flow">
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content"><h4>Browse Products</h4><p>All active products displayed. Each shows name, description, price (₹), category tag, and image. Badge-gated items appear in a locked section with blur effect.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content"><h4>Badge Check</h4><p>Products can have <code>required_badge_id</code>. If the user hasn't earned that badge, the product is locked. Shows which badge is needed.</p>
+        <div class="why"><strong>Why badge-gate products?</strong> Safety. A maker shouldn't buy advanced machining tools until they've proven domain knowledge through challenges. The badge proves competency.</div></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content"><h4>Purchase</h4><p>Logged-in maker clicks "Purchase" → Order created in <code>store_order</code> + line item in <code>store_order_item</code>. Status: pending. Confirmation shown immediately.</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 14 · USER JOURNEY ═══════════ -->
+<div class="section-dark" id="user-journey">
+  <div class="inner">
+    <div class="section-num"><span>14</span> — <span>The Path</span></div>
+    <h2 class="section-title">Complete User Journey</h2>
+    <p style="color: rgba(245,243,238,0.4); font-family: 'Space Mono'; font-size: 12px; margin-bottom: 40px; max-width: 700px;">
+      From first visit to Lab Pro — this is the intended progression path that the entire platform is designed around.
+    </p>
+    <div class="flow">
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">1. Discovery</h4>
+          <p style="color: rgba(245,243,238,0.5);">Visitor lands on homepage → browses projects, challenges, makers → decides to join.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">2. Registration → Curious (0 XP)</h4>
+          <p style="color: rgba(245,243,238,0.5);">Creates account → auto-assigned viewer role → first login auto-creates profile + Curious badge + 10 XP. Can browse everything but can't create.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">3. Profile Setup → Tinkerer (60 XP)</h4>
+          <p style="color: rgba(245,243,238,0.5);">Completes bio + avatar + social link = 50 XP. Total: 60 XP → Tinkerer rank. Role upgraded to maker. Can now create projects and complete challenges.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">4. First Challenge → Domain Badge</h4>
+          <p style="color: rgba(245,243,238,0.5);">Completes a Tier 1 challenge = 50 XP + domain T1 badge. Attends an event = 25 XP. Total ~135 XP.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">5. First Project → Builder (250 XP)</h4>
+          <p style="color: rgba(245,243,238,0.5);">Creates project → submits for review → mentor approves = 100 XP + Builder badge. Project goes active = 200 XP. Unlocks Tier 3 challenges and showcase slots.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">6. Deep Engagement → Maker (600 XP)</h4>
+          <p style="color: rgba(245,243,238,0.5);">More challenges (T2 = 150 XP each), more projects, more events. Accumulates domain badges across multiple areas. Can propose T3 projects.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">7. Mastery → Innovator (1200 XP)</h4>
+          <p style="color: rgba(245,243,238,0.5);">Tier 3 challenges (400 XP each), multiple active projects, event presentations. Can request mentor role.</p></div></div>
+      <div class="flow-step"><div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-content" style="color: var(--bg);">
+          <h4 style="color: var(--bg);">8. Leadership → Lab Pro (2500 XP + Mentor role)</h4>
+          <p style="color: rgba(245,243,238,0.5);">Admin grants mentor role → with 2500+ XP and 3+ active projects → Lab Pro rank. Can review projects, verify challenges, manage events. Full circle: the maker becomes a guide.</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 15 · ADMIN ═══════════ -->
+<div class="section" id="admin">
+  <div class="section-num"><span>15</span> — <span>Management</span></div>
+  <h2 class="section-title">Admin & Mentor Panels</h2>
+  <div class="cards">
+    <div class="card"><span class="card-tag">Admin</span><h3>Manage Users</h3><p>View all users, change roles (viewer→maker→mentor→admin), activate/deactivate accounts. The nuclear button — controls who can do what.</p></div>
+    <div class="card"><span class="card-tag">Admin</span><h3>Manage Challenges</h3><p>Create/edit challenges with full content: steps, materials, skills, vocabulary, images, videos. Set tier, domain, time estimate.</p></div>
+    <div class="card"><span class="card-tag">Mentor+</span><h3>Review Projects</h3><p>Queue of pending_review projects. Approve → active (awards XP) or reject with feedback. Quality gate for the public archive.</p></div>
+    <div class="card"><span class="card-tag">Mentor+</span><h3>Review Challenges</h3><p>Queue of pending challenge completions. Verify evidence → awards XP + domain badge. Or reject with reason.</p></div>
+    <div class="card"><span class="card-tag">Admin</span><h3>Manage Badges</h3><p>Create/edit badges. Set name, tier, domain, type, criteria, image. Badges are the currency of the progression system.</p></div>
+    <div class="card"><span class="card-tag">Admin</span><h3>Manage Store</h3><p>Create/edit products. Set price, category, image, badge requirement. Toggle active/inactive.</p></div>
+    <div class="card"><span class="card-tag">Mentor+</span><h3>Manage Events</h3><p>Create events with type, date, location, capacity. Set auto-badge. View registrations and check-ins.</p></div>
+    <div class="card"><span class="card-tag">Admin</span><h3>Equipment & Inventory</h3><p>Equipment: track machines, inductions (safety training), bookings. Inventory: consumable materials with quantities and locations.</p></div>
+  </div>
+</div>
+
+<!-- ═══════════ 16 · FILE STRUCTURE ═══════════ -->
+<div class="section-alt" id="files">
+  <div class="inner">
+    <div class="section-num"><span>16</span> — <span>Codebase Map</span></div>
+    <h2 class="section-title">File Structure</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Path</th><th>Purpose</th><th>Why It Exists</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/App.tsx</code></td><td>Router + route guards</td><td>Single source of truth for all routes and their role requirements.</td></tr>
+          <tr><td><code>src/lib/auth.tsx</code></td><td>Auth context + flows</td><td>Centralized auth logic prevents scattered login/logout code across components.</td></tr>
+          <tr><td><code>src/lib/hooks.ts</code></td><td>40+ data hooks</td><td>One file = one import. All Supabase queries co-located for easy maintenance and type safety.</td></tr>
+          <tr><td><code>src/lib/database.types.ts</code></td><td>Full TypeScript schema</td><td>Generated from Supabase. Every table, column, and type defined. Catches schema mismatches at compile time.</td></tr>
+          <tr><td><code>src/lib/xpEngine.ts</code></td><td>XP + rank logic</td><td>Separated from hooks because it's pure business logic — no React, no Supabase. Testable in isolation.</td></tr>
+          <tr><td><code>src/lib/badgeEngine.ts</code></td><td>Badge award triggers</td><td>Event-driven: "when X happens, award Y badge." Centralized so badge logic doesn't leak into page components.</td></tr>
+          <tr><td><code>src/lib/rankAccess.ts</code></td><td>Feature gating</td><td>Maps features to required ranks. Components import <code>canAccess('feature')</code> instead of hardcoding rank checks.</td></tr>
+          <tr><td><code>src/lib/supabase.ts</code></td><td>Supabase client</td><td>Singleton client with session persistence, HMR-safe lock, and storage helpers.</td></tr>
+          <tr><td><code>src/components/layout/</code></td><td>App shell</td><td>Navbar, Footer, ProtectedRoute, SessionGuard, ScrollToTop — structural components that wrap pages.</td></tr>
+          <tr><td><code>src/components/ui/</code></td><td>Reusable UI</td><td>Button, Card, Input, RankBadge, MagneticCard, BadgeIcon — design system components used across all pages.</td></tr>
+          <tr><td><code>src/pages/</code></td><td>Route pages</td><td>One file per route. Self-contained: each page fetches its own data via hooks.</td></tr>
+          <tr><td><code>src/pages/admin/</code></td><td>Admin panels</td><td>Separated from public pages. All guarded by ProtectedRoute with mentor/admin roles.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 17 · FAQ ═══════════ -->
+<div class="section" id="faq">
+  <div class="section-num"><span>17</span> — <span>Common Questions</span></div>
+  <h2 class="section-title">FAQ</h2>
+  <div class="qa">
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why Supabase instead of a custom backend?</div><div class="qa-a">Supabase provides auth, database, storage, and realtime in one hosted service. For a makerspace platform with &lt;1000 users, building a custom Express/Django backend would be over-engineering. Supabase's free tier covers the scale, and Row Level Security (RLS) handles authorization at the database layer — more secure than application-level checks alone.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why do new users start as "viewer" instead of "maker"?</div><div class="qa-a">Spam prevention and quality control. If new signups immediately got maker access, bots could create projects, spam challenges, and pollute the platform. Starting as viewer means you can browse but not create. Upgrading to maker requires completing your profile — a signal of genuine intent.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why is the XP system not just a simple level counter?</div><div class="qa-a">Ranks are named (Curious, Tinkerer, Builder...) instead of numbered (Level 1, 2, 3...) because names create identity. A "Builder" feels like an achievement. "Level 3" feels generic. The names also describe what you can do at that level — a Tinkerer tinkers (completes challenges), a Builder builds (creates projects).</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why are challenges structured with steps, materials, skills, and vocabulary?</div><div class="qa-a">This mimics how real makerspace instruction works. A laser cutting challenge needs: step-by-step instructions (steps), the acrylic sheet and settings (materials), what you'll learn (skills), and terms like "kerf" or "vector cut" (vocabulary). It's a complete learning unit, not just a task description.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why do projects require mentor review?</div><div class="qa-a">The public project archive is the makerspace's portfolio. If anyone could publish without review, the quality would degrade. Mentor review ensures: (1) the project is real (not a test post), (2) it's documented well enough to be useful, (3) safety standards were followed. It's quality curation, not censorship.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why can't I see Tier 3 challenges until I'm a Builder?</div><div class="qa-a">Two reasons: (1) Pedagogical — advanced challenges assume knowledge from T1/T2. Showing them to beginners creates confusion and discouragement. (2) Motivational — unlocking new content feels rewarding. It gives Builders something new to discover, reinforcing the progression loop.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why are store products badge-gated?</div><div class="qa-a">Safety. In a physical makerspace, you don't hand someone a CNC mill until they've completed safety training. Badge-gating is the digital equivalent: the domain badge proves you completed the relevant challenges, which means you have the knowledge to safely use the tool.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why GSAP instead of Framer Motion or CSS animations?</div><div class="qa-a">GSAP's ScrollTrigger plugin is the industry standard for scroll-based animations. Framer Motion is great for component transitions but weaker for scroll-driven sequences. CSS animations can't do scroll-triggered stagger effects. GSAP gives precise control over timing, easing, and triggering.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why CSS keyframes for hero animations instead of GSAP?</div><div class="qa-a">React 19 Strict Mode double-mounts components in development. GSAP's fromTo() with ctx.revert() cleanup breaks — revert sets opacity to 0, second mount animates 0→0 (invisible). CSS @keyframes are immune because they're declarative, not imperative. GSAP is still used for scroll-triggered elements with a useRef guard to prevent double-animation.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">How does the polymorphic comment/reaction system work?</div><div class="qa-a">Comments and reactions use target_type + target_id instead of separate tables per entity. So one "comment" table handles project comments, challenge comments, and event comments. target_type = "project" + target_id = project's UUID. This avoids table proliferation and keeps the code DRY — one useComments() hook works for everything.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why is Lab Pro rank restricted to mentors?</div><div class="qa-a">Lab Pro represents mastery + leadership. Having 2500 XP proves deep engagement. Having the mentor role proves the community trusts you to guide others. Both are required because XP alone doesn't prove teaching ability, and mentor role alone doesn't prove hands-on experience.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">What happens if a user's role is changed while they're logged in?</div><div class="qa-a">The auth context re-fetches the user's role from app_user on every auth state change. So if an admin promotes a viewer to maker, the user's next action will trigger a role sync. No logout required. The ProtectedRoute component checks the live role, not a cached one.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why version-tag auth tokens?</div><div class="qa-a">When the database schema changes (new columns, renamed tables), old tokens may carry stale session data that causes mismatched queries. The APP_VERSION constant (currently 2.0.1) is stored alongside the token. On app load, if the stored version doesn't match, all tokens are wiped and the user must re-login — getting a fresh session that matches the current schema.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">How many Supabase storage buckets are there and why?</div><div class="qa-a">8 buckets: avatars, project-images, project-files, challenge-images, event-images, badge-images, product-images, equipment-images, induction-certificates. Separate buckets enable different RLS policies per content type. Avatars are public read, anyone can upload. Project files require auth. Induction certificates are mentor-only readable.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">Why are all hooks in one file instead of separate files?</div><div class="qa-a">Discoverability. With 40+ hooks, having them in one file means Cmd+F finds anything instantly. They're grouped by entity (projects, challenges, events...) with comment headers. Splitting into 15 files would add import complexity without meaningful benefit at this scale. If the app grew to 100+ hooks, splitting would make sense.</div></div>
+    <div class="qa-item"><div class="qa-q" onclick="this.parentElement.classList.toggle('open')">What are the 7 domains and why these specific ones?</div><div class="qa-a">Electronics, Robotics, AI, Design, Fabrication, Bio, Interdisciplinary. These map to the physical zones/equipment in the Param makerspace. Electronics = soldering stations, oscilloscopes. Robotics = motors, sensors. AI = computing resources. Design = CAD workstations. Fabrication = 3D printers, laser cutters. Bio = lab equipment. Interdisciplinary = cross-domain projects.</div></div>
+  </div>
+</div>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<div style="background: var(--dark); padding: 48px; text-align: center;">
+  <p style="font-family: 'Space Grotesk'; font-weight: 700; font-size: 24px; color: var(--bg); text-transform: uppercase; margin-bottom: 8px;">Param.</p>
+  <p style="font-family: 'Space Mono'; font-size: 10px; color: rgba(245,243,238,0.3); letter-spacing: 0.1em; text-transform: uppercase;">
+    Built by Makers, for Makers. Project Flow Document v2.0.1
+  </p>
+</div>
+
+</body>
+</html>

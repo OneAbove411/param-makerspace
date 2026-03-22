@@ -48,3 +48,15 @@ body::before {
 .interactive-lift:hover {
   transform: translateY(-1px);
 }
+
+/* Fade + slide-in for streaming activity items */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

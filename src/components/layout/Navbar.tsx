@@ -113,7 +113,7 @@ export function Navbar() {
                             <Link to="/login" className="hidden sm:block font-data text-sm font-bold hover:underline interactive-lift">Log In</Link>
                             <Link to="/register">
                                 <Button variant={(scrolled || !isHome) ? "primary" : "secondary"} size="sm">
-                                    Start as Curious
+                                    Join the Lab
                                 </Button>
                             </Link>
                         </>
@@ -152,7 +152,7 @@ export function Navbar() {
                             <>
                                 <Link to="/login" className="text-brutal-dark font-bold hover:text-brutal-red py-2">Log In</Link>
                                 <Link to="/register">
-                                    <Button className="w-full">Start as Curious</Button>
+                                    <Button className="w-full">Join the Lab</Button>
                                 </Link>
                             </>
                         )}

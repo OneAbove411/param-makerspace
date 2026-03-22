@@ -60,3 +60,15 @@ body::before {
     transform: translateY(0);
   }
 }
+
+/* General fade-in-up for page entrances */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

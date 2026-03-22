@@ -1,156 +1,333 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChallenges } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
+import { MagneticCard } from '../components/ui/MagneticCard';
 import { Link } from 'react-router-dom';
-import { Clock } from 'lucide-react';
+import { Clock, ArrowRight, Loader2, Compass, Wrench, Cpu } from 'lucide-react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+// ─── Tier metadata ───
+
+const TIER_INFO = [
+    {
+        key: 'Tier 1',
+        name: 'Explorer',
+        subtitle: 'Fundamental workshops and core engineering principles.',
+        icon: Compass,
+    },
+    {
+        key: 'Tier 2',
+        name: 'Solver',
+        subtitle: 'Complex problem-solving and cross-platform integration missions.',
+        icon: Wrench,
+    },
+    {
+        key: 'Tier 3',
+        name: 'Architect',
+        subtitle: 'High-level systems design and industrial-scale development.',
+        icon: Cpu,
+    },
+];
+
+const DOMAINS = ['All', 'Electronics', 'Robotics', 'AI', 'Design', 'Fabrication'];
+
+// ─── Domain color map for badges ───
+
+const DOMAIN_COLORS: Record<string, string> = {
+    electronics: 'bg-brutal-red text-brutal-bg',
+    robotics: 'bg-blue-600 text-white',
+    ai: 'bg-green-700 text-white',
+    design: 'bg-purple-600 text-white',
+    fabrication: 'bg-amber-600 text-white',
+    bio: 'bg-teal-600 text-white',
+    interdisciplinary: 'bg-brutal-dark text-brutal-bg',
+};
+
+function getDomainBadgeClass(domain: string | null): string {
+    if (!domain) return 'bg-brutal-dark/10 text-brutal-dark/50';
+    return DOMAIN_COLORS[domain.toLowerCase()] || 'bg-brutal-dark/10 text-brutal-dark/50';
+}
+
+// ─── Skeleton for loading ───
+
+function ChallengeSkeleton() {
+    return (
+        <div className="rounded-2xl border-2 border-brutal-dark/5 overflow-hidden animate-pulse">
+            <div className="h-48 bg-brutal-dark/5" />
+            <div className="p-5 space-y-3">
+                <div className="h-5 w-3/4 bg-brutal-dark/5 rounded" />
+                <div className="h-3 w-full bg-brutal-dark/[0.03] rounded" />
+                <div className="h-3 w-1/2 bg-brutal-dark/[0.03] rounded" />
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Component ───
 
 export function Challenges() {
     const [tierFilter, setTierFilter] = useState('All');
     const [domainFilter, setDomainFilter] = useState('All');
-    const tiers = ['All', 'Tier 1', 'Tier 2', 'Tier 3'];
-    const domains = ['All', 'Electronics', 'Robotics', 'AI', 'Design', 'Fabrication', 'Bio', 'Interdisciplinary'];
     const { data: challenges, loading } = useChallenges(tierFilter, domainFilter);
+    const pageRef = useRef<HTMLDivElement>(null);
+    const [visibleCount, setVisibleCount] = useState(9);
+
     const normalizeDomain = (d: string) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
-    
-    const tierMap: Record<string, number> = { 'All': 0, 'Tier 1': 1, 'Tier 2': 2, 'Tier 3': 3 };
-    const activeTier = tierMap[tierFilter] || 0;
+
+    const visibleChallenges = (challenges || []).slice(0, visibleCount);
+    const hasMore = (challenges || []).length > visibleCount;
+
+    // ─── GSAP Animations ───
+    useEffect(() => {
+        const ctx = gsap.context(() => {
+            // Hero text entrance
+            gsap.fromTo('.eh-hero-text',
+                { y: 50, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.9, stagger: 0.12, ease: 'power3.out', delay: 0.1 }
+            );
+
+            // Tier cards entrance
+            gsap.fromTo('.eh-tier-card',
+                { y: 40, opacity: 0 },
+                {
+                    y: 0, opacity: 1,
+                    duration: 0.7, stagger: 0.1, ease: 'power3.out',
+                    scrollTrigger: { trigger: '.eh-tiers-section', start: 'top 80%' }
+                }
+            );
+        }, pageRef);
+
+        return () => ctx.revert();
+    }, []);
+
+    // Animate challenge cards on data change
+    useEffect(() => {
+        if (loading || !challenges?.length) return;
+
+        const ctx = gsap.context(() => {
+            gsap.fromTo('.eh-challenge-card',
+                { y: 40, opacity: 0 },
+                {
+                    y: 0, opacity: 1,
+                    duration: 0.6, stagger: 0.06, ease: 'power3.out',
+                    scrollTrigger: { trigger: '.eh-challenges-grid', start: 'top 85%' }
+                }
+            );
+        }, pageRef);
+
+        return () => ctx.revert();
+    }, [loading, challenges?.length, tierFilter, domainFilter]);
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg pt-40 px-6 md:px-12 lg:px-24 min-h-screen">
-            <div className="max-w-7xl mx-auto">
-                <h1 className="font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading mb-8">
+        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
+
+            {/* ═══════════════════════════════════════════════════
+                HERO SECTION
+            ═══════════════════════════════════════════════════ */}
+            <section className="pt-36 pb-16 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto">
+                <h1 className="eh-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading">
                     Explorer Hub
                 </h1>
+                <p className="eh-hero-text font-heading text-base md:text-lg text-brutal-dark/55 max-w-lg mt-6 leading-relaxed">
+                    The central repository for technical challenges, architectural blueprints,
+                    and cross-domain engineering missions. Prototype. Deploy. Ascend.
+                </p>
+            </section>
 
-                {/* Filters */}
-                <div className="flex flex-col gap-y-3 mb-12 border-b-2 border-brutal-dark/10 pb-6">
-                    <div className="flex flex-wrap gap-4">
-                        {tiers.map(t => (
+            {/* ═══════════════════════════════════════════════════
+                ACCESS TIERS — 3 cards showing tier progression
+            ═══════════════════════════════════════════════════ */}
+            <section className="eh-tiers-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto pb-20">
+                <div className="flex items-center gap-3 mb-8">
+                    <span className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest">01</span>
+                    <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading">Access Tiers</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {TIER_INFO.map((tier, i) => {
+                        const isActive = tierFilter === tier.key || tierFilter === 'All';
+                        const Icon = tier.icon;
+
+                        return (
                             <button
-                                key={t}
-                                onClick={() => setTierFilter(t)}
-                                className={`px-4 py-2 font-data text-sm font-bold rounded-full transition-colors border-2 ${tierFilter === t
-                                        ? 'bg-brutal-red text-brutal-bg border-brutal-red'
-                                        : 'border-brutal-dark/20 text-brutal-dark hover:border-brutal-dark hover:bg-brutal-dark/5'
-                                    }`}
+                                key={tier.key}
+                                onClick={() => setTierFilter(tierFilter === tier.key ? 'All' : tier.key)}
+                                className={`eh-tier-card text-left p-6 rounded-2xl border-2 transition-all duration-300 group
+                                    ${isActive && tierFilter !== 'All'
+                                        ? 'border-brutal-red bg-brutal-bg shadow-[0_4px_24px_rgba(196,41,30,0.06)]'
+                                        : 'border-brutal-dark/10 bg-brutal-bg hover:border-brutal-dark/25'}`}
                             >
-                                {t}
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className={`font-data text-[9px] font-bold uppercase tracking-[0.2em]
+                                        ${isActive && tierFilter !== 'All' ? 'text-brutal-red' : 'text-brutal-dark/35'}`}>
+                                        {tierFilter !== 'All' && tierFilter === tier.key ? 'Active Pathway' : `Tier ${i + 1} Access`}
+                                    </span>
+                                    <Icon size={20} className={`transition-colors ${isActive && tierFilter !== 'All'
+                                        ? 'text-brutal-red' : 'text-brutal-dark/20'}`} />
+                                </div>
+
+                                <h3 className="font-heading font-bold text-xl uppercase tracking-tight-heading mb-1.5">
+                                    {tier.name}
+                                </h3>
+                                <p className="font-data text-xs text-brutal-dark/50 leading-relaxed">
+                                    {tier.subtitle}
+                                </p>
+
+                                {/* Progress indicator line */}
+                                <div className="w-full h-0.5 bg-brutal-dark/8 rounded-full mt-5">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500
+                                            ${isActive && tierFilter !== 'All' ? 'bg-brutal-red w-full' : 'bg-brutal-dark/15 w-0'}`}
+                                    />
+                                </div>
                             </button>
-                        ))}
+                        );
+                    })}
+                </div>
+            </section>
+
+            {/* ═══════════════════════════════════════════════════
+                ACTIVE CHALLENGES — domain filters + card grid
+            ═══════════════════════════════════════════════════ */}
+            <section className="px-6 md:px-12 lg:px-24 max-w-7xl mx-auto pb-32">
+                {/* Section header with domain filter pills */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-3">
+                        <span className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest">02</span>
+                        <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading">Active Challenges</h2>
                     </div>
+
                     <div className="flex flex-wrap gap-2">
-                        {domains.map(d => (
+                        {DOMAINS.map(d => (
                             <button
                                 key={d}
-                                onClick={() => {
-                                    console.log('Clicked domain pill:', d);
-                                    setDomainFilter(d);
-                                }}
-                                className={`px-3 py-1.5 font-data text-xs rounded-full transition-colors border ${domainFilter === d
-                                        ? 'bg-brutal-dark text-brutal-bg border-brutal-dark'
-                                        : 'border-brutal-dark/20 text-brutal-dark/70 hover:border-brutal-dark hover:text-brutal-dark hover:bg-brutal-dark/5'
-                                    }`}
+                                onClick={() => setDomainFilter(d)}
+                                className={`px-3.5 py-1.5 font-data text-[10px] font-bold rounded-full transition-all duration-200 uppercase tracking-wider
+                                    ${domainFilter === d
+                                        ? 'bg-brutal-dark text-brutal-bg'
+                                        : 'border border-brutal-dark/15 text-brutal-dark/50 hover:border-brutal-dark/40 hover:text-brutal-dark'}`}
                             >
+                                {d === 'All' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 opacity-60" />}
+                                {d !== 'All' && <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${getDomainBadgeClass(d).split(' ')[0]}`} />}
                                 {d}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <div className="mb-12 flex flex-col md:flex-row gap-4 items-center justify-between pointer-events-none">
-                    <div className={`flex-1 w-full flex flex-col items-center justify-center p-4 rounded-2xl text-center border-2 transition-all ${
-                        activeTier === 0 || activeTier >= 1 
-                            ? 'bg-brutal-dark text-brutal-bg border-brutal-dark' 
-                            : 'bg-brutal-dark/10 text-brutal-dark/40 border-brutal-dark/10'
-                    }`}>
-                        <strong className="font-heading text-lg tracking-widest uppercase mb-1">Tier 1 &mdash; Explorer</strong>
-                        <span className="font-data text-xs">Curiosity & basics</span>
-                    </div>
+                {/* Count */}
+                {!loading && challenges && (
+                    <p className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest mb-6 text-right">
+                        Showing {visibleChallenges.length} of {challenges.length} challenge{challenges.length !== 1 ? 's' : ''}
+                    </p>
+                )}
 
-                    <div className="hidden md:block text-brutal-dark/30 font-bold font-data">→</div>
-                    
-                    <div className={`flex-1 w-full flex flex-col items-center justify-center p-4 rounded-2xl text-center border-2 transition-all ${
-                        activeTier === 0 || activeTier >= 2 
-                            ? 'bg-brutal-dark text-brutal-bg border-brutal-dark' 
-                            : 'bg-brutal-dark/10 text-brutal-dark/40 border-brutal-dark/10'
-                    }`}>
-                        <strong className="font-heading text-lg tracking-widest uppercase mb-1">Tier 2 &mdash; Solver</strong>
-                        <span className="font-data text-xs">Apply & problem-solve</span>
-                    </div>
-
-                    <div className="hidden md:block text-brutal-dark/30 font-bold font-data">→</div>
-                    
-                    <div className={`flex-1 w-full flex flex-col items-center justify-center p-4 rounded-2xl text-center border-2 transition-all ${
-                        activeTier === 0 || activeTier >= 3 
-                            ? 'bg-brutal-dark text-brutal-bg border-brutal-dark' 
-                            : 'bg-brutal-dark/10 text-brutal-dark/40 border-brutal-dark/10'
-                    }`}>
-                        <strong className="font-heading text-lg tracking-widest uppercase mb-1">Tier 3 &mdash; Architect</strong>
-                        <span className="font-data text-xs">Build complete systems</span>
-                    </div>
-                </div>
-
+                {/* Challenge cards grid */}
                 {loading ? (
-                    <div className="py-20 text-center font-data text-brutal-dark/50">Loading challenges...</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[...Array(6)].map((_, i) => <ChallengeSkeleton key={i} />)}
+                    </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-32">
-                        {(challenges || []).map(challenge => (
-                            <Link key={challenge.id} to={`/challenges/${challenge.id}`} className="group interactive-lift block">
-                                <Card className="h-full flex flex-col group-hover:border-brutal-dark transition-colors duration-300 pointer-events-auto">
-                                    <div className="h-48 w-full overflow-hidden bg-brutal-dark relative">
-                                        {challenge.cover_image_url ? (
-                                            <img
-                                                src={challenge.cover_image_url}
-                                                alt={challenge.title}
-                                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ease-out"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center font-data text-brutal-bg/20">NO IMAGE</div>
-                                        )}
-                                        <div className="absolute top-4 left-4 flex gap-2">
-                                            {challenge.tier && <span className="bg-brutal-dark text-brutal-bg px-2 py-1 text-xs font-bold font-data rounded border border-brutal-dark/10 shadow-sm">{challenge.tier}</span>}
-                                        </div>
-                                        {challenge.domain && (
-                                            <div className="absolute top-4 right-4">
-                                                <span className="bg-brutal-bg text-brutal-dark px-2 py-1 text-xs font-bold font-data rounded border border-brutal-bg/10 shadow-sm">{normalizeDomain(challenge.domain)}</span>
+                    <>
+                        <div className="eh-challenges-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {visibleChallenges.map(challenge => (
+                                <MagneticCard
+                                    key={challenge.id}
+                                    className="eh-challenge-card"
+                                    glowOnHover
+                                    intensity={5}
+                                >
+                                    <Link to={`/challenges/${challenge.id}`} className="block h-full">
+                                        <Card className="h-full flex flex-col hover:border-brutal-dark/25 transition-colors duration-300">
+                                            {/* Image */}
+                                            <div className="h-48 w-full overflow-hidden bg-brutal-dark relative group">
+                                                {challenge.cover_image_url ? (
+                                                    <img
+                                                        src={challenge.cover_image_url}
+                                                        alt={challenge.title}
+                                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100
+                                                                   group-hover:scale-105 transition-all duration-700 ease-out"
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="w-full h-full"
+                                                        style={{
+                                                            backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.06) 1px, transparent 1px)',
+                                                            backgroundSize: '20px 20px',
+                                                        }}
+                                                    />
+                                                )}
+
+                                                {/* Badges overlay */}
+                                                <div className="absolute top-3 left-3 flex gap-1.5">
+                                                    {challenge.tier && (
+                                                        <span className="bg-brutal-dark/80 text-brutal-bg px-2 py-0.5 text-[9px] font-bold font-data rounded uppercase tracking-wider backdrop-blur-sm">
+                                                            {challenge.tier}
+                                                        </span>
+                                                    )}
+                                                    {challenge.domain && (
+                                                        <span className={`px-2 py-0.5 text-[9px] font-bold font-data rounded uppercase tracking-wider ${getDomainBadgeClass(challenge.domain)}`}>
+                                                            {normalizeDomain(challenge.domain)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
 
-                                    <div className="p-6 flex-1 flex flex-col">
-                                        <h3 className="font-heading font-bold text-2xl mb-2 line-clamp-2 leading-tight">{challenge.title}</h3>
-                                        
-                                        {challenge.mystery && (
-                                            <p className="font-data text-xs text-brutal-dark/60 italic mb-4 line-clamp-2 pb-2">
-                                                {challenge.mystery.length > 80 ? challenge.mystery.substring(0, 80) + '...' : challenge.mystery}
-                                            </p>
-                                        )}
+                                            {/* Content */}
+                                            <div className="p-5 flex-1 flex flex-col">
+                                                <h3 className="font-heading font-bold text-lg mb-1.5 leading-tight line-clamp-2 group-hover:text-brutal-red transition-colors">
+                                                    {challenge.title}
+                                                </h3>
 
-                                        <div className="flex items-center justify-between border-t border-brutal-dark/10 pt-4 mt-auto">
-                                            {challenge.domain ? (
-                                                <span className="font-data text-xs font-bold text-brutal-red bg-brutal-red/10 px-2 py-1 rounded">
-                                                    {normalizeDomain(challenge.domain)}
-                                                </span>
-                                            ) : (
-                                                <span /> // Spacer
-                                            )}
-                                            <div className="flex items-center gap-2 font-data text-xs font-bold text-brutal-dark/60 uppercase">
-                                                <Clock className="w-4 h-4" /> {challenge.time_estimate || 'Varies'}
+                                                {challenge.mystery && (
+                                                    <p className="font-data text-xs text-brutal-dark/50 leading-relaxed mb-4 line-clamp-2">
+                                                        {challenge.mystery}
+                                                    </p>
+                                                )}
+
+                                                <div className="flex items-center justify-between mt-auto pt-4 border-t border-brutal-dark/5">
+                                                    <span className="font-data text-[10px] font-bold text-brutal-red uppercase tracking-wider flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
+                                                        View Blueprint <ArrowRight size={12} />
+                                                    </span>
+                                                    {challenge.time_estimate && (
+                                                        <span className="font-data text-[10px] text-brutal-dark/35 font-bold flex items-center gap-1 uppercase">
+                                                            <Clock size={11} /> {challenge.time_estimate}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </Link>
-                        ))}
+                                        </Card>
+                                    </Link>
+                                </MagneticCard>
+                            ))}
 
-                        {(challenges || []).length === 0 && !loading && (
-                            <div className="col-span-full py-20 text-center font-data text-brutal-dark/50 border-2 border-dashed border-brutal-dark/20 rounded-2xl">
-                                No challenges found.
+                            {(challenges || []).length === 0 && (
+                                <div className="col-span-full py-20 text-center font-data text-sm text-brutal-dark/30 border-2 border-dashed border-brutal-dark/10 rounded-2xl">
+                                    No challenges found for this filter.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Load More */}
+                        {hasMore && (
+                            <div className="flex justify-center mt-12">
+                                <button
+                                    onClick={() => setVisibleCount(prev => prev + 9)}
+                                    className="flex items-center gap-3 px-8 py-3.5 bg-brutal-dark text-brutal-bg font-data text-xs font-bold
+                                               uppercase tracking-widest rounded-full hover:bg-brutal-red transition-colors duration-300
+                                               shadow-[0_4px_20px_rgba(17,17,17,0.15)] hover:shadow-[0_4px_24px_rgba(196,41,30,0.2)]"
+                                >
+                                    Load More Archives
+                                    <Loader2 size={14} className="opacity-50" />
+                                </button>
                             </div>
                         )}
-                    </div>
+                    </>
                 )}
-            </div>
+            </section>
         </div>
     );
 }

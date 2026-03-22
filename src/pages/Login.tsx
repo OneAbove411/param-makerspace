@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { gsap } from 'gsap';
 import { useAuth } from '../lib/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
@@ -8,10 +9,23 @@ import { Input } from '../components/ui/Input';
 export function Login() {
     const { signIn, user, isLoading } = useAuth();
     const navigate = useNavigate();
+    const pageRef = useRef(null);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // GSAP entrance animation
+    useEffect(() => {
+        const cardElement = pageRef.current?.querySelector('.auth-card');
+        if (cardElement) {
+            gsap.fromTo(
+                cardElement,
+                { y: 30, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out' }
+            );
+        }
+    }, []);
 
     // Redirect already-authenticated users (e.g. non-incognito with stored session)
     useEffect(() => {
@@ -36,13 +50,13 @@ export function Login() {
     };
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg min-h-screen flex items-center justify-center p-6 pt-32">
-            <Card className="w-full max-w-md p-8 shadow-2xl border-2 border-brutal-dark/10 bg-white/70 backdrop-blur-sm">
-                <h1 className="font-heading font-bold text-4xl mb-2 text-brutal-dark uppercase tracking-tight-heading">System Access</h1>
-                <p className="font-data text-sm text-brutal-dark/60 mb-8 border-l-2 border-brutal-red pl-3">Provide credentials to access the Param Makerspace internal network.</p>
+        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen flex items-center justify-center p-6 pt-32">
+            <Card className="auth-card w-full max-w-md p-8 border-2 border-brutal-dark/10">
+                <h1 className="font-heading font-bold text-3xl uppercase tracking-tight-heading mb-2 text-brutal-dark">System Access</h1>
+                <p className="font-data text-xs text-brutal-dark/50 border-l-2 border-brutal-red pl-3 mb-8">Provide credentials to access the Param Makerspace internal network.</p>
 
                 {error && (
-                    <div className="mb-6 p-3 bg-brutal-red/10 border-2 border-brutal-red/30 rounded-xl">
+                    <div className="mb-6 p-3 bg-brutal-red/5 border border-brutal-red/20 rounded-xl">
                         <p className="font-data text-sm text-brutal-red font-bold">{error}</p>
                     </div>
                 )}
@@ -65,17 +79,17 @@ export function Login() {
                         required
                     />
 
-                    <div className="flex justify-between items-center text-sm font-data font-bold">
-                        <Link to="/forgot-password" className="text-brutal-dark/60 hover:text-brutal-red">Forgot Password?</Link>
+                    <div className="flex justify-between items-center">
+                        <Link to="/forgot-password" className="font-data text-xs font-bold text-brutal-dark/60 hover:text-brutal-red">Forgot Password?</Link>
                     </div>
 
-                    <Button type="submit" className="w-full text-lg shadow-[0_4px_14px_0_rgba(230,59,46,0.39)] uppercase" disabled={loading}>
+                    <Button type="submit" className="w-full text-lg uppercase" disabled={loading}>
                         {loading ? 'Authenticating...' : 'Authenticate'}
                     </Button>
 
-                    <div className="text-center font-data text-sm mt-6">
+                    <div className="text-center font-data text-xs mt-6">
                         <span className="text-brutal-dark/60">New initialization? </span>
-                        <Link to="/register" className="text-brutal-red font-bold hover:underline">Register Here</Link>
+                        <Link to="/register" className="font-bold text-brutal-red hover:underline">Register Here</Link>
                     </div>
                 </form>
             </Card>

@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+gsap.registerPlugin(ScrollTrigger);
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useProject, useProjectMutations } from '../lib/hooks';
@@ -28,6 +31,7 @@ import type { Project } from '../lib/database.types';
 
 
 export function EditProject() {
+    const pageRef = useRef<HTMLDivElement>(null);
     const { id } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -333,9 +337,44 @@ export function EditProject() {
         await fetchMembers();
     };
 
+    // GSAP entrance animations (after all data is loaded)
+    useEffect(() => {
+        if (loading || !project || !pageRef.current) return;
+
+        // Animate hero text elements
+        gsap.fromTo(
+            '.ep-hero-text',
+            { y: 40, opacity: 0 },
+            { y: 0, opacity: 1, stagger: 0.1, duration: 0.8, ease: 'power3.out' }
+        );
+
+        // Animate sections with ScrollTrigger
+        gsap.utils.toArray('.ep-section').forEach((element: any) => {
+            gsap.fromTo(
+                element,
+                { y: 40, opacity: 0 },
+                {
+                    y: 0,
+                    opacity: 1,
+                    duration: 0.8,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: element,
+                        start: 'top 80%',
+                        markers: false,
+                    },
+                }
+            );
+        });
+
+        return () => {
+            ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+        };
+    }, [loading, project]);
+
     return (
-        <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
-            <div className="max-w-4xl mx-auto space-y-8">
+        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
+            <div className="pt-36 pb-8 px-6 md:px-12 lg:px-24 max-w-4xl mx-auto space-y-8">
                 <div className="flex items-center gap-3 mb-2">
                     <span className={`px-2 py-1 text-xs font-bold font-data rounded uppercase text-white ${project.status === 'draft' ? 'bg-brutal-dark/40' :
                             project.status === 'pending_review' ? 'bg-yellow-500 text-yellow-900' :
@@ -354,11 +393,11 @@ export function EditProject() {
 
                 <div className="flex justify-between items-end border-b-2 border-brutal-dark/10 pb-6">
                     <div>
-                        <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading flex items-center gap-4">
+                        <h1 className="ep-hero-text font-heading font-bold text-5xl md:text-6xl uppercase tracking-tight-heading flex items-center gap-4">
                             <Settings className="w-10 h-10 text-brutal-dark" />
                             Edit Project
                         </h1>
-                        <p className="font-data text-lg text-brutal-dark/60 mt-2">
+                        <p className="ep-hero-text font-data text-lg text-brutal-dark/60 mt-2">
                             Update your project thesis, attach CAD files, and upload gallery images.
                         </p>
                     </div>
@@ -385,8 +424,9 @@ export function EditProject() {
                                 </div>
                             )}
 
-                            <Card className="p-8 border-2 border-brutal-dark/20">
-                                <h2 className="font-heading font-bold text-2xl uppercase border-b-2 border-brutal-dark/10 pb-4 mb-6">Core Details</h2>
+                            <Card className="ep-section p-8 border-2 border-brutal-dark/20">
+                                <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                                <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading mb-6">01 Core Details</h2>
                                 <form onSubmit={handleSave} className="space-y-6">
                                     <Input label="Project Title" required value={form.title || ''} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                                     <Input label="Summary (One-line pitch)" required value={form.summary || ''} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
@@ -417,9 +457,10 @@ export function EditProject() {
                         </div>
 
                         {/* ── Milestones ── */}
-                        <section ref={milestoneListRef} className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10 scroll-mt-32">
-                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
-                                <CheckCircle2 className="w-5 h-5" /> Build Milestones
+                        <section ref={milestoneListRef} className="ep-section bg-brutal-dark/5 rounded-2xl p-5 border border-brutal-dark/10 scroll-mt-32">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase tracking-tight-heading flex items-center gap-2">
+                                <CheckCircle2 className="w-5 h-5" /> 02 Build Milestones
                             </h3>
                             <div className="flex flex-col gap-2 mb-6">
                                 <input
@@ -468,9 +509,10 @@ export function EditProject() {
                         </section>
 
                         {/* ── Contributors ── */}
-                        <section className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
-                                <Users className="w-5 h-5" /> Contributors
+                        <section className="ep-section bg-brutal-dark/5 rounded-2xl p-5 border border-brutal-dark/10">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase tracking-tight-heading flex items-center gap-2">
+                                <Users className="w-5 h-5" /> 03 Contributors
                             </h3>
 
                             <div className="mb-6 relative">
@@ -560,8 +602,8 @@ export function EditProject() {
                     <div className="space-y-6">
                         {/* Submit card */}
                         {(project.status === 'draft' || project.status === 'rejected') && (
-                            <Card className="p-6 border-2 border-brutal-red bg-brutal-red/5">
-                                <h3 className="font-heading font-bold text-xl uppercase text-brutal-red mb-2">Ready to Build?</h3>
+                            <Card className="ep-section p-6 border-2 border-brutal-red bg-brutal-red/5">
+                                <h3 className="font-heading font-bold text-lg uppercase text-brutal-red mb-2">Ready to Build?</h3>
                                 <p className="font-data text-sm text-brutal-dark/70 mb-4">Submit to mentors for approval to begin fabrication.</p>
                                 <Button className="w-full justify-center gap-2" onClick={handleSubmitForReview} disabled={actionLoading}>
                                     <Send className="w-4 h-4" /> Submit for Review
@@ -570,9 +612,10 @@ export function EditProject() {
                         )}
 
                         {/* ── Gallery Images ── */}
-                        <section className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
-                                <ImageIcon className="w-5 h-5" /> Gallery Images
+                        <section className="ep-section bg-brutal-dark/5 rounded-2xl p-5 border border-brutal-dark/10">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase tracking-tight-heading flex items-center gap-2">
+                                <ImageIcon className="w-5 h-5" /> 04 Gallery Images
                             </h3>
                             <div className="space-y-3 mb-4">
                                 {project.images && project.images.length > 0 ? (
@@ -612,9 +655,10 @@ export function EditProject() {
 
                         {/* ── Video Links ── */}
                         {/* ── Video Links — simple list ── */}
-                        <section className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
-                                <Youtube className="w-5 h-5 text-brutal-red" /> Video Links
+                        <section className="ep-section bg-brutal-dark/5 rounded-2xl p-5 border border-brutal-dark/10">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase tracking-tight-heading flex items-center gap-2">
+                                <Youtube className="w-5 h-5 text-brutal-red" /> 05 Video Links
                             </h3>
                             <div className="space-y-2 mb-4">
                                 {videos.length > 0 ? videos.map((vid) => {
@@ -664,9 +708,10 @@ export function EditProject() {
                         </section>
 
                         {/* ── Source Files ── */}
-                        <section className="bg-brutal-dark/5 rounded-[2rem] p-6 border border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-lg mb-4 uppercase flex items-center gap-2 border-b-2 border-brutal-dark/10 pb-2">
-                                <FileText className="w-5 h-5" /> Source Files
+                        <section className="ep-section bg-brutal-dark/5 rounded-2xl p-5 border border-brutal-dark/10">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg mb-4 uppercase tracking-tight-heading flex items-center gap-2">
+                                <FileText className="w-5 h-5" /> 06 Source Files
                             </h3>
                             <div className="space-y-2 mb-4">
                                 {project.files && project.files.length > 0 ? (

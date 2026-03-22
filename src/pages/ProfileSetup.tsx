@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+gsap.registerPlugin(ScrollTrigger);
 import { useAuth } from '../lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { useMyProfile, useProfileMutation, useSupabaseQuery } from '../lib/hooks';
@@ -35,6 +38,7 @@ function PrivacyToggle({ label, value, onChange }: { label: string; value: boole
 }
 
 export function ProfileSetup() {
+    const pageRef = useRef<HTMLDivElement>(null);
     const { user, role } = useAuth();
     const navigate = useNavigate();
     const { data: existingProfile, loading: profileLoading } = useMyProfile();
@@ -114,6 +118,41 @@ export function ProfileSetup() {
         }
     }, [existingProfile, user]);
 
+    // GSAP entrance animations
+    useEffect(() => {
+        if (!pageRef.current) return;
+
+        // Animate hero text elements
+        gsap.fromTo(
+            '.ps-hero-text',
+            { y: 40, opacity: 0 },
+            { y: 0, opacity: 1, stagger: 0.1, duration: 0.8, ease: 'power3.out' }
+        );
+
+        // Animate form sections with ScrollTrigger
+        gsap.utils.toArray('.ps-section').forEach((element: any) => {
+            gsap.fromTo(
+                element,
+                { y: 40, opacity: 0 },
+                {
+                    y: 0,
+                    opacity: 1,
+                    duration: 0.8,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: element,
+                        start: 'top 80%',
+                        markers: false,
+                    },
+                }
+            );
+        });
+
+        return () => {
+            ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+        };
+    }, []);
+
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -186,16 +225,16 @@ export function ProfileSetup() {
     }
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
-            <div className="max-w-3xl mx-auto">
-                <h1 className="font-heading font-bold text-5xl md:text-6xl uppercase tracking-tight-heading mb-4">
+        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
+            <div className="pt-36 pb-8 px-6 md:px-12 lg:px-24 max-w-3xl mx-auto">
+                <h1 className="ps-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
                     Identity Configuration
                 </h1>
-                <p className="font-data text-xl text-brutal-dark/60 mb-12 border-l-4 border-brutal-red pl-4">
+                <p className="ps-hero-text font-data text-base text-brutal-dark/50 border-l-2 border-brutal-red pl-4 mb-12">
                     Customize your public presence in the Maker Directory.
                 </p>
 
-                <Card className="p-8 md:p-12 border-2 border-brutal-dark/10 shadow-xl">
+                <Card className="p-8 md:p-10 border-2 border-brutal-dark/10">
                     {error && (
                         <div className="mb-6 p-3 bg-brutal-red/10 border-2 border-brutal-red/30 rounded-xl">
                             <p className="font-data text-sm text-brutal-red font-bold">{error}</p>
@@ -207,7 +246,7 @@ export function ProfileSetup() {
                         {/* Avatar Upload */}
                         <div className="flex flex-col items-center gap-4 pb-8 border-b-2 border-brutal-dark/10 mb-8">
                             <div className="relative group">
-                                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-brutal-dark bg-brutal-dark flex items-center justify-center">
+                                <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-brutal-dark bg-brutal-dark flex items-center justify-center">
                                     {avatarPreview || (existingProfile as any)?.avatar_url ? (
                                         <img
                                             src={avatarPreview || (existingProfile as any)?.avatar_url || ''}
@@ -234,8 +273,9 @@ export function ProfileSetup() {
                         </div>
 
                         {/* Basic Telemetry */}
-                        <div className="space-y-6">
-                            <h3 className="font-heading font-bold text-2xl border-b border-brutal-dark/10 pb-2 uppercase tracking-tight-heading text-brutal-red">Basic Telemetry</h3>
+                        <div className="ps-section space-y-6">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">01 Basic Telemetry</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <Input
                                     label="Full Name"
@@ -263,8 +303,9 @@ export function ProfileSetup() {
                         </div>
 
                         {/* Privacy Controls */}
-                        <div className="space-y-4">
-                            <h3 className="font-heading font-bold text-2xl border-b border-brutal-dark/10 pb-2 uppercase tracking-tight-heading text-brutal-red">Privacy</h3>
+                        <div className="ps-section space-y-4">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">02 Privacy</h3>
                             <div className="flex items-center justify-between p-4 bg-brutal-dark/5 rounded-xl border border-brutal-dark/10">
                                 <div>
                                     <span className="font-data text-sm font-bold block">{user?.email}</span>
@@ -279,8 +320,9 @@ export function ProfileSetup() {
                         </div>
 
                         {/* Capabilities */}
-                        <div className="space-y-6">
-                            <h3 className="font-heading font-bold text-2xl border-b border-brutal-dark/10 pb-2 uppercase tracking-tight-heading text-brutal-red">Capabilities</h3>
+                        <div className="ps-section space-y-6">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">03 Capabilities</h3>
                             <div>
                                 <label className="font-data text-sm font-bold text-brutal-dark mb-2 block uppercase tracking-wider">Tags & Skills (Comma Separated)</label>
                                 <Input
@@ -301,8 +343,9 @@ export function ProfileSetup() {
                         </div>
 
                         {/* Links */}
-                        <div className="space-y-6">
-                            <h3 className="font-heading font-bold text-2xl border-b border-brutal-dark/10 pb-2 uppercase tracking-tight-heading text-brutal-red">Links</h3>
+                        <div className="ps-section space-y-6">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">04 Links</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <Input
                                     label="GitHub URL"
@@ -345,9 +388,10 @@ export function ProfileSetup() {
 
                         {/* Mentor Configuration (only for mentors) */}
                         {role === 'mentor' && (
-                            <div className="space-y-6 pt-8 border-t-2 border-brutal-dark/10">
-                                <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading text-brutal-red">
-                                    Mentor Configuration
+                            <div className="ps-section space-y-6 pt-8 border-t-2 border-brutal-dark/10">
+                                <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                                <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">
+                                    05 Mentor Configuration
                                 </h3>
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark mb-2 block uppercase tracking-wider">
@@ -379,8 +423,9 @@ export function ProfileSetup() {
                         )}
 
                         {/* Your Progress (Domain Levels) */}
-                        <div className="space-y-4 pt-8 border-t-2 border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading text-brutal-red">Your Progress</h3>
+                        <div className="ps-section space-y-4 pt-8 border-t-2 border-brutal-dark/10">
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-4"></div>
+                            <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">06 Your Progress</h3>
                             {domainLevels.length > 0 ? (
                                 <div className="space-y-2">
                                     {domainLevels.map(dl => (

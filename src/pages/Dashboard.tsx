@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
@@ -9,6 +11,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award } from 'lucide-react';
 import { isValidVideoUrl } from '../lib/videoUtils';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export function Dashboard() {
     const { user, role } = useAuth();
@@ -23,6 +27,7 @@ export function Dashboard() {
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const [videoUrlError, setVideoUrlError] = useState('');
 
+    const pageRef = useRef<HTMLDivElement>(null);
     const formRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -30,6 +35,44 @@ export function Dashboard() {
             formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }, [showNewProject]);
+
+    useEffect(() => {
+        const ctx = gsap.context(() => {
+            // Hero text entrance animation
+            gsap.fromTo(
+                '.db-hero-text',
+                { y: 40, opacity: 0 },
+                {
+                    y: 0,
+                    opacity: 1,
+                    stagger: 0.1,
+                    duration: 0.8,
+                    ease: 'power3.out'
+                }
+            );
+
+            // Section entrance animations with ScrollTrigger
+            gsap.utils.toArray('.db-section').forEach((section: any) => {
+                gsap.fromTo(
+                    section,
+                    { y: 20, opacity: 0 },
+                    {
+                        y: 0,
+                        opacity: 1,
+                        duration: 0.6,
+                        ease: 'power2.out',
+                        scrollTrigger: {
+                            trigger: section,
+                            start: 'top 85%',
+                            toggleActions: 'play none none none'
+                        }
+                    }
+                );
+            });
+        }, pageRef);
+
+        return () => ctx.revert();
+    }, [myProjects, stats]);
 
     // Fixed domain/tier options
     const DOMAINS = ['Electronics', 'AI', 'Robotics', 'Embedded Systems', 'IoT', '3D Printing', 'Automation', 'Woodworks', 'Wireless Comms', 'Quantum Computing', 'Parallel Computing', 'Design', 'Fabrication', 'Bio & Life Sciences', 'Interdisciplinary'];
@@ -97,111 +140,121 @@ export function Dashboard() {
     };
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
-            <div className="max-w-7xl mx-auto space-y-12">
-
-                {/* Header */}
+        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
+            {/* Hero Section */}
+            <section className="pt-36 pb-8 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-2 border-brutal-dark/10 pb-8">
                     <div>
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="db-hero-text flex items-center gap-3 mb-2">
                             <span className="bg-brutal-dark text-brutal-bg px-2 py-1 text-xs font-bold font-data rounded uppercase">{role}</span>
                         </div>
-                        <h1 className="font-heading font-bold text-5xl md:text-6xl tracking-tight-heading">
+                        <h1 className="db-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading">
                             Welcome back, {user?.name || 'Maker'}.
                         </h1>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="db-hero-text flex gap-4">
                         <Link to="/profile-setup" className="font-data text-sm font-bold flex items-center gap-2 border-2 border-brutal-dark/20 px-4 py-2 hover:bg-brutal-dark/5 interactive-lift transition-colors">
                             <Settings className="w-4 h-4" /> Edit Profile
                         </Link>
                     </div>
                 </div>
+            </section>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 border-b-2 border-brutal-dark/10 pb-8 mb-8">
-                    <Card className="p-6 bg-brutal-dark text-brutal-bg border-none shadow-xl">
+            {/* Stats Section */}
+            <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-12">
+                <div className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest mb-6">01 Stats</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-5 border-b-2 border-brutal-dark/10 pb-8 mb-8">
+                    <Card className="p-5 bg-brutal-dark text-brutal-bg border-none shadow-xl">
                         <div className="flex items-center gap-2 text-brutal-bg/60 font-data text-xs uppercase font-bold tracking-widest mb-4">
                             <Zap className="w-4 h-4" /> Active Projects
                         </div>
-                        <div className="text-4xl md:text-5xl font-heading font-bold">{activeProjects}</div>
+                        <div className="text-3xl font-heading font-bold">{activeProjects}</div>
                     </Card>
-                    <Card className="p-6 border-2 border-brutal-dark/10">
+                    <Card className="p-5 border-2 border-brutal-dark/10">
                         <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4">
                             <Calendar className="w-4 h-4" /> Upcoming Events
                         </div>
-                        <div className="text-4xl md:text-5xl font-heading font-bold">{upcomingEvents}</div>
+                        <div className="text-3xl font-heading font-bold">{upcomingEvents}</div>
                     </Card>
-                    <Card className="p-6 border-2 border-brutal-dark/10">
+                    <Card className="p-5 border-2 border-brutal-dark/10">
                         <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4">
                             <Trophy className="w-4 h-4" /> Challenges
                         </div>
-                        <div className="text-4xl md:text-5xl font-heading font-bold">{completedChallenges}</div>
+                        <div className="text-3xl font-heading font-bold">{completedChallenges}</div>
                     </Card>
                     <Card
-                        className={`p-6 bg-brutal-red/10 border-2 border-brutal-red/20 text-brutal-red content-center flex flex-col justify-center items-center text-center transition-colors ${role === 'viewer' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-brutal-red hover:text-brutal-bg interactive-lift'}`}
+                        className={`p-5 bg-brutal-red/10 border-2 border-brutal-red/20 text-brutal-red content-center flex flex-col justify-center items-center text-center transition-colors ${role === 'viewer' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-brutal-red hover:text-brutal-bg interactive-lift'}`}
                         onClick={() => { if (role !== 'viewer') setShowNewProject(true); }}
                     >
                         <Plus className="w-6 h-6 md:w-8 md:h-8 mb-2" />
                         <span className="font-data text-xs md:text-sm font-bold uppercase tracking-wider">Propose Project</span>
                     </Card>
                 </div>
+            </section>
 
                 {role === 'viewer' && (
-                    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r mb-8 font-data">
-                        <p className="font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> View-Only Access</p>
-                        <p className="text-sm mt-1">Your account is currently pending maker induction. Speak to a mentor to get inducted!</p>
-                    </div>
+                    <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto">
+                        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r mb-8 font-data">
+                            <p className="font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> View-Only Access</p>
+                            <p className="text-sm mt-1">Your account is currently pending maker induction. Speak to a mentor to get inducted!</p>
+                        </div>
+                    </section>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div>
-                        <RankBadge rank={rankAccess?.rank || 'Curious'} xp={rankAccess?.xp || 0} variant="full" />
+                <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                        <div>
+                            <RankBadge rank={rankAccess?.rank || 'Curious'} xp={rankAccess?.xp || 0} variant="full" />
+                        </div>
+                        <Card className="p-5 border-2 border-brutal-dark/10 flex flex-col max-h-[250px]">
+                            <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4 flex-shrink-0">
+                                <Zap className="w-4 h-4" /> Recent Experience
+                            </div>
+                            <div className="overflow-y-auto pr-2 space-y-3 flex-1 font-data text-sm">
+                                {(xpHistory || []).slice(0, 5).map(event => (
+                                    <div key={event.id} className="flex justify-between items-center border-b border-brutal-dark/5 pb-2 last:border-0 last:pb-0">
+                                        <div className="font-medium text-brutal-dark">{event.reason}</div>
+                                        <div className="font-bold text-green-600">+{event.amount} XP</div>
+                                    </div>
+                                ))}
+                                {(!xpHistory || xpHistory.length === 0) && (
+                                    <div className="text-brutal-dark/40 italic">Complete challenges or projects to earn XP!</div>
+                                )}
+                            </div>
+                        </Card>
                     </div>
-                    <Card className="p-6 border-2 border-brutal-dark/10 flex flex-col max-h-[250px]">
-                        <div className="flex items-center gap-2 text-brutal-dark/60 font-data text-xs uppercase font-bold tracking-widest mb-4 flex-shrink-0">
-                            <Zap className="w-4 h-4" /> Recent Experience
-                        </div>
-                        <div className="overflow-y-auto pr-2 space-y-3 flex-1 font-data text-sm">
-                            {(xpHistory || []).slice(0, 5).map(event => (
-                                <div key={event.id} className="flex justify-between items-center border-b border-brutal-dark/5 pb-2 last:border-0 last:pb-0">
-                                    <div className="font-medium text-brutal-dark">{event.reason}</div>
-                                    <div className="font-bold text-green-600">+{event.amount} XP</div>
-                                </div>
-                            ))}
-                            {(!xpHistory || xpHistory.length === 0) && (
-                                <div className="text-brutal-dark/40 italic">Complete challenges or projects to earn XP!</div>
-                            )}
-                        </div>
-                    </Card>
-                </div>
+                </section>
 
                 {/* Profile Completion Banner */}
                 {!profileComplete && !bannerDismissed && (
-                    <div className="flex items-center justify-between p-4 bg-brutal-dark text-brutal-bg rounded-2xl border border-brutal-dark/20">
-                        <div className="flex items-center gap-3">
-                            <div className="w-2 h-2 rounded-full bg-brutal-red animate-pulse" />
-                            <span className="font-data text-sm font-bold">Your profile is incomplete — add a bio, avatar, and social links to appear in the Makers Directory.</span>
+                    <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto">
+                        <div className="flex items-center justify-between p-4 bg-brutal-dark text-brutal-bg rounded-2xl border border-brutal-dark/20">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-brutal-red animate-pulse" />
+                                <span className="font-data text-sm font-bold">Your profile is incomplete — add a bio, avatar, and social links to appear in the Makers Directory.</span>
+                            </div>
+                            <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                                <Link to="/profile-setup">
+                                    <Button size="sm" variant="secondary" className="bg-brutal-bg text-brutal-dark hover:bg-brutal-red hover:text-brutal-bg">
+                                        Complete Profile
+                                    </Button>
+                                </Link>
+                                <button onClick={() => setBannerDismissed(true)} className="text-brutal-bg/50 hover:text-brutal-bg">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                            <Link to="/profile-setup">
-                                <Button size="sm" variant="secondary" className="bg-brutal-bg text-brutal-dark hover:bg-brutal-red hover:text-brutal-bg">
-                                    Complete Profile
-                                </Button>
-                            </Link>
-                            <button onClick={() => setBannerDismissed(true)} className="text-brutal-bg/50 hover:text-brutal-bg">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
+                    </section>
                 )}
 
                 {/* ── New Project Form — simple, no fluff ── */}
                 {showNewProject && (
-                    <Card ref={formRef} className="p-8 border-2 border-brutal-red/30 shadow-2xl relative scroll-mt-32">
-                        <button onClick={handleCloseModal} className="absolute top-4 right-4 text-brutal-dark/50 hover:text-brutal-dark">
-                            <X className="w-5 h-5" />
-                        </button>
-                        <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">New Project Proposal</h3>
+                    <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-12">
+                        <Card ref={formRef} className="p-8 border-2 border-brutal-red/30 shadow-2xl relative scroll-mt-32">
+                            <button onClick={handleCloseModal} className="absolute top-4 right-4 text-brutal-dark/50 hover:text-brutal-dark">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">New Project Proposal</h3>
 
                         <form onSubmit={handleCreateProject} className="space-y-4">
                             <Input
@@ -263,51 +316,51 @@ export function Dashboard() {
                                 </Button>
                             </div>
                         </form>
-                    </Card>
+                        </Card>
+                    </section>
                 )}
 
                 {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 pt-8 border-t border-brutal-dark/5">
+                <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-12 grid grid-cols-1 lg:grid-cols-3 gap-12 border-t border-brutal-dark/5">
 
                     {/* Left Col = Alerts */}
                     <div className="space-y-8">
-                        <section>
-                            <h3 className="font-heading text-2xl font-bold uppercase tracking-tight-heading flex items-center gap-2 mb-6">
-                                <AlertTriangle className="w-5 h-5 text-brutal-red" /> Attention Required
-                            </h3>
-                            <div className="space-y-4">
+                        <div>
+                            <div className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest mb-6">03 Attention Required</div>
+                            <div className="space-y-5">
                                 {(myProjects || []).filter(p => p.status === 'rejected').map(p => (
-                                    <div key={p.id} className="p-4 bg-brutal-red/10 border-2 border-brutal-red/30 rounded-xl text-brutal-dark">
+                                    <div key={p.id} className="p-5 bg-brutal-red/10 border-2 border-brutal-red/30 rounded-xl text-brutal-dark">
                                         <strong className="block font-data text-sm uppercase mb-1">Project Rejected</strong>
                                         <p className="font-data text-sm">"{p.title}" was not approved. Edit and resubmit.</p>
                                     </div>
                                 ))}
                                 {(myProjects || []).filter(p => p.status === 'pending_review').map(p => (
-                                    <div key={p.id} className="p-4 bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl text-brutal-dark">
+                                    <div key={p.id} className="p-5 bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl text-brutal-dark">
                                         <strong className="block font-data text-sm uppercase mb-1">Under Review</strong>
                                         <p className="font-data text-sm">"{p.title}" is awaiting mentor approval.</p>
                                     </div>
                                 ))}
                                 {!(myProjects || []).some(p => p.status === 'rejected' || p.status === 'pending_review') && (
-                                    <div className="p-4 bg-brutal-dark/5 border-2 border-brutal-dark/10 rounded-xl">
+                                    <div className="p-5 bg-brutal-dark/5 border-2 border-brutal-dark/10 rounded-xl">
                                         <p className="font-data text-sm text-brutal-dark/60">No items require your attention.</p>
                                     </div>
                                 )}
                             </div>
-                        </section>
+                        </div>
                     </div>
 
                     {/* Right Col = Projects */}
                     <div className="lg:col-span-2 space-y-12">
-                        <section>
+                        <div>
+                            <div className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest mb-6">02 My Projects</div>
                             <div className="flex justify-between items-end border-b-2 border-brutal-dark/10 pb-2 mb-6">
-                                <h3 className="font-heading text-3xl font-bold uppercase tracking-tight-heading">My Projects</h3>
+                                <h3 className="font-heading text-3xl font-bold uppercase tracking-tight-heading"></h3>
                                 <Link to="/projects" className="text-brutal-red font-data text-xs font-bold uppercase underline">View All Directory</Link>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 {(myProjects || []).slice(0, 4).map((p) => (
-                                    <Card key={p.id} className="flex flex-col p-4 hover:border-brutal-dark transition-colors cursor-pointer border-2 border-brutal-dark/10 shadow-md">
+                                    <Card key={p.id} className="flex flex-col p-5 hover:border-brutal-dark transition-colors cursor-pointer border-2 border-brutal-dark/10 shadow-md">
                                         <div className="flex items-center gap-2 mb-3">
                                             <span className={`px-2 py-0.5 text-[10px] font-bold font-data uppercase rounded ${p.status === 'active' ? 'bg-green-100 text-green-700' :
                                                 p.status === 'draft' ? 'bg-brutal-dark/10 text-brutal-dark/60' :
@@ -335,105 +388,105 @@ export function Dashboard() {
                                     No projects yet. Create your first one above!
                                 </div>
                             )}
-                        </section>
+                        </div>
                     </div>
-                </div>
+                </section>
 
                 {/* ── Mentor Tools ── */}
                 {(role === 'mentor' || role === 'admin') && (
-                    <div className="pt-12 border-t-2 border-brutal-dark/10">
+                    <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-12 border-t-2 border-brutal-dark/10">
+                        <div className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest mb-6">04 Mentor Tools</div>
                         <div className="flex items-center gap-3 mb-8">
                             <span className="bg-yellow-500 text-brutal-dark px-3 py-1 text-xs font-bold font-data rounded uppercase">Mentor Tools</span>
                             <h2 className="font-heading text-3xl font-bold uppercase tracking-tight-heading">Review Queue</h2>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <ClipboardCheck className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Project Reviews</h3>
+                                    <h3 className="font-heading font-bold text-lg uppercase">Project Reviews</h3>
                                 </div>
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Review pending project submissions from makers. Approve or request changes.</p>
                                 <Link to="/admin/review-projects"><Button variant="outline" size="sm" className="w-full">View Pending Projects</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Trophy className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Challenge Verification</h3>
+                                    <h3 className="font-heading font-bold text-lg uppercase">Challenge Verification</h3>
                                 </div>
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Verify maker challenge completions and award badges.</p>
                                 <Link to="/admin/review-challenges"><Button variant="outline" size="sm" className="w-full">View Submissions</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Trophy className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Event Submissions</h3>
+                                    <h3 className="font-heading font-bold text-lg uppercase">Event Submissions</h3>
                                 </div>
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Review and shortlist Build Challenge submissions.</p>
                                 <Link to="/admin/review-submissions"><Button variant="outline" size="sm" className="w-full">Review Submissions</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Calendar className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Event Management</h3>
+                                    <h3 className="font-heading font-bold text-lg uppercase">Event Management</h3>
                                 </div>
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Schedule and manage makerspace events and workshops.</p>
                                 <Link to="/admin/events"><Button variant="outline" size="sm" className="w-full">Manage Events</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Settings className="w-5 h-5 text-yellow-600" />
-                                    <h3 className="font-heading font-bold text-xl uppercase">Lab Inventory</h3>
+                                    <h3 className="font-heading font-bold text-lg uppercase">Lab Inventory</h3>
                                 </div>
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Track supplies, adjust consumable quantities.</p>
                                 <Link to="/admin/inventory"><Button variant="outline" size="sm" className="w-full">Manage Inventory</Button></Link>
                             </Card>
                         </div>
-                    </div>
+                    </section>
                 )}
 
                 {/* ── Admin Panel ── */}
                 {role === 'admin' && (
-                    <div className="pt-12 border-t-2 border-brutal-dark/10">
+                    <section className="db-section px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-12 border-t-2 border-brutal-dark/10">
+                        <div className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest mb-6">05 Admin Panel</div>
                         <div className="flex items-center gap-3 mb-8">
                             <span className="bg-brutal-red text-brutal-bg px-3 py-1 text-xs font-bold font-data rounded uppercase">Admin Panel</span>
                             <h2 className="font-heading text-3xl font-bold uppercase tracking-tight-heading">System Control</h2>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Users className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Users</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Manage accounts & roles.</p>
                                 <Link to="/admin/users"><Button variant="outline" size="sm" className="w-full">Manage Users</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Zap className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Challenges</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Create & publish challenges.</p>
                                 <Link to="/admin/challenges"><Button variant="outline" size="sm" className="w-full">Manage Challenges</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Award className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Badges</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Mint achievement badges.</p>
                                 <Link to="/admin/badges"><Button variant="outline" size="sm" className="w-full">Manage Badges</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Settings className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Store</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Manage store products.</p>
                                 <Link to="/admin/store"><Button variant="outline" size="sm" className="w-full">Manage Store</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Settings className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Equipment</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Lab tools & inductions.</p>
                                 <Link to="/admin/equipment"><Button variant="outline" size="sm" className="w-full">Manage Equipment</Button></Link>
                             </Card>
-                            <Card className="p-6 border-2 border-brutal-red/20 bg-brutal-red/5">
+                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Zap className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Projects</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">View, manage & delete projects.</p>
                                 <Link to="/admin/projects"><Button variant="outline" size="sm" className="w-full">Manage Projects</Button></Link>
                             </Card>
                         </div>
-                    </div>
+                    </section>
                 )}
-
-            </div>
         </div>
     );
 }

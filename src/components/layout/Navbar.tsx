@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../lib/auth';
 import { LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
-import { ParamLogo } from '../ui/ParamLogo';
+// ParamLogo removed from navbar per redesign
 import { useRankAccess } from '../../lib/hooks';
 import { RankBadge } from '../ui/RankBadge';
 
@@ -55,9 +55,12 @@ export function Navbar() {
                         : "bg-transparent text-brutal-bg"
                 )}
             >
-                <Link to="/" className="font-heading font-bold text-xl tracking-tight-heading flex items-center gap-2 interactive-lift">
-                    <ParamLogo variant={(scrolled || !isHome) ? 'dark' : 'light'} size={28} />
-                    PARAM
+                <Link to="/" className="font-heading font-bold tracking-tight-heading flex flex-col items-start leading-none interactive-lift">
+                    <span className="text-xl">PARAM</span>
+                    <span className={cn(
+                        "font-data text-[9px] uppercase tracking-[0.25em] font-bold -mt-0.5",
+                        (scrolled || !isHome) ? "text-brutal-dark/40" : "text-brutal-bg/40"
+                    )}>makersadda</span>
                 </Link>
 
                 <div className="hidden lg:flex items-center gap-6 font-data font-medium text-sm">

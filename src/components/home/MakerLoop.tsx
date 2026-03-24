@@ -1,13 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Card } from '../ui/Card';
-import { MagneticCard } from '../ui/MagneticCard';
 import { Target, Wrench, TrendingUp } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
-// ─── Step 1 visual: Mini challenge cards that shuffle (reuses DiagnosticShuffler pattern) ───
+/**
+ * MakerLoop — Section 5 "How It Works"
+ *
+ * Design critique of previous version:
+ * - Interactive visuals (QuestCardStack, BuildProgress, XPCounter) were HIDDEN
+ *   behind "Tap to explore" accordion. These ARE the selling point! A goldfish
+ *   user never clicks to discover them.
+ * - "Fading icons don't show the full picture" — the icons were behind a click
+ *   and faded in/out with inconsistent timing.
+ *
+ * New approach:
+ * - Everything visible. Three columns, each showing:
+ *   step number + title + description + interactive visual
+ * - Interactive visuals run continuously and are ALWAYS visible
+ * - No accordion, no "tap to explore"
+ * - Scroll-triggered entrance: cards stagger up
+ * - The interactive visuals ARE the animation — no additional decorative
+ *   pulsing/floating/bouncing needed. The QuestCardStack shuffles,
+ *   the BuildProgress fills, the XPCounter ticks. That IS engagement.
+ */
 
 const QUEST_CARDS = [
     { title: 'LED Matrix Challenge', domain: 'Electronics', xp: 50 },
@@ -38,9 +55,9 @@ function QuestCardStack() {
                     className="absolute w-[85%] bg-brutal-dark text-brutal-bg rounded-xl p-4
                                transition-all duration-700 ease-spring border border-brutal-bg/10"
                     style={{
-                        transform: `translateY(${i * 12}px) scale(${1 - i * 0.04})`,
+                        transform: `translateY(${i * 10}px) scale(${1 - i * 0.04})`,
                         zIndex: 3 - i,
-                        opacity: 1 - i * 0.25,
+                        opacity: 1 - i * 0.2,
                     }}
                 >
                     <span className="font-data text-[10px] text-brutal-red uppercase tracking-widest">
@@ -56,8 +73,6 @@ function QuestCardStack() {
     );
 }
 
-// ─── Step 2 visual: Progress bar that fills on loop ───
-
 function BuildProgress() {
     const [progress, setProgress] = useState(0);
 
@@ -71,7 +86,7 @@ function BuildProgress() {
     return (
         <div className="w-full px-4 flex flex-col items-center justify-center h-full gap-4">
             <div className="w-full space-y-3">
-                {['Blueprint uploaded', 'Milestone 1 logged', 'Peer review passed'].map((step, i) => (
+                {['Idea sketched out', 'First prototype built', 'Shared with community'].map((step, i) => (
                     <div key={step} className="flex items-center gap-3">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors duration-500
                             ${progress > (i + 1) * 30 ? 'bg-brutal-red border-brutal-red' : 'border-brutal-dark/20'}`}>
@@ -98,18 +113,13 @@ function BuildProgress() {
     );
 }
 
-// ─── Step 3 visual: XP counter ticking up ───
-
 function XPCounter() {
     const [xp, setXP] = useState(0);
     const target = 120;
 
     useEffect(() => {
         const interval = setInterval(() => {
-            setXP(prev => {
-                if (prev >= target) return 0;
-                return prev + 2;
-            });
+            setXP(prev => (prev >= target ? 0 : prev + 2));
         }, 50);
         return () => clearInterval(interval);
     }, []);
@@ -128,7 +138,7 @@ function XPCounter() {
                 />
             </div>
             <span className={`font-data text-xs font-bold uppercase tracking-widest transition-all duration-300
-                ${rank === 'Tinkerer' ? 'text-brutal-red scale-110' : 'text-brutal-dark/50'}`}>
+                ${rank === 'Tinkerer' ? 'text-brutal-red' : 'text-brutal-dark/50'}`}>
                 {rank}
             </span>
             {xp >= 60 && (
@@ -140,27 +150,25 @@ function XPCounter() {
     );
 }
 
-// ─── Main Component ───
-
 const STEPS = [
     {
         num: '01',
-        title: 'Pick a Quest',
-        desc: 'Browse challenges matched to your skill level. Start with Tier 1 Explorer missions and work your way up.',
+        title: 'Pick a Challenge',
+        desc: 'Browse beginner-friendly challenges across electronics, robotics, design, and more. Each one tells you exactly what to build.',
         icon: Target,
         visual: <QuestCardStack />,
     },
     {
         num: '02',
-        title: 'Build & Document',
-        desc: 'Log your milestones in the Maker Notebook. Sharing your failures is just as valuable as your wins.',
+        title: 'Build & Share',
+        desc: 'Work at your own pace. Document what you tried, what broke, and what worked — the journey matters as much as the result.',
         icon: Wrench,
         visual: <BuildProgress />,
     },
     {
         num: '03',
-        title: 'Level Up',
-        desc: 'Earn XP and climb the ranks. Curious → Tinkerer → Builder → Maker → Innovator → Lab Pro.',
+        title: 'Grow Your Skills',
+        desc: 'Every project earns XP and unlocks new ranks. Start as "Curious" and work your way up. The more you build, the more doors open.',
         icon: TrendingUp,
         visual: <XPCounter />,
     },
@@ -171,14 +179,22 @@ export function MakerLoop() {
 
     useEffect(() => {
         const ctx = gsap.context(() => {
-            // Section header entrance
+            // Accent line
+            gsap.fromTo('.loop-line',
+                { scaleX: 0 },
+                {
+                    scaleX: 1, duration: 1, ease: 'power2.inOut',
+                    scrollTrigger: { trigger: containerRef.current, start: 'top 75%' }
+                }
+            );
+
+            // Header
             gsap.fromTo('.loop-header',
-                { y: 40, opacity: 0 },
+                { y: 30, opacity: 0 },
                 {
                     y: 0, opacity: 1,
-                    duration: 0.8, stagger: 0.1,
-                    ease: 'power3.out',
-                    scrollTrigger: { trigger: containerRef.current, start: 'top 75%' }
+                    duration: 0.7, stagger: 0.08, ease: 'power2.out',
+                    scrollTrigger: { trigger: containerRef.current, start: 'top 70%' }
                 }
             );
 
@@ -187,9 +203,8 @@ export function MakerLoop() {
                 { y: 60, opacity: 0 },
                 {
                     y: 0, opacity: 1,
-                    duration: 0.8, stagger: 0.15,
-                    ease: 'power3.out',
-                    scrollTrigger: { trigger: '.loop-card', start: 'top 80%' }
+                    duration: 0.8, stagger: 0.15, ease: 'power2.out',
+                    scrollTrigger: { trigger: '.loop-grid', start: 'top 80%' }
                 }
             );
         }, containerRef);
@@ -200,60 +215,60 @@ export function MakerLoop() {
         <section
             id="maker-loop"
             ref={containerRef}
-            className="py-32 md:py-40 px-6 md:px-12 lg:px-24 bg-brutal-bg"
+            className="py-24 md:py-32 px-6 md:px-12 lg:px-24 bg-brutal-bg"
         >
             <div className="max-w-6xl mx-auto">
-                {/* Section header */}
-                <div className="mb-16">
+                {/* Header */}
+                <div className="mb-14">
+                    <div className="loop-line w-16 h-0.5 bg-brutal-red mb-8 origin-left" />
                     <p className="loop-header font-data text-xs text-brutal-red uppercase tracking-[0.2em] mb-4">
                         How It Works
                     </p>
-                    <h2 className="loop-header font-heading font-bold text-4xl md:text-6xl uppercase tracking-tight-heading">
-                        The Maker Loop
+                    <h2 className="loop-header font-heading font-bold text-3xl md:text-5xl uppercase tracking-tight-heading">
+                        Three steps to start building.
                     </h2>
                     <p className="loop-header font-data text-sm text-brutal-dark/50 mt-4 max-w-lg">
-                        Three steps. One cycle. Repeat until you've built something the world hasn't seen.
+                        Pick something to build, make it real, learn from the process. Then do it again.
                     </p>
                 </div>
 
-                {/* Step cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Step cards — all content + visuals always visible */}
+                <div className="loop-grid grid grid-cols-1 md:grid-cols-3 gap-8">
                     {STEPS.map((step) => {
                         const Icon = step.icon;
                         return (
-                            <MagneticCard
+                            <div
                                 key={step.num}
-                                intensity={6}
-                                glowOnHover
-                                className="loop-card"
+                                className="loop-card bg-brutal-bg border-2 border-brutal-dark/8 rounded-2xl
+                                           overflow-hidden hover:border-brutal-red/20
+                                           transition-all duration-500
+                                           hover:shadow-[0_12px_40px_rgba(196,41,30,0.06)]
+                                           hover:-translate-y-1"
                             >
-                                <Card className="h-full p-8 flex flex-col gap-5 group">
-                                    {/* Step number + icon */}
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-data text-4xl font-bold text-brutal-red">
+                                {/* Text content */}
+                                <div className="p-8 pb-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <span className="font-data text-5xl font-bold text-brutal-red/20 leading-none">
                                             {step.num}
                                         </span>
-                                        <div className="w-10 h-10 rounded-full bg-brutal-dark/5 flex items-center justify-center
-                                                        group-hover:bg-brutal-red/10 transition-colors duration-300">
-                                            <Icon size={18} className="text-brutal-dark/40 group-hover:text-brutal-red transition-colors duration-300" />
+                                        <div className="w-10 h-10 rounded-full bg-brutal-dark/5 flex items-center justify-center flex-shrink-0">
+                                            <Icon size={18} className="text-brutal-dark/40" />
                                         </div>
                                     </div>
-
-                                    {/* Title + description */}
-                                    <h3 className="font-heading font-bold text-xl uppercase tracking-tight-heading">
+                                    <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading mb-3">
                                         {step.title}
                                     </h3>
-                                    <p className="font-data text-sm text-brutal-dark/60 leading-relaxed">
+                                    <p className="font-data text-sm text-brutal-dark/50 leading-relaxed">
                                         {step.desc}
                                     </p>
+                                </div>
 
-                                    {/* Visual zone */}
-                                    <div className="flex-1 min-h-[160px] bg-brutal-bg rounded-xl border border-brutal-dark/5
-                                                    flex items-center justify-center overflow-hidden mt-2">
-                                        {step.visual}
-                                    </div>
-                                </Card>
-                            </MagneticCard>
+                                {/* Interactive visual — always visible, always running */}
+                                <div className="min-h-[160px] bg-brutal-bg border-t border-brutal-dark/5
+                                                flex items-center justify-center px-4 py-6">
+                                    {step.visual}
+                                </div>
+                            </div>
                         );
                     })}
                 </div>

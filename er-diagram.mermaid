@@ -1,0 +1,332 @@
+erDiagram
+
+    %% ═══════════════════════════════════════
+    %% PARAM MAKERSPACE — ER DIAGRAM
+    %% ═══════════════════════════════════════
+
+    %% ── CORE ──
+    app_user {
+        uuid id PK
+        uuid auth_id UK
+        text email
+        text name
+        text role
+        boolean is_active
+    }
+
+    maker_profile {
+        uuid id PK
+        uuid user_id FK
+        text display_name
+        text bio
+        boolean is_public
+    }
+
+    skill {
+        uuid id PK
+        text name UK
+        text category
+    }
+
+    badge {
+        uuid id PK
+        text name
+        text tier
+        text domain
+        text badge_type
+    }
+
+    user_badge {
+        uuid id PK
+        uuid user_id FK
+        uuid badge_id FK
+    }
+
+    %% ── PROJECTS ──
+    project {
+        uuid id PK
+        uuid owner_id FK
+        text title
+        text status
+        text visibility
+    }
+
+    project_member {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK
+        text role
+    }
+
+    project_milestone {
+        uuid id PK
+        uuid project_id FK
+        text title
+        boolean is_complete
+    }
+
+    project_image {
+        uuid id PK
+        uuid project_id FK
+        text image_url
+    }
+
+    project_video {
+        uuid id PK
+        uuid project_id FK
+        text video_url
+    }
+
+    project_file {
+        uuid id PK
+        uuid project_id FK
+        text file_url
+    }
+
+    %% ── CHALLENGES ──
+    challenge {
+        uuid id PK
+        text title
+        text status
+        uuid created_by FK
+    }
+
+    challenge_step {
+        uuid id PK
+        uuid challenge_id FK
+        text step_text
+    }
+
+    challenge_material {
+        uuid id PK
+        uuid challenge_id FK
+        text name
+    }
+
+    challenge_skill {
+        uuid id PK
+        uuid challenge_id FK
+        text skill_name
+    }
+
+    challenge_vocabulary {
+        uuid id PK
+        uuid challenge_id FK
+        text term
+    }
+
+    challenge_level {
+        uuid id PK
+        uuid challenge_id FK
+        text level_name
+    }
+
+    challenge_image {
+        uuid id PK
+        uuid challenge_id FK
+        text image_url
+    }
+
+    challenge_video {
+        uuid id PK
+        uuid challenge_id FK
+        text video_url
+    }
+
+    challenge_completion {
+        uuid id PK
+        uuid challenge_id FK
+        uuid user_id FK
+        text status
+    }
+
+    %% ── EVENTS ──
+    event {
+        uuid id PK
+        text title
+        text event_type
+        timestamptz date
+        uuid auto_badge_id FK
+        uuid created_by FK
+    }
+
+    event_registration {
+        uuid id PK
+        uuid event_id FK
+        uuid user_id FK
+    }
+
+    event_checkin {
+        uuid id PK
+        uuid event_id FK
+        uuid user_id FK
+    }
+
+    event_team {
+        uuid id PK
+        uuid event_id FK
+        text name
+        uuid lead_id FK
+    }
+
+    event_team_member {
+        uuid id PK
+        uuid team_id FK
+        uuid user_id FK
+    }
+
+    event_submission {
+        uuid id PK
+        uuid event_id FK
+        uuid team_id FK
+        uuid user_id FK
+        uuid project_id FK
+    }
+
+    showcase_slot {
+        uuid id PK
+        uuid event_id FK
+        uuid user_id FK
+        uuid project_id FK
+    }
+
+    %% ── COMMUNITY ──
+    comment {
+        uuid id PK
+        text target_type
+        uuid target_id
+        uuid user_id FK
+        text content
+    }
+
+    reaction {
+        uuid id PK
+        text target_type
+        uuid target_id
+        uuid user_id FK
+        text reaction_type
+    }
+
+    tag {
+        uuid id PK
+        text name UK
+    }
+
+    entity_tag {
+        uuid id PK
+        text target_type
+        uuid target_id
+        uuid tag_id FK
+    }
+
+    %% ── OPS ──
+    equipment {
+        uuid id PK
+        text name
+        boolean requires_induction
+    }
+
+    equipment_induction {
+        uuid id PK
+        uuid equipment_id FK
+        uuid user_id FK
+    }
+
+    equipment_booking {
+        uuid id PK
+        uuid equipment_id FK
+        uuid user_id FK
+        text status
+    }
+
+    inventory {
+        uuid id PK
+        text name
+        int quantity
+    }
+
+    %% ── STORE ──
+    store_product {
+        uuid id PK
+        text name
+        decimal price
+        uuid required_badge_id FK
+    }
+
+    store_order {
+        uuid id PK
+        uuid user_id FK
+        text status
+        decimal total
+    }
+
+    store_order_item {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        int quantity
+    }
+
+    %% ═══════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════
+
+    %% Core
+    app_user ||--o| maker_profile : "has profile"
+    app_user ||--o{ user_badge : "earns"
+    badge ||--o{ user_badge : "awarded to"
+
+    %% Projects
+    app_user ||--o{ project : "owns"
+    project ||--o{ project_member : "has"
+    app_user ||--o{ project_member : "collaborates"
+    project ||--o{ project_milestone : "has"
+    project ||--o{ project_image : "has"
+    project ||--o{ project_video : "has"
+    project ||--o{ project_file : "has"
+
+    %% Challenges
+    app_user ||--o{ challenge : "creates"
+    challenge ||--o{ challenge_step : "has"
+    challenge ||--o{ challenge_material : "needs"
+    challenge ||--o{ challenge_skill : "teaches"
+    challenge ||--o{ challenge_vocabulary : "defines"
+    challenge ||--o{ challenge_level : "has"
+    challenge ||--o{ challenge_image : "has"
+    challenge ||--o{ challenge_video : "has"
+    challenge ||--o{ challenge_completion : "completed by"
+    app_user ||--o{ challenge_completion : "completes"
+
+    %% Events
+    app_user ||--o{ event : "creates"
+    badge ||--o{ event : "auto-awards"
+    event ||--o{ event_registration : "has"
+    app_user ||--o{ event_registration : "registers"
+    event ||--o{ event_checkin : "has"
+    app_user ||--o{ event_checkin : "checks in"
+    event ||--o{ event_team : "has"
+    app_user ||--o{ event_team : "leads"
+    event_team ||--o{ event_team_member : "has"
+    app_user ||--o{ event_team_member : "joins"
+    event ||--o{ event_submission : "has"
+    event_team ||--o{ event_submission : "submits"
+    project ||--o{ event_submission : "linked"
+    event ||--o{ showcase_slot : "has"
+    project ||--o{ showcase_slot : "showcased"
+
+    %% Community (polymorphic)
+    app_user ||--o{ comment : "writes"
+    app_user ||--o{ reaction : "reacts"
+    tag ||--o{ entity_tag : "applied"
+
+    %% Ops
+    equipment ||--o{ equipment_induction : "requires"
+    app_user ||--o{ equipment_induction : "inducted"
+    equipment ||--o{ equipment_booking : "booked"
+    app_user ||--o{ equipment_booking : "books"
+
+    %% Store
+    badge ||--o{ store_product : "unlocks"
+    app_user ||--o{ store_order : "places"
+    store_order ||--o{ store_order_item : "contains"
+    store_product ||--o{ store_order_item : "ordered"

@@ -57,7 +57,7 @@ export function ClosingCTA() {
                     Ready to start?
                 </p>
 
-                <h2 className="cta-element font-drama italic text-4xl md:text-6xl lg:text-7xl text-brutal-bg leading-tight">
+                <h2 className="cta-element font-drama italic text-2xl sm:text-3xl md:text-6xl lg:text-7xl text-brutal-bg leading-tight">
                     You don't need permission to build something amazing.
                 </h2>
 

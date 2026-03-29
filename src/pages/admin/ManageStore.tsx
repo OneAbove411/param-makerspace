@@ -93,7 +93,10 @@ export function ManageStore() {
     const handleDelete = async (id: string) => {
         if (!window.confirm("Are you sure you want to delete this product?")) return;
         setActionLoading(true);
-        await deleteProduct(id);
+        const { error } = await deleteProduct(id);
+        if (error) {
+            alert(`Failed to delete product: ${error}`);
+        }
         await refetch();
         setActionLoading(false);
     };

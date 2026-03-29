@@ -148,7 +148,7 @@ export function Dashboard() {
                         <div className="db-hero-text flex items-center gap-3 mb-2">
                             <span className="bg-brutal-dark text-brutal-bg px-2 py-1 text-xs font-bold font-data rounded uppercase">{role}</span>
                         </div>
-                        <h1 className="db-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading">
+                        <h1 className="db-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading">
                             Welcome back, {user?.name || 'Maker'}.
                         </h1>
                     </div>
@@ -441,6 +441,22 @@ export function Dashboard() {
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Track supplies, adjust consumable quantities.</p>
                                 <Link to="/admin/inventory"><Button variant="outline" size="sm" className="w-full">Manage Inventory</Button></Link>
                             </Card>
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Zap className="w-5 h-5 text-yellow-600" />
+                                    <h3 className="font-heading font-bold text-lg uppercase">Challenges</h3>
+                                </div>
+                                <p className="font-data text-sm text-brutal-dark/60 mb-4">Create & publish challenges.</p>
+                                <Link to="/admin/challenges"><Button variant="outline" size="sm" className="w-full">Manage Challenges</Button></Link>
+                            </Card>
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Zap className="w-5 h-5 text-yellow-600" />
+                                    <h3 className="font-heading font-bold text-lg uppercase">Projects</h3>
+                                </div>
+                                <p className="font-data text-sm text-brutal-dark/60 mb-4">View, manage & delete projects.</p>
+                                <Link to="/admin/projects"><Button variant="outline" size="sm" className="w-full">Manage Projects</Button></Link>
+                            </Card>
                         </div>
                     </section>
                 )}
@@ -460,11 +476,6 @@ export function Dashboard() {
                                 <Link to="/admin/users"><Button variant="outline" size="sm" className="w-full">Manage Users</Button></Link>
                             </Card>
                             <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
-                                <div className="flex items-center gap-2 mb-4"><Zap className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Challenges</h3></div>
-                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Create & publish challenges.</p>
-                                <Link to="/admin/challenges"><Button variant="outline" size="sm" className="w-full">Manage Challenges</Button></Link>
-                            </Card>
-                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
                                 <div className="flex items-center gap-2 mb-4"><Award className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Badges</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Mint achievement badges.</p>
                                 <Link to="/admin/badges"><Button variant="outline" size="sm" className="w-full">Manage Badges</Button></Link>
@@ -478,11 +489,6 @@ export function Dashboard() {
                                 <div className="flex items-center gap-2 mb-4"><Settings className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Equipment</h3></div>
                                 <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">Lab tools & inductions.</p>
                                 <Link to="/admin/equipment"><Button variant="outline" size="sm" className="w-full">Manage Equipment</Button></Link>
-                            </Card>
-                            <Card className="p-5 border-2 border-brutal-red/20 bg-brutal-red/5">
-                                <div className="flex items-center gap-2 mb-4"><Zap className="w-5 h-5 text-brutal-red" /><h3 className="font-heading font-bold text-lg uppercase">Projects</h3></div>
-                                <p className="font-data text-xs text-brutal-dark/60 mb-4 h-8">View, manage & delete projects.</p>
-                                <Link to="/admin/projects"><Button variant="outline" size="sm" className="w-full">Manage Projects</Button></Link>
                             </Card>
                         </div>
                     </section>

@@ -3,7 +3,7 @@ import { useEvents } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
 import { MagneticCard } from '../components/ui/MagneticCard';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Users, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, Users, ArrowRight, ChevronDown } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -13,6 +13,9 @@ export const formatEventType = (type: string) => ({
     build_challenge: 'Build Challenge',
     maker_meetup: 'Maker Meetup',
     tech_tuesday: 'Tech Tuesday',
+    workshop: 'Workshop',
+    hackathon: 'Hackathon',
+    demo_day: 'Demo Day',
 }[type] || type);
 
 const TYPE_BADGE_STYLE: Record<string, string> = {
@@ -35,7 +38,7 @@ function EventSkeleton() {
 
 export function Events() {
     const [filter, setFilter] = useState('All');
-    const types = ['All', 'build_challenge', 'maker_meetup', 'tech_tuesday'];
+    const types = ['All', 'build_challenge', 'maker_meetup', 'tech_tuesday', 'workshop', 'hackathon', 'demo_day'];
     const { data: events, loading } = useEvents(filter);
     const pageRef = useRef<HTMLDivElement>(null);
 
@@ -136,21 +139,29 @@ export function Events() {
         <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
             {/* Hero */}
             <section className="pt-36 pb-12 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto">
-                <h1 className="ev-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading mb-6">
+                <h1 className="ev-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading mb-6">
                     Ecosystem Events
                 </h1>
 
-                {/* Filters */}
-                <div className="ev-hero-text flex flex-wrap gap-2">
-                    {types.map(t => (
-                        <button key={t} onClick={() => setFilter(t)}
-                            className={`px-3.5 py-1.5 font-data text-[10px] font-bold rounded-full transition-all duration-200 uppercase tracking-wider
-                                ${filter === t
-                                    ? 'bg-brutal-dark text-brutal-bg'
-                                    : 'border border-brutal-dark/15 text-brutal-dark/50 hover:border-brutal-dark/40 hover:text-brutal-dark'}`}>
-                            {t === 'All' ? 'All' : formatEventType(t)}
-                        </button>
-                    ))}
+                {/* Event type dropdown */}
+                <div className="ev-hero-text flex items-center gap-3">
+                    <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
+                        Type:
+                    </span>
+                    <div className="relative w-full sm:w-auto">
+                        <select
+                            className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
+                                       w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
+                                       focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                        >
+                            {types.map(t => (
+                                <option key={t} value={t}>{t === 'All' ? 'All' : formatEventType(t)}</option>
+                            ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
+                    </div>
                 </div>
             </section>
 

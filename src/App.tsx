@@ -69,16 +69,16 @@ function App() {
               <Route path="/admin/review-submissions" element={<ReviewEventSubmissions />} />
               <Route path="/admin/events" element={<ManageEvents />} />
               <Route path="/admin/inventory" element={<ManageInventory />} />
+              <Route path="/admin/challenges" element={<ManageChallenges />} />
+              <Route path="/admin/projects" element={<ManageProjects />} />
             </Route>
 
             {/* Admin Only Routes */}
             <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
               <Route path="/admin/users" element={<ManageUsers />} />
-              <Route path="/admin/challenges" element={<ManageChallenges />} />
               <Route path="/admin/badges" element={<ManageBadges />} />
               <Route path="/admin/store" element={<ManageStore />} />
               <Route path="/admin/equipment" element={<ManageEquipment />} />
-              <Route path="/admin/projects" element={<ManageProjects />} />
             </Route>
 
             <Route path="*" element={<div className="p-20 font-data text-2xl">404 - Not Found</div>} />

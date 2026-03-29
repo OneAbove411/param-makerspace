@@ -3,7 +3,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 import { WelcomeHero } from '../components/home/WelcomeHero';
 import { BuildQuestion } from '../components/home/BuildQuestion';
-import { WhyParam } from '../components/home/WhyParam';
+// WhyParam removed per redesign
 import { WhatIsParam } from '../components/home/WhatIsParam';
 import { MakerLoop } from '../components/home/MakerLoop';
 import { FeaturedProjects } from '../components/home/FeaturedProjects';
@@ -40,7 +40,6 @@ export function Home() {
         <div className="flex-1 w-full bg-brutal-bg overflow-hidden relative">
             <WelcomeHero />
             <BuildQuestion />
-            <WhyParam />
             <WhatIsParam />
             <MakerLoop />
             <FeaturedProjects />

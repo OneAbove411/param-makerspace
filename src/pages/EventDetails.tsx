@@ -674,7 +674,7 @@ export function EventDetails() {
 
                     <div className="max-w-5xl">
                         <span className="bg-brutal-bg text-brutal-dark px-2 py-0.5 font-data text-[9px] font-bold rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] border border-brutal-dark uppercase mb-3 inline-block">{formatEventType(event.event_type)}</span>
-                        <h1 className="ed-hero-text font-heading font-bold text-5xl md:text-7xl tracking-tight-heading leading-tight mb-4 uppercase">
+                        <h1 className="ed-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-7xl tracking-tight-heading leading-tight mb-4 uppercase">
                             {event.title}
                         </h1>
 

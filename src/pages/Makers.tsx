@@ -4,7 +4,7 @@ import { Card } from '../components/ui/Card';
 import { MagneticCard } from '../components/ui/MagneticCard';
 import { Link } from 'react-router-dom';
 import { RankBadge } from '../components/ui/RankBadge';
-import { Search, ArrowRight, Star } from 'lucide-react';
+import { Search, ArrowRight, Star, ChevronDown } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -21,7 +21,7 @@ const DOMAIN_COLORS: Record<string, string> = {
 };
 
 const domainNames = ['Electronics', 'Robotics', 'AI', 'Design', 'Fabrication', 'Bio', 'Interdisciplinary'];
-const FILTER_DOMAINS = ['Robotics', 'Woodworking', 'Bio-Hacking', 'Additive MFG', 'Circuit Design'];
+const FILTER_DOMAINS = ['All', 'Robotics', 'Woodworking', 'Bio-Hacking', 'Additive MFG', 'Circuit Design', 'Electronics', 'AI', 'Design', 'Fabrication', 'Interdisciplinary'];
 
 function MakerSkeleton() {
     return (
@@ -88,7 +88,7 @@ export function Makers() {
         <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
             {/* Hero */}
             <section className="pt-36 pb-6 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto animate-[fadeInUp_0.6s_ease-out_both]">
-                <h1 className="font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading leading-[0.9] mb-5">
+                <h1 className="font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading leading-[0.9] mb-5">
                     Makers Directory
                 </h1>
                 <div className="w-16 h-1 bg-brutal-red mb-10" />
@@ -97,26 +97,53 @@ export function Makers() {
             {/* Filter Bar */}
             <section className="border-y border-brutal-dark/10 bg-brutal-paper/30 animate-[fadeInUp_0.6s_ease-out_0.2s_both]">
                 <div className="px-6 md:px-12 lg:px-24 max-w-7xl mx-auto py-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-4">
-                        {/* Role filters */}
-                        <div>
-                            <span className="font-data text-[9px] font-bold text-brutal-dark/30 uppercase tracking-[0.2em] block mb-2">Filter by Designation</span>
-                            <div className="flex gap-2">
-                                {roles.map(r => (
-                                    <button key={r} onClick={() => setRoleFilter(r)}
-                                        className={`px-4 py-1.5 font-data text-[10px] font-bold rounded-sm transition-all duration-200 uppercase tracking-wider
-                                            ${roleFilter === r
-                                                ? 'bg-brutal-red text-brutal-bg'
-                                                : 'border border-brutal-dark/15 text-brutal-dark/50 hover:border-brutal-dark/40'}`}>
-                                        {r}
-                                    </button>
-                                ))}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4">
+                        {/* Dropdowns + Search */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            {/* Domain dropdown */}
+                            <div className="flex items-center gap-3">
+                                <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
+                                    Domain:
+                                </span>
+                                <div className="relative w-full sm:w-auto">
+                                    <select
+                                        className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
+                                                   w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
+                                                   focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
+                                        value={domainFilter}
+                                        onChange={(e) => setDomainFilter(e.target.value)}
+                                    >
+                                        {FILTER_DOMAINS.map(d => (
+                                            <option key={d} value={d}>{d}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
+                                </div>
                             </div>
                         </div>
 
-                        {/* Search */}
-                        <div>
-                            <span className="font-data text-[9px] font-bold text-brutal-dark/30 uppercase tracking-[0.2em] block mb-2">Search Registry</span>
+                        {/* Role dropdown + Search */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
+                                    Role:
+                                </span>
+                                <div className="relative w-full sm:w-auto">
+                                    <select
+                                        className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
+                                                   w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
+                                                   focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
+                                        value={roleFilter}
+                                        onChange={(e) => setRoleFilter(e.target.value)}
+                                    >
+                                        {roles.map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
+                                </div>
+                            </div>
+
                             <div className="relative">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brutal-dark/25" />
                                 <input
@@ -124,23 +151,10 @@ export function Makers() {
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     placeholder="Search by name, skill, or domain..."
-                                    className="w-full md:w-80 bg-white border border-brutal-dark/15 pl-9 pr-4 py-2 font-data text-xs text-brutal-dark placeholder:text-brutal-dark/30 focus:outline-none focus:border-brutal-dark/40 transition-colors"
+                                    className="w-full md:w-72 bg-brutal-bg border-2 border-brutal-dark/15 rounded-full pl-9 pr-4 py-2 font-data text-xs text-brutal-dark placeholder:text-brutal-dark/30 focus:outline-none focus:border-brutal-dark transition-colors"
                                 />
                             </div>
                         </div>
-                    </div>
-
-                    {/* Domain pills */}
-                    <div className="flex flex-wrap gap-2">
-                        {FILTER_DOMAINS.map(d => (
-                            <button key={d} onClick={() => setDomainFilter(domainFilter === d ? 'All' : d)}
-                                className={`px-3 py-1 font-data text-[9px] font-bold uppercase tracking-wider transition-all duration-200
-                                    ${domainFilter === d
-                                        ? 'bg-brutal-dark text-brutal-bg'
-                                        : 'border border-brutal-dark/12 text-brutal-dark/40 hover:border-brutal-dark/30 hover:text-brutal-dark/60'}`}>
-                                {d}
-                            </button>
-                        ))}
                     </div>
                 </div>
             </section>

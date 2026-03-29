@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { ChevronDown } from 'lucide-react';
+import { InteractiveRobotSpline } from '../ui/interactive-3d-robot';
 
 /**
  * WelcomeHero — Viewport 1
@@ -123,7 +124,7 @@ export function WelcomeHero() {
             ref={sectionRef}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            className="h-[100dvh] w-full relative flex items-center px-6 md:px-12 lg:px-24 overflow-hidden"
+            className="min-h-[100dvh] w-full relative flex items-center px-6 md:px-12 lg:px-24 py-20 md:py-0 overflow-hidden"
         >
             {/* Dark bg with dot grid */}
             <div
@@ -140,40 +141,50 @@ export function WelcomeHero() {
                 className="absolute inset-0 pointer-events-none z-[1]"
             />
 
-            {/* Content — left-aligned, minimal */}
-            <div className="relative z-10 w-full max-w-5xl mx-auto">
-                <div className="max-w-3xl">
+            {/* Content — stacks vertically on mobile, side-by-side on md+ */}
+            <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col md:flex-row items-center">
+                {/* Left column — text */}
+                <div className="w-full md:w-3/5 lg:w-1/2 max-w-3xl">
                     {/* Main headline */}
-                    <h1 className="font-drama italic text-6xl md:text-8xl lg:text-[8rem] text-brutal-bg leading-[0.95] tracking-tight">
+                    <h1 className="font-drama italic text-4xl sm:text-6xl md:text-8xl lg:text-[8rem] text-brutal-bg leading-[0.95] tracking-tight">
                         {welcomeChars}
                     </h1>
 
                     {/* Second line */}
-                    <p className="welcome-subtitle font-drama italic text-3xl md:text-5xl lg:text-6xl text-brutal-bg/70 leading-[1.1] mt-2 md:mt-4">
+                    <p className="welcome-subtitle font-drama italic text-xl sm:text-3xl md:text-5xl lg:text-6xl text-brutal-bg/70 leading-[1.1] mt-2 md:mt-4">
                         to <span className="text-brutal-bg">Param</span>{' '}
                         <span className="text-brutal-red">Makersadda.</span>
                     </p>
 
                     {/* Tagline */}
-                    <p className="welcome-tagline font-data text-sm md:text-base text-brutal-bg/50 mt-8 max-w-lg leading-relaxed">
+                    <p className="welcome-tagline font-data text-xs sm:text-sm md:text-base text-brutal-bg/50 mt-5 sm:mt-8 max-w-lg leading-relaxed">
                         Where makers build the future, together.
                     </p>
 
                     {/* Accent line */}
-                    <div className="welcome-line w-16 md:w-24 h-px bg-brutal-red/60 mt-8 origin-left" />
+                    <div className="welcome-line w-12 sm:w-16 md:w-24 h-px bg-brutal-red/60 mt-5 sm:mt-8 origin-left" />
 
                     {/* CTA */}
-                    <div className="welcome-cta mt-8">
+                    <div className="welcome-cta mt-5 sm:mt-8">
                         <button
                             onClick={scrollDown}
-                            className="px-8 py-4 rounded-full bg-brutal-red text-brutal-bg
-                                       font-heading font-bold text-sm uppercase tracking-widest
+                            className="px-6 py-3 sm:px-8 sm:py-4 rounded-full bg-brutal-red text-brutal-bg
+                                       font-heading font-bold text-xs sm:text-sm uppercase tracking-widest
                                        hover:bg-brutal-bg hover:text-brutal-dark
                                        transition-all duration-500"
                         >
                             See What's Possible ↓
                         </button>
                     </div>
+                </div>
+
+                {/* 3D Robot — below text on mobile, beside text on md+
+                     Dynamically scales: small on mobile, full column on desktop */}
+                <div className="welcome-cta w-full md:w-2/5 lg:w-1/2 h-[340px] sm:h-[380px] md:h-[400px] lg:h-[500px] xl:h-[600px] relative flex-shrink-0 mt-2 md:mt-0">
+                    <InteractiveRobotSpline
+                        scene="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode"
+                        className="w-full h-full"
+                    />
                 </div>
             </div>
 

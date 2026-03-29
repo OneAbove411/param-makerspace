@@ -9,7 +9,7 @@ import { ArrowRight, Plus, ChevronDown } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const DOMAINS = ['All', 'Software & Robotics', 'Fabrication', 'Electronics'];
+const DOMAINS = ['All', 'Software & Robotics', 'Fabrication', 'Electronics', 'AI & Machine Learning', 'Bio-Hacking', 'Woodworking', 'Interdisciplinary'];
 
 // ─── Featured Project Banner ───
 
@@ -199,7 +199,7 @@ export function Projects() {
             <div className="max-w-7xl mx-auto">
 
                 {/* ─── Page Title ─── */}
-                <h1 className="archive-title font-heading font-bold text-5xl md:text-7xl uppercase
+                <h1 className="archive-title font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase
                                tracking-tight-heading mb-4">
                     Project Archive
                 </h1>
@@ -207,22 +207,25 @@ export function Projects() {
                 {/* ─── Filter Bar ─── */}
                 <div className="filter-bar flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12
                                 border-b border-brutal-dark/10 pb-6 mt-10">
-                    {/* Domain pills */}
-                    <div className="flex flex-wrap gap-3">
-                        {DOMAINS.map(d => (
-                            <button
-                                key={d}
-                                onClick={() => setFilter(d)}
-                                className={`px-5 py-2 font-data text-xs font-bold uppercase tracking-wider
-                                           rounded-full transition-all duration-300 border-2
-                                           ${filter === d
-                                        ? 'bg-brutal-dark text-brutal-bg border-brutal-dark shadow-[0_2px_12px_rgba(17,17,17,0.15)]'
-                                        : 'border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-dark/40 hover:text-brutal-dark'
-                                    }`}
+                    {/* Domain dropdown */}
+                    <div className="flex items-center gap-3">
+                        <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
+                            Domain:
+                        </span>
+                        <div className="relative w-full sm:w-auto">
+                            <select
+                                className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
+                                           w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
+                                           focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
                             >
-                                {d}
-                            </button>
-                        ))}
+                                {DOMAINS.map(d => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
+                        </div>
                     </div>
 
                     {/* Sort dropdown */}
@@ -230,10 +233,10 @@ export function Projects() {
                         <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
                             Sort by:
                         </span>
-                        <div className="relative">
+                        <div className="relative w-full sm:w-auto">
                             <select
                                 className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
-                                           px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
+                                           w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
                                            focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
@@ -290,22 +293,6 @@ export function Projects() {
                                                         </span>
                                                     </div>
                                                 )}
-
-                                                {/* Tier badge */}
-                                                <div className="absolute top-4 left-4 flex gap-2">
-                                                    {project.tier === 'Tier 3' ? (
-                                                        <span className="bg-brutal-red text-brutal-bg px-3 py-1 text-[9px] font-bold
-                                                                        font-data rounded-full uppercase tracking-wider shadow-md">
-                                                            T3 Architect
-                                                        </span>
-                                                    ) : (
-                                                        <span className="bg-brutal-bg/90 text-brutal-dark/60 px-3 py-1 text-[9px] font-bold
-                                                                        font-data rounded-full uppercase tracking-wider shadow-sm
-                                                                        border border-brutal-dark/5 backdrop-blur-sm">
-                                                            Independent
-                                                        </span>
-                                                    )}
-                                                </div>
 
                                                 {/* Hover arrow overlay */}
                                                 <div className="absolute bottom-4 right-4 w-8 h-8 rounded-full bg-brutal-bg/0

@@ -146,7 +146,7 @@ export function WhyParam() {
                         <div className="why-row flex flex-col md:flex-row md:items-center gap-4 md:gap-8 py-10 md:py-12">
                             {/* Left phrase */}
                             <div className="why-left flex-1">
-                                <span className="font-heading text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight">
+                                <span className="font-heading text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold tracking-tight">
                                     {s.left}
                                 </span>
                             </div>
@@ -156,7 +156,7 @@ export function WhyParam() {
 
                             {/* Right phrase */}
                             <div className="why-right flex-1 md:text-right">
-                                <span className="font-heading text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-brutal-bg/70">
+                                <span className="font-heading text-lg sm:text-xl md:text-3xl lg:text-4xl font-bold tracking-tight text-brutal-bg/70">
                                     {s.right}
                                 </span>
                             </div>

@@ -1139,6 +1139,8 @@ export function useProductMutations() {
     };
 
     const deleteProduct = async (id: string) => {
+        // Delete referencing order items first (cascade is set at DB level too, but belt-and-suspenders)
+        await supabase.from('store_order_item').delete().eq('product_id', id);
         const { error } = await supabase.from('store_product').delete().eq('id', id);
         return { error: error?.message || null };
     };

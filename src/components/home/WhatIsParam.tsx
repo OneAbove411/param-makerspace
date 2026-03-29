@@ -102,7 +102,7 @@ export function WhatIsParam() {
                 <p className="wp-header font-data text-xs text-brutal-red uppercase tracking-[0.2em] mb-4">
                     New Here?
                 </p>
-                <h2 className="wp-header font-heading font-bold text-3xl md:text-5xl uppercase tracking-tight-heading">
+                <h2 className="wp-header font-heading font-bold text-2xl sm:text-3xl md:text-5xl uppercase tracking-tight-heading">
                     Here's what you need to know.
                 </h2>
 

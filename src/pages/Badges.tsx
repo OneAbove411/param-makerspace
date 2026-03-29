@@ -91,7 +91,7 @@ export function Badges() {
         <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
             {/* Hero */}
             <section className="pt-36 pb-10 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto animate-[fadeInUp_0.6s_ease-out_both]">
-                <h1 className="font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
+                <h1 className="font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
                     Badge Catalog
                 </h1>
                 <p className="font-data text-sm text-brutal-dark/50 max-w-xl border-l-2 border-brutal-red pl-4 leading-relaxed">
@@ -319,7 +319,7 @@ export function Badges() {
             )}
 
             {/* CTA */}
-            <section className="bd-section pb-24 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto text-center">
+            <section className="bd-section pt-20 pb-24 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto text-center">
                 <Link
                     to="/makers"
                     className="inline-flex items-center gap-2 bg-brutal-red text-brutal-bg px-8 py-3.5 rounded-full font-data text-sm font-bold uppercase tracking-wider hover:bg-brutal-dark transition-colors duration-300"

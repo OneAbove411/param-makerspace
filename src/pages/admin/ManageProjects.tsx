@@ -29,10 +29,10 @@ export function ManageProjects() {
         }
     }, [previewProjectId]);
 
-    if (role !== 'admin') {
+    if (role !== 'admin' && role !== 'mentor') {
         return (
             <div className="p-24 text-center font-data text-2xl">
-                Access Denied: Admin Only
+                Access Denied: Mentor or Admin Only
             </div>
         );
     }

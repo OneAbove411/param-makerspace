@@ -3,31 +3,29 @@ import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ArrowRight, ChevronDown } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 gsap.registerPlugin(ScrollTrigger);
 
 /**
  * FeaturedProjects — Section 6
  *
- * Design critique of previous version:
- * - Cards had continuous floating animation (y: -4, yoyo) which made
- *   the whole grid feel "wobbly." Projects = stability, credibility.
- *   Wobbling undermines trust.
- * - Stat numbers had continuous scale pulse — unnecessary distraction.
- * - MagneticCard 3D tilt was heavy for project cards (elastic.out on leave
- *   is jarring when you're trying to read project titles).
- *
- * New approach:
- * - Project cards show image + domain + title always visible.
- * - Click to expand summary + maker credit (expandable IS justified here —
- *   the image takes up space, and the summary is multiple sentences).
- * - NO continuous floating. Cards are static after scroll entrance.
- * - NO MagneticCard wrapper. Simple CSS hover lift + shadow.
- * - Stats counter kept (count-up is satisfying and scroll-triggered once).
- * - Hover: image zooms slightly, border shifts. Clean and predictable.
+ * Now fetches REAL projects from Supabase with real images and maker names.
+ * Stats (project count, maker count) are live from the database.
+ * Cards link to actual project detail pages.
+ * Falls back to placeholder data if DB is empty.
  */
 
-const FEATURED = [
+interface FeaturedProject {
+    id: string;
+    title: string;
+    domain: string;
+    summary: string;
+    maker: string;
+    image: string;
+}
+
+const FALLBACK_PROJECTS: FeaturedProject[] = [
     {
         id: 'p1',
         title: 'Solar Powered Kiln v2',
@@ -57,6 +55,85 @@ const FEATURED = [
 export function FeaturedProjects() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [projects, setProjects] = useState<FeaturedProject[]>(FALLBACK_PROJECTS);
+    const [projectCount, setProjectCount] = useState(0);
+    const [makerCount, setMakerCount] = useState(0);
+    const statsReady = useRef(false);
+
+    // Fetch real projects and stats
+    useEffect(() => {
+        async function fetchData() {
+            // Fetch 3 featured projects with owner name
+            const { data: dbProjects } = await supabase
+                .from('project')
+                .select('id, title, domain, summary, owner_id')
+                .eq('status', 'active')
+                .eq('visibility', 'public')
+                .order('created_at', { ascending: false })
+                .limit(3);
+
+            if (dbProjects && dbProjects.length > 0) {
+                // Fetch images and owner names in parallel
+                const projectIds = dbProjects.map(p => p.id);
+                const ownerIds = [...new Set(dbProjects.map(p => p.owner_id))];
+
+                const [imagesRes, ownersRes] = await Promise.all([
+                    supabase
+                        .from('project_image')
+                        .select('project_id, image_url')
+                        .in('project_id', projectIds)
+                        .order('display_order', { ascending: true }),
+                    supabase
+                        .from('app_user')
+                        .select('id, name')
+                        .in('id', ownerIds),
+                ]);
+
+                // Map first image per project
+                const imageMap: Record<string, string> = {};
+                (imagesRes.data || []).forEach(img => {
+                    if (!imageMap[img.project_id]) {
+                        imageMap[img.project_id] = img.image_url;
+                    }
+                });
+
+                // Map owner names
+                const ownerMap: Record<string, string> = {};
+                (ownersRes.data || []).forEach((u: any) => {
+                    ownerMap[u.id] = u.name || 'Unknown';
+                });
+
+                const real: FeaturedProject[] = dbProjects.map((p, i) => ({
+                    id: p.id,
+                    title: p.title,
+                    domain: p.domain || 'Maker',
+                    summary: p.summary || '',
+                    maker: ownerMap[p.owner_id] || 'Unknown',
+                    image: imageMap[p.id] || FALLBACK_PROJECTS[i % FALLBACK_PROJECTS.length].image,
+                }));
+
+                setProjects(real);
+            }
+
+            // Fetch total project count
+            const { count: totalProjects } = await supabase
+                .from('project')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'active')
+                .eq('visibility', 'public');
+
+            // Fetch active maker count (public profiles)
+            const { count: totalMakers } = await supabase
+                .from('maker_profile')
+                .select('id', { count: 'exact', head: true })
+                .eq('is_public', true);
+
+            setProjectCount(totalProjects || 0);
+            setMakerCount(totalMakers || 0);
+            statsReady.current = true;
+        }
+        fetchData();
+    }, []);
 
     const handleCardClick = (id: string) => {
         setExpandedId(expandedId === id ? null : id);
@@ -64,7 +141,7 @@ export function FeaturedProjects() {
 
     // Animate expand/collapse
     useEffect(() => {
-        FEATURED.forEach((project) => {
+        projects.forEach((project) => {
             const el = document.querySelector(`[data-project="${project.id}"]`) as HTMLElement;
             if (!el) return;
 
@@ -86,8 +163,9 @@ export function FeaturedProjects() {
                 if (chevron) gsap.to(chevron, { rotation: 0, duration: 0.3, ease: 'power2.inOut' });
             }
         });
-    }, [expandedId]);
+    }, [expandedId, projects]);
 
+    // Entrance animations (run once on mount)
     useEffect(() => {
         const ctx = gsap.context(() => {
             // Accent line
@@ -108,20 +186,6 @@ export function FeaturedProjects() {
                     scrollTrigger: { trigger: containerRef.current, start: 'top 70%' }
                 }
             );
-
-            // Stat count-up (scroll-triggered, runs once)
-            gsap.utils.toArray<HTMLElement>('.stat-number').forEach((el) => {
-                const target = parseInt(el.dataset.target || '0', 10);
-                gsap.fromTo(el,
-                    { innerText: 0 },
-                    {
-                        innerText: target,
-                        duration: 1.8, ease: 'power2.out',
-                        snap: { innerText: 1 },
-                        scrollTrigger: { trigger: el, start: 'top 85%' }
-                    }
-                );
-            });
 
             // Cards stagger
             gsap.fromTo('.fp-card',
@@ -146,6 +210,47 @@ export function FeaturedProjects() {
         return () => ctx.revert();
     }, []);
 
+    // Stat count-up — runs AFTER data loads so data-target has real values
+    // Uses ScrollTrigger if section is below viewport, or animates immediately
+    // if the user already scrolled past it before data arrived.
+    useEffect(() => {
+        if (projectCount === 0 && makerCount === 0) return;
+        const ctx = gsap.context(() => {
+            gsap.utils.toArray<HTMLElement>('.stat-number').forEach((el) => {
+                const target = parseInt(el.dataset.target || '0', 10);
+                if (target === 0) return;
+
+                // Check if element is already in or above the viewport
+                const rect = el.getBoundingClientRect();
+                const alreadyVisible = rect.top < window.innerHeight * 0.85;
+
+                if (alreadyVisible) {
+                    // Already scrolled past — animate immediately
+                    gsap.fromTo(el,
+                        { innerText: 0 },
+                        {
+                            innerText: target,
+                            duration: 1.8, ease: 'power2.out',
+                            snap: { innerText: 1 },
+                        }
+                    );
+                } else {
+                    // Not yet visible — use scroll trigger
+                    gsap.fromTo(el,
+                        { innerText: 0 },
+                        {
+                            innerText: target,
+                            duration: 1.8, ease: 'power2.out',
+                            snap: { innerText: 1 },
+                            scrollTrigger: { trigger: el, start: 'top 85%' }
+                        }
+                    );
+                }
+            });
+        }, containerRef);
+        return () => ctx.revert();
+    }, [projectCount, makerCount]);
+
     return (
         <section ref={containerRef} className="py-24 md:py-32 px-6 md:px-12 lg:px-24 bg-brutal-bg">
             <div className="max-w-6xl mx-auto">
@@ -163,22 +268,22 @@ export function FeaturedProjects() {
                             Real projects by community members. Some started with zero experience.
                         </p>
                     </div>
-                    <div className="fp-header flex gap-10 md:gap-14">
-                        <div>
-                            <span className="stat-number font-data text-4xl md:text-5xl font-bold text-brutal-dark tabular-nums" data-target="47">0</span>
-                            <p className="font-data text-[10px] text-brutal-dark/40 uppercase tracking-widest mt-1">Projects Built</p>
-                        </div>
+                    <div className="fp-header flex gap-6 sm:gap-10 md:gap-14">
+                        <Link to="/projects" className="group hover:opacity-80 transition-opacity">
+                            <span className="stat-number font-data text-4xl md:text-5xl font-bold text-brutal-dark tabular-nums" data-target={projectCount || 0}>0</span>
+                            <p className="font-data text-[10px] text-brutal-dark/40 uppercase tracking-widest mt-1 group-hover:text-brutal-red transition-colors">Projects Built</p>
+                        </Link>
                         <div className="w-px bg-brutal-dark/10 hidden md:block" />
-                        <div>
-                            <span className="stat-number font-data text-4xl md:text-5xl font-bold text-brutal-dark tabular-nums" data-target="12">0</span>
-                            <p className="font-data text-[10px] text-brutal-dark/40 uppercase tracking-widest mt-1">Active Makers</p>
-                        </div>
+                        <Link to="/makers" className="group hover:opacity-80 transition-opacity">
+                            <span className="stat-number font-data text-4xl md:text-5xl font-bold text-brutal-dark tabular-nums" data-target={makerCount || 0}>0</span>
+                            <p className="font-data text-[10px] text-brutal-dark/40 uppercase tracking-widest mt-1 group-hover:text-brutal-red transition-colors">Active Makers</p>
+                        </Link>
                     </div>
                 </div>
 
                 {/* Project cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {FEATURED.map((project) => (
+                    {projects.map((project) => (
                         <div
                             key={project.id}
                             data-project={project.id}
@@ -189,16 +294,18 @@ export function FeaturedProjects() {
                                        hover:-translate-y-1"
                             onClick={() => handleCardClick(project.id)}
                         >
-                            {/* Image */}
-                            <div className="aspect-[4/3] bg-brutal-dark/10 overflow-hidden">
-                                <img
-                                    src={project.image}
-                                    alt={project.title}
-                                    className="w-full h-full object-cover group-hover:scale-105
-                                               transition-transform duration-700 ease-out"
-                                    loading="lazy"
-                                />
-                            </div>
+                            {/* Image — clicking the image navigates to project */}
+                            <Link to={`/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>
+                                <div className="aspect-[4/3] bg-brutal-dark/10 overflow-hidden">
+                                    <img
+                                        src={project.image}
+                                        alt={project.title}
+                                        className="w-full h-full object-cover group-hover:scale-105
+                                                   transition-transform duration-700 ease-out"
+                                        loading="lazy"
+                                    />
+                                </div>
+                            </Link>
 
                             {/* Content */}
                             <div className="p-6">
@@ -207,10 +314,12 @@ export function FeaturedProjects() {
                                         <span className="font-data text-[10px] text-brutal-red uppercase tracking-[0.15em] font-bold">
                                             #{project.domain}
                                         </span>
-                                        <h3 className="font-heading font-bold text-lg mt-2 tracking-tight-heading
-                                                       group-hover:text-brutal-red transition-colors duration-300">
-                                            {project.title}
-                                        </h3>
+                                        <Link to={`/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>
+                                            <h3 className="font-heading font-bold text-lg mt-2 tracking-tight-heading
+                                                           group-hover:text-brutal-red transition-colors duration-300">
+                                                {project.title}
+                                            </h3>
+                                        </Link>
                                     </div>
                                     <ChevronDown
                                         data-chevron
@@ -232,6 +341,14 @@ export function FeaturedProjects() {
                                     <p className="font-data text-[10px] text-brutal-dark/40 mt-3 uppercase tracking-widest">
                                         Built by {project.maker}
                                     </p>
+                                    <Link
+                                        to={`/projects/${project.id}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="inline-flex items-center gap-1 font-data text-xs font-bold text-brutal-red
+                                                   hover:underline mt-3"
+                                    >
+                                        View Project <ArrowRight size={12} />
+                                    </Link>
                                 </div>
                             </div>
                         </div>
@@ -246,7 +363,7 @@ export function FeaturedProjects() {
                                    tracking-widest text-brutal-dark hover:text-brutal-red transition-colors
                                    duration-300 group/link"
                     >
-                        Explore All Projects
+                        Explore Project Archive
                         <ArrowRight size={16} className="group-hover/link:translate-x-1 transition-transform duration-300" />
                     </Link>
                 </div>

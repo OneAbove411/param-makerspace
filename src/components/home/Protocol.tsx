@@ -61,15 +61,15 @@ export function Protocol() {
             {STEPS.map((step, index) => (
                 <section
                     key={step.num}
-                    className="protocol-card h-[100dvh] w-full flex items-center justify-center p-6 md:p-12 relative bg-brutal-bg"
+                    className="protocol-card min-h-screen sm:h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 md:p-12 relative bg-brutal-bg"
                     style={{ zIndex: index }}
                 >
                     <div className="absolute inset-0 bg-brutal-bg border-t-2 border-brutal-dark/10" />
 
-                    <div className="relative w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                    <div className="relative w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
                         <div className="flex flex-col gap-6">
-                            <span className="font-data text-brutal-red text-6xl md:text-8xl font-bold">{step.num}</span>
-                            <h2 className="font-heading text-4xl md:text-6xl font-bold uppercase tracking-tight-heading">{step.title}</h2>
+                            <span className="font-data text-brutal-red text-4xl sm:text-5xl md:text-8xl font-bold">{step.num}</span>
+                            <h2 className="font-heading text-2xl sm:text-3xl md:text-6xl font-bold uppercase tracking-tight-heading">{step.title}</h2>
                             <p className="font-data text-lg md:text-xl text-brutal-dark/80 max-w-md">{step.desc}</p>
                         </div>
 

@@ -227,7 +227,7 @@ export function ProfileSetup() {
     return (
         <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
             <div className="pt-36 pb-8 px-6 md:px-12 lg:px-24 max-w-3xl mx-auto">
-                <h1 className="ps-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
+                <h1 className="ps-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
                     Identity Configuration
                 </h1>
                 <p className="ps-hero-text font-data text-base text-brutal-dark/50 border-l-2 border-brutal-red pl-4 mb-12">

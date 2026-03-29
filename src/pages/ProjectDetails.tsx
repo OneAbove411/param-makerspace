@@ -189,15 +189,6 @@ export function ProjectDetails() {
                         <span className="font-data text-[9px] text-brutal-red font-bold uppercase tracking-[0.2em]">
                             Project_Code: {project.title.replace(/\s+/g, '_').substring(0, 12).toUpperCase()}
                         </span>
-                        {project.tier === 'Tier 3' ? (
-                            <span className="bg-brutal-red text-brutal-bg px-2.5 py-0.5 font-data text-[9px] font-bold rounded-full uppercase tracking-wider">
-                                T3 Architect
-                            </span>
-                        ) : (
-                            <span className="bg-brutal-dark/8 text-brutal-dark/50 px-2.5 py-0.5 font-data text-[9px] font-bold rounded-full uppercase tracking-wider">
-                                Independent
-                            </span>
-                        )}
                         {project.domain && (
                             <span className="border border-brutal-dark/15 px-2.5 py-0.5 font-data text-[9px] font-bold rounded-full uppercase tracking-wider text-brutal-dark/60">
                                 {project.domain}

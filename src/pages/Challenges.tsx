@@ -3,7 +3,7 @@ import { useChallenges } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
 import { MagneticCard } from '../components/ui/MagneticCard';
 import { Link } from 'react-router-dom';
-import { Clock, ArrowRight, Loader2, Compass, Wrench, Cpu } from 'lucide-react';
+import { Clock, ArrowRight, Loader2, Compass, Wrench, Cpu, ChevronDown } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -32,7 +32,7 @@ const TIER_INFO = [
     },
 ];
 
-const DOMAINS = ['All', 'Electronics', 'Robotics', 'AI', 'Design', 'Fabrication'];
+const DOMAINS = ['All', 'Electronics', 'Robotics', 'AI', 'Design', 'Fabrication', 'Bio', 'Interdisciplinary', 'Woodworking'];
 
 // ─── Domain color map for badges ───
 
@@ -128,7 +128,7 @@ export function Challenges() {
                 HERO SECTION
             ═══════════════════════════════════════════════════ */}
             <section className="pt-36 pb-16 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto">
-                <h1 className="eh-hero-text font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading">
+                <h1 className="eh-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading">
                     Explorer Hub
                 </h1>
                 <p className="eh-hero-text font-heading text-base md:text-lg text-brutal-dark/55 max-w-lg mt-6 leading-relaxed">
@@ -200,21 +200,24 @@ export function Challenges() {
                         <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading">Active Challenges</h2>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        {DOMAINS.map(d => (
-                            <button
-                                key={d}
-                                onClick={() => setDomainFilter(d)}
-                                className={`px-3.5 py-1.5 font-data text-[10px] font-bold rounded-full transition-all duration-200 uppercase tracking-wider
-                                    ${domainFilter === d
-                                        ? 'bg-brutal-dark text-brutal-bg'
-                                        : 'border border-brutal-dark/15 text-brutal-dark/50 hover:border-brutal-dark/40 hover:text-brutal-dark'}`}
+                    <div className="flex items-center gap-3">
+                        <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
+                            Domain:
+                        </span>
+                        <div className="relative w-full sm:w-auto">
+                            <select
+                                className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
+                                           w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
+                                           focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
+                                value={domainFilter}
+                                onChange={(e) => setDomainFilter(e.target.value)}
                             >
-                                {d === 'All' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 opacity-60" />}
-                                {d !== 'All' && <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${getDomainBadgeClass(d).split(' ')[0]}`} />}
-                                {d}
-                            </button>
-                        ))}
+                                {DOMAINS.map(d => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
+                        </div>
                     </div>
                 </div>
 

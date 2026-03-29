@@ -48,7 +48,7 @@ export function Philosophy() {
                     ))}
                 </h2>
 
-                <h2 className="font-drama italic text-4xl md:text-6xl lg:text-8xl text-brutal-bg leading-tight flex flex-wrap gap-x-3 gap-y-2">
+                <h2 className="font-drama italic text-2xl sm:text-3xl md:text-6xl lg:text-8xl text-brutal-bg leading-tight flex flex-wrap gap-x-1 sm:gap-x-2 md:gap-x-3 gap-y-1 md:gap-y-2">
                     {secondLine.map((word, i) => {
                         const isHighlight = word.toLowerCase().includes("precision") || word.toLowerCase().includes("architect");
                         return (

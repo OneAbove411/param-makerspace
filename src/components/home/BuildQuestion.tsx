@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { supabase } from '../../lib/supabase';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -9,26 +11,30 @@ gsap.registerPlugin(ScrollTrigger);
  *
  * Design rationale:
  * - ONE focal point: the question "What would you [build]?" with rotating word
- * - ONE supporting element: the orbiting project carousel
- * - REMOVED: 14 floating particles, pulsing center glow, rotating ring
- *   → These competed with the carousel for attention. gsap.com uses
- *     clean backgrounds with ONE animated element per section.
- * - Kept the dot-grid background for texture continuity with hero
- * - Subtitle is short and stays visible (no breathing/fading)
+ * - ONE supporting element: the orbiting project carousel with REAL projects
+ * - Carousel cards are clickable — link to actual project pages
+ * - Falls back to placeholder cards while loading
  */
 
-// Project cards for orbit carousel
-const SHOWCASE_PROJECTS = [
-    { title: 'Robotic Arm Build', domain: 'Robotics', image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500&auto=format&fit=crop&q=80' },
-    { title: 'LED Matrix Art', domain: 'Electronics', image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=500&auto=format&fit=crop&q=80' },
-    { title: 'Bio-Reactor v2', domain: 'Bio', image: 'https://images.unsplash.com/photo-1582719471384-894fbb16f461?w=500&auto=format&fit=crop&q=80' },
-    { title: 'CNC Sculpture', domain: 'Fabrication', image: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=500&auto=format&fit=crop&q=80' },
-    { title: 'Custom PCB Array', domain: 'Electronics', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80' },
-    { title: '3D Print Lattice', domain: 'Design', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=500&auto=format&fit=crop&q=80' },
+// Fallback projects shown while real data loads
+const FALLBACK_PROJECTS = [
+    { id: '', title: 'Robotic Arm Build', domain: 'Robotics', image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500&auto=format&fit=crop&q=80' },
+    { id: '', title: 'LED Matrix Art', domain: 'Electronics', image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=500&auto=format&fit=crop&q=80' },
+    { id: '', title: 'Bio-Reactor v2', domain: 'Bio', image: 'https://images.unsplash.com/photo-1582719471384-894fbb16f461?w=500&auto=format&fit=crop&q=80' },
+    { id: '', title: 'CNC Sculpture', domain: 'Fabrication', image: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=500&auto=format&fit=crop&q=80' },
+    { id: '', title: 'Custom PCB Array', domain: 'Electronics', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80' },
+    { id: '', title: '3D Print Lattice', domain: 'Design', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=500&auto=format&fit=crop&q=80' },
 ];
 
+interface CarouselProject {
+    id: string;
+    title: string;
+    domain: string;
+    image: string;
+}
+
 // ─── Orbit Carousel — the ONE interactive element ───
-function OrbitCarousel() {
+function OrbitCarousel({ projects }: { projects: CarouselProject[] }) {
     const [angle, setAngle] = useState(0);
     const animRef = useRef<number>(0);
 
@@ -44,16 +50,16 @@ function OrbitCarousel() {
         return () => cancelAnimationFrame(animRef.current);
     }, []);
 
-    const count = SHOWCASE_PROJECTS.length;
+    const count = projects.length;
     const radiusX = typeof window !== 'undefined' && window.innerWidth < 640 ? 130 : 240;
     const radiusY = typeof window !== 'undefined' && window.innerWidth < 640 ? 25 : 45;
 
     return (
         <div
-            className="relative w-full h-48 md:h-60 flex items-center justify-center"
+            className="relative w-full h-48 md:h-60 flex items-center justify-center overflow-hidden"
             style={{ perspective: '800px' }}
         >
-            {SHOWCASE_PROJECTS.map((project, i) => {
+            {projects.map((project, i) => {
                 const theta = ((360 / count) * i + angle) * (Math.PI / 180);
                 const x = Math.sin(theta) * radiusX;
                 const z = Math.cos(theta) * radiusY;
@@ -63,11 +69,11 @@ function OrbitCarousel() {
                 const zIndex = Math.round(normalizedZ * 100);
                 const blur = normalizedZ < 0.25 ? 2 : 0;
 
-                return (
+                const cardContent = (
                     <div
-                        key={project.title}
                         className="absolute rounded-xl overflow-hidden border border-brutal-bg/10
-                                   bg-brutal-dark/60 backdrop-blur-sm"
+                                   bg-brutal-dark/60 backdrop-blur-sm cursor-pointer
+                                   hover:border-brutal-red/40 transition-colors duration-300"
                         style={{
                             width: typeof window !== 'undefined' && window.innerWidth < 640 ? '95px' : '130px',
                             transform: `translateX(${x}px) translateZ(${z}px) scale(${scale})`,
@@ -95,6 +101,16 @@ function OrbitCarousel() {
                         </div>
                     </div>
                 );
+
+                // Only wrap in Link if we have a real project id
+                if (project.id) {
+                    return (
+                        <Link key={project.id} to={`/projects/${project.id}`} className="contents">
+                            {cardContent}
+                        </Link>
+                    );
+                }
+                return <div key={project.title + i}>{cardContent}</div>;
             })}
         </div>
     );
@@ -138,6 +154,55 @@ function RotatingWord() {
 // ─── Main Component ───
 export function BuildQuestion() {
     const sectionRef = useRef<HTMLDivElement>(null);
+    const [carouselProjects, setCarouselProjects] = useState<CarouselProject[]>(FALLBACK_PROJECTS);
+
+    // Fetch real projects with their first image
+    useEffect(() => {
+        async function fetchProjects() {
+            const { data: projects } = await supabase
+                .from('project')
+                .select('id, title, domain')
+                .eq('status', 'active')
+                .eq('visibility', 'public')
+                .order('created_at', { ascending: false })
+                .limit(6);
+
+            if (!projects || projects.length === 0) return;
+
+            // Fetch first image for each project
+            const projectIds = projects.map(p => p.id);
+            const { data: images } = await supabase
+                .from('project_image')
+                .select('project_id, image_url')
+                .in('project_id', projectIds)
+                .order('display_order', { ascending: true });
+
+            // Map first image per project
+            const imageMap: Record<string, string> = {};
+            (images || []).forEach(img => {
+                if (!imageMap[img.project_id]) {
+                    imageMap[img.project_id] = img.image_url;
+                }
+            });
+
+            const real: CarouselProject[] = projects.map((p, i) => ({
+                id: p.id,
+                title: p.title,
+                domain: p.domain || 'Maker',
+                image: imageMap[p.id] || FALLBACK_PROJECTS[i % FALLBACK_PROJECTS.length].image,
+            }));
+
+            // Ensure we have at least 4 cards for the carousel to look good
+            if (real.length >= 4) {
+                setCarouselProjects(real);
+            } else if (real.length > 0) {
+                // Pad with fallback if too few real projects
+                const padded = [...real, ...FALLBACK_PROJECTS.slice(0, 6 - real.length)];
+                setCarouselProjects(padded);
+            }
+        }
+        fetchProjects();
+    }, []);
 
     useEffect(() => {
         const ctx = gsap.context(() => {
@@ -193,12 +258,12 @@ export function BuildQuestion() {
             <div className="relative z-10 flex flex-col items-center text-center w-full max-w-4xl">
                 {/* Question headline */}
                 <div className="bq-headline">
-                    <h2 className="font-drama italic text-5xl md:text-7xl lg:text-[5.5rem] text-brutal-bg leading-[1.05]">
+                    <h2 className="font-drama italic text-3xl sm:text-5xl md:text-7xl lg:text-[5.5rem] text-brutal-bg leading-[1.05]">
                         What would you
                     </h2>
                     <div className="mt-1 md:mt-2">
                         <span
-                            className="font-drama italic text-5xl md:text-7xl lg:text-[5.5rem] leading-[1.05]"
+                            className="font-drama italic text-3xl sm:text-5xl md:text-7xl lg:text-[5.5rem] leading-[1.05]"
                             style={{ perspective: '600px' }}
                         >
                             <RotatingWord />
@@ -209,12 +274,12 @@ export function BuildQuestion() {
 
                 {/* Carousel */}
                 <div className="bq-carousel mt-10 md:mt-14 w-full">
-                    <OrbitCarousel />
+                    <OrbitCarousel projects={carouselProjects} />
                 </div>
 
                 {/* Subtitle — static, no fading */}
                 <p className="bq-sub font-data text-xs md:text-sm text-brutal-bg/35 mt-6 max-w-md leading-relaxed">
-                    Real projects built by makers in the lab. Scroll down to start building yours.
+                    Real projects built by makers in the lab. Click any to explore.
                 </p>
             </div>
         </section>

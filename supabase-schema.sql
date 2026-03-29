@@ -30,6 +30,7 @@ CREATE TABLE xp_event (
 ALTER TABLE xp_event ENABLE ROW LEVEL SECURITY;
 CREATE POLICY xp_event_admin_all ON xp_event FOR ALL USING (get_my_role() = 'admin');
 CREATE POLICY xp_event_read_own ON xp_event FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY xp_event_public_read ON xp_event FOR SELECT USING (true);
 */
 
 CREATE TABLE app_user (
@@ -566,7 +567,8 @@ CREATE POLICY admin_all ON store_product FOR ALL USING (get_my_role() = 'admin')
 CREATE POLICY admin_all ON store_order FOR ALL USING (get_my_role() = 'admin');
 CREATE POLICY admin_all ON store_order_item FOR ALL USING (get_my_role() = 'admin');
 
--- ── app_user: users can read own row ──
+-- ── app_user: public read for names (project owners, comment authors, team members) ──
+CREATE POLICY user_public_read ON app_user FOR SELECT USING (true);
 CREATE POLICY user_read_own ON app_user FOR SELECT USING (auth_id = auth.uid());
 
 -- ── maker_profile: public read (if is_public), own CRUD ──

@@ -84,7 +84,7 @@ export function Store() {
         <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
             {/* Hero */}
             <section className="pt-36 pb-10 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto animate-[fadeInUp_0.6s_ease-out_both]">
-                <h1 className="font-heading font-bold text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
+                <h1 className="font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading mb-4">
                     Store
                 </h1>
                 <p className="font-data text-sm text-brutal-dark/50 max-w-xl border-l-2 border-brutal-red pl-4 leading-relaxed">

@@ -27,6 +27,7 @@ interface AuthContextType {
     session: Session | null;
     role: Role;
     isLoading: boolean;
+    isRecovery: boolean;
     signUp: (
         email: string,
         password: string,
@@ -104,7 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRecovery, setIsRecovery] = useState(false);
+    const isRecoveryRef = useRef(false);
     const initDone = useRef(false);
+    const eventCounter = useRef(0); // Tracks latest event to discard stale async results
 
     useEffect(() => {
         let mounted = true;
@@ -177,22 +181,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             setSession(s);
 
-            if (s?.user) {
-                const appUser = await fetchAppUser(s.user.id);
+            // Handle password recovery flow — set flag and skip normal user loading
+            if (event === 'PASSWORD_RECOVERY') {
+                isRecoveryRef.current = true;
                 if (mounted) {
-                    setUser(appUser);
-                    if (appUser) {
-                        fetchAvatar(appUser.id).then((avatar) => {
-                            if (mounted && avatar)
-                                setUser((prev) => (prev ? { ...prev, avatar } : prev));
-                        });
-                        if (event === 'SIGNED_IN') {
-                            ensureMakerProfile(appUser.id, appUser.name).catch(console.error);
-                        }
-                    }
+                    setIsRecovery(true);
                     setIsLoading(false);
                 }
+                return;
+            }
+
+            // Skip normal auth processing while in recovery mode
+            if (isRecoveryRef.current) {
+                if (mounted) setIsLoading(false);
+                return;
+            }
+
+            if (s?.user) {
+                const thisEvent = ++eventCounter.current;
+                const appUser = await fetchAppUser(s.user.id);
+                // Discard result if a newer event has fired while we were awaiting
+                if (!mounted || thisEvent !== eventCounter.current) return;
+                setUser(appUser);
+                if (appUser) {
+                    fetchAvatar(appUser.id).then((avatar) => {
+                        if (mounted && avatar && thisEvent === eventCounter.current)
+                            setUser((prev) => (prev ? { ...prev, avatar } : prev));
+                    });
+                    if (event === 'SIGNED_IN') {
+                        ensureMakerProfile(appUser.id, appUser.name).catch(console.error);
+                    }
+                }
+                setIsLoading(false);
             } else {
+                eventCounter.current++;
                 if (mounted) {
                     setUser(null);
                     setIsLoading(false);
@@ -207,12 +229,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const signUp = async (email: string, password: string, name: string) => {
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: { data: { name } },
-        });
-        return { error: error?.message || null };
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: { data: { name } },
+            });
+            if (error) {
+                return { error: error.message || JSON.stringify(error) };
+            }
+            return { error: null };
+        } catch (e: any) {
+            return { error: e?.message || 'An unexpected error occurred during signup.' };
+        }
     };
 
     const signIn = async (email: string, password: string) => {
@@ -234,15 +263,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
-        clearAppAuth();
-        await supabase.auth.signOut();
+        // Clear state immediately so UI updates instantly
+        isRecoveryRef.current = false;
+        setIsRecovery(false);
         setUser(null);
         setSession(null);
+        clearAppAuth();
+        await supabase.auth.signOut();
     };
 
     const resetPassword = async (email: string) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/login`,
+            redirectTo: `${window.location.origin}/update-password`,
         });
         return { error: error?.message || null };
     };
@@ -267,6 +299,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 session,
                 role: user?.role || 'viewer',
                 isLoading,
+                isRecovery,
                 signUp,
                 signIn,
                 signInWithGoogle,

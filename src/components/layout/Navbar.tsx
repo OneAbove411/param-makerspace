@@ -31,9 +31,9 @@ export function Navbar() {
         setMobileOpen(false);
     }, [location.pathname]);
 
-    const handleSignOut = async () => {
-        await signOut();
-        navigate('/');
+    const handleSignOut = () => {
+        signOut(); // State clears instantly (setUser(null) is synchronous in signOut)
+        navigate('/', { replace: true });
     };
 
     const navLinks = [

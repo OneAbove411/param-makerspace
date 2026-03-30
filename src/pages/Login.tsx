@@ -5,9 +5,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { CheckCircle2 } from 'lucide-react';
 
 export function Login() {
-    const { signIn, signInWithGoogle, user, isLoading } = useAuth();
+    const { signIn, signInWithGoogle, user, isLoading, isRecovery } = useAuth();
     const navigate = useNavigate();
     const pageRef = useRef<HTMLDivElement>(null);
     const [email, setEmail] = useState('');
@@ -15,6 +16,19 @@ export function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [successMsg, setSuccessMsg] = useState('');
+
+    // Check for password reset success flag
+    useEffect(() => {
+        const resetSuccess = sessionStorage.getItem('password_reset_success');
+        if (resetSuccess) {
+            sessionStorage.removeItem('password_reset_success');
+            setSuccessMsg('Password reset successful. Please sign in with your new password.');
+            // Auto-dismiss after 6 seconds
+            const timer = setTimeout(() => setSuccessMsg(''), 6000);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     // GSAP entrance animation
     useEffect(() => {
@@ -28,12 +42,19 @@ export function Login() {
         }
     }, []);
 
+    // Redirect to update-password page during recovery flow
+    useEffect(() => {
+        if (!isLoading && isRecovery) {
+            navigate('/update-password', { replace: true });
+        }
+    }, [isLoading, isRecovery, navigate]);
+
     // Redirect already-authenticated users (e.g. non-incognito with stored session)
     useEffect(() => {
-        if (!isLoading && user) {
+        if (!isLoading && user && !isRecovery) {
             navigate('/dashboard', { replace: true });
         }
-    }, [user, isLoading, navigate]);
+    }, [user, isLoading, isRecovery, navigate]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -55,6 +76,13 @@ export function Login() {
             <Card className="auth-card w-full max-w-md p-8 border-2 border-brutal-dark/10">
                 <h1 className="font-heading font-bold text-3xl uppercase tracking-tight-heading mb-2 text-brutal-dark">System Access</h1>
                 <p className="font-data text-xs text-brutal-dark/50 border-l-2 border-brutal-red pl-3 mb-8">Provide credentials to access the Param Makerspace internal network.</p>
+
+                {successMsg && (
+                    <div className="mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-xl flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                        <p className="font-data text-sm text-green-800 font-bold">{successMsg}</p>
+                    </div>
+                )}
 
                 {error && (
                     <div className="mb-6 p-3 bg-brutal-red/5 border border-brutal-red/20 rounded-xl">

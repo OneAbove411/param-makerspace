@@ -1,0 +1,103 @@
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirm Your Identity</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F3EE;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;color:#111111;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F3EE;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:0 0 32px 0;">
+              <span style="font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.04em;color:#111111;text-transform:uppercase;">PARAM</span>
+              <span style="font-family:'Space Mono',monospace;font-size:10px;color:#111111;opacity:0.4;display:block;margin-top:-2px;text-transform:uppercase;">makersadda</span>
+            </td>
+          </tr>
+
+          <!-- Main Card -->
+          <tr>
+            <td style="background-color:#FFFFFF;border:2px solid rgba(17,17,17,0.08);border-radius:16px;padding:48px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+
+                <!-- Title -->
+                <tr>
+                  <td style="padding:0 0 8px 0;">
+                    <h1 style="margin:0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.04em;text-transform:uppercase;color:#111111;">Verify Identity</h1>
+                  </td>
+                </tr>
+
+                <!-- Red accent line + subtitle -->
+                <tr>
+                  <td style="padding:0 0 32px 0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:3px;background-color:#C4291E;"></td>
+                        <td style="padding:4px 0 4px 12px;">
+                          <p style="margin:0;font-family:'Space Mono',monospace;font-size:12px;color:rgba(17,17,17,0.5);line-height:1.5;">Confirm your email to activate your Param Ecosystem account.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Body text -->
+                <tr>
+                  <td style="padding:0 0 32px 0;">
+                    <p style="margin:0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111111;">
+                      Welcome to the lab. You're one step away from joining the Param Makerspace community. Click the button below to verify your email address and complete your initialization.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- CTA Button -->
+                <tr>
+                  <td style="padding:0 0 32px 0;" align="center">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;background-color:#111111;color:#F5F3EE;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;text-decoration:none;padding:16px 48px;border-radius:12px;">Confirm Email</a>
+                  </td>
+                </tr>
+
+                <!-- Divider -->
+                <tr>
+                  <td style="padding:0 0 24px 0;">
+                    <hr style="border:none;border-top:1px solid rgba(17,17,17,0.08);margin:0;" />
+                  </td>
+                </tr>
+
+                <!-- Fallback link -->
+                <tr>
+                  <td style="padding:0;">
+                    <p style="margin:0;font-family:'Space Mono',monospace;font-size:11px;color:rgba(17,17,17,0.4);line-height:1.7;">
+                      If the button doesn't work, copy and paste this link into your browser:
+                    </p>
+                    <p style="margin:8px 0 0 0;font-family:'Space Mono',monospace;font-size:11px;color:#C4291E;line-height:1.5;word-break:break-all;">
+                      {{ .ConfirmationURL }}
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:32px 0 0 0;" align="center">
+              <p style="margin:0;font-family:'Space Mono',monospace;font-size:10px;color:rgba(17,17,17,0.3);text-transform:uppercase;letter-spacing:0.05em;">
+                Param Innovation AI &amp; Robotics Lab
+              </p>
+              <p style="margin:6px 0 0 0;font-family:'Space Mono',monospace;font-size:10px;color:rgba(17,17,17,0.2);line-height:1.5;">
+                This is an automated message. If you didn't create an account, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

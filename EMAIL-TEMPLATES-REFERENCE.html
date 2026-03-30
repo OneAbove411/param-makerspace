@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Param Makerspace Email Templates - Reference Guide</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Space Grotesk', Helvetica, Arial, sans-serif;
+      background-color: #F5F3EE;
+      color: #111111;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 60px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      color: rgba(17, 17, 17, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .description {
+      margin-top: 24px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: rgba(17, 17, 17, 0.7);
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .templates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 32px;
+      margin-bottom: 60px;
+    }
+
+    .template-card {
+      background: #FFFFFF;
+      border: 2px solid rgba(17, 17, 17, 0.08);
+      border-radius: 16px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .template-card h2 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: #111111;
+    }
+
+    .template-card .label {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: #C4291E;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid rgba(17, 17, 17, 0.08);
+    }
+
+    .template-card p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(17, 17, 17, 0.7);
+      margin-bottom: 12px;
+    }
+
+    .template-details {
+      margin-top: auto;
+      padding-top: 24px;
+      border-top: 1px solid rgba(17, 17, 17, 0.08);
+    }
+
+    .detail-row {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: rgba(17, 17, 17, 0.4);
+      line-height: 1.8;
+      margin-bottom: 8px;
+    }
+
+    .detail-row strong {
+      color: rgba(17, 17, 17, 0.6);
+      text-transform: uppercase;
+    }
+
+    .detail-value {
+      color: #C4291E;
+      word-break: break-all;
+      margin-top: 2px;
+      padding-left: 12px;
+    }
+
+    .file-link {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 8px 16px;
+      background-color: #111111;
+      color: #F5F3EE;
+      text-decoration: none;
+      border-radius: 6px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: background-color 0.2s;
+    }
+
+    .file-link:hover {
+      background-color: #333333;
+    }
+
+    section.full-width {
+      background: #FFFFFF;
+      border: 2px solid rgba(17, 17, 17, 0.08);
+      border-radius: 16px;
+      padding: 40px;
+      margin-bottom: 60px;
+    }
+
+    section.full-width h2 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid rgba(17, 17, 17, 0.08);
+    }
+
+    section.full-width h3 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      color: rgba(17, 17, 17, 0.7);
+    }
+
+    section.full-width p {
+      font-size: 14px;
+      line-height: 1.7;
+      color: rgba(17, 17, 17, 0.6);
+      margin-bottom: 12px;
+    }
+
+    .code-block {
+      background-color: rgba(17, 17, 17, 0.04);
+      border-left: 3px solid #C4291E;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      color: #111111;
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+
+    .design-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .design-item {
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(17, 17, 17, 0.08);
+      background-color: rgba(17, 17, 17, 0.02);
+    }
+
+    .design-item h4 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      color: rgba(17, 17, 17, 0.4);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .color-swatch {
+      width: 100%;
+      height: 60px;
+      border-radius: 8px;
+      border: 1px solid rgba(17, 17, 17, 0.08);
+      margin-bottom: 8px;
+    }
+
+    .design-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: #111111;
+      word-break: break-all;
+    }
+
+    footer {
+      text-align: center;
+      padding-top: 40px;
+      border-top: 2px solid rgba(17, 17, 17, 0.08);
+      margin-top: 60px;
+    }
+
+    footer p {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: rgba(17, 17, 17, 0.3);
+      margin: 4px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 32px;
+      }
+
+      .templates-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .design-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>PARAM</h1>
+      <p class="subtitle">Email Templates Reference Guide</p>
+      <p class="description">
+        Complete set of 6 Supabase authentication email templates designed for Param Makerspace.
+        All templates follow the brand system and email deliverability best practices.
+      </p>
+    </header>
+
+    <div class="templates-grid">
+      <div class="template-card">
+        <h2>Confirm Sign Up</h2>
+        <p class="label">Email Verification</p>
+        <p>Verify email address after account signup. Most common authentication email.</p>
+        <div class="template-details">
+          <div class="detail-row">
+            <strong>Subject Line:</strong>
+            <div class="detail-value">Param Makerspace — Verify your email address</div>
+          </div>
+          <div class="detail-row">
+            <strong>CTA:</strong>
+            <div class="detail-value">Verify Email Address</div>
+          </div>
+          <div class="detail-row">
+            <strong>Variable:</strong>
+            <div class="detail-value">{{ .ConfirmationURL }}</div>
+          </div>
+          <a href="#" class="file-link">email-template-confirm-signup.html</a>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <h2>Invite User</h2>
+        <p class="label">User Invitation</p>
+        <p>Invite users who don't yet have a Param Makerspace account to join.</p>
+        <div class="template-details">
+          <div class="detail-row">
+            <strong>Subject Line:</strong>
+            <div class="detail-value">You've been invited to Param Makerspace</div>
+          </div>
+          <div class="detail-row">
+            <strong>CTA:</strong>
+            <div class="detail-value">Accept Invitation</div>
+          </div>
+          <div class="detail-row">
+            <strong>Variable:</strong>
+            <div class="detail-value">{{ .ConfirmationURL }}</div>
+          </div>
+          <a href="#" class="file-link">email-template-invite-user.html</a>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <h2>Magic Link</h2>
+        <p class="label">One-Time Sign In</p>
+        <p>Passwordless sign-in link. Link expires in 10 minutes for security.</p>
+        <div class="template-details">
+          <div class="detail-row">
+            <strong>Subject Line:</strong>
+            <div class="detail-value">Param Makerspace — Your sign-in link</div>
+          </div>
+          <div class="detail-row">
+            <strong>CTA:</strong>
+            <div class="detail-value">Sign In to Param</div>
+          </div>
+          <div class="detail-row">
+            <strong>Variable:</strong>
+            <div class="detail-value">{{ .ConfirmationURL }}</div>
+          </div>
+          <a href="#" class="file-link">email-template-magic-link.html</a>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <h2>Change Email Address</h2>
+        <p class="label">Email Verification</p>
+        <p>Verify new email after user changes their account email address.</p>
+        <div class="template-details">
+          <div class="detail-row">
+            <strong>Subject Line:</strong>
+            <div class="detail-value">Param Makerspace — Confirm your new email address</div>
+          </div>
+          <div class="detail-row">
+            <strong>CTA:</strong>
+            <div class="detail-value">Confirm New Email</div>
+          </div>
+          <div class="detail-row">
+            <strong>Variable:</strong>
+            <div class="detail-value">{{ .ConfirmationURL }}</div>
+          </div>
+          <a href="#" class="file-link">email-template-change-email.html</a>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <h2>Reset Password</h2>
+        <p class="label">Account Recovery</p>
+        <p>Password recovery email with security notice if not requested by user.</p>
+        <div class="template-details">
+          <div class="detail-row">
+            <strong>Subject Line:</strong>
+            <div class="detail-value">Param Makerspace — Reset your password</div>
+          </div>
+          <div class="detail-row">
+            <strong>CTA:</strong>
+            <div class="detail-value">Reset Password</div>
+          </div>
+          <div class="detail-row">
+            <strong>Variable:</strong>
+            <div class="detail-value">{{ .ConfirmationURL }}</div>
+          </div>
+          <a href="#" class="file-link">email-template-reset-password.html</a>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <h2>Reauthentication</h2>
+        <p class="label">Verification Code</p>
+        <p>OTP code for sensitive action verification. Code expires in 10 minutes.</p>
+        <div class="template-details">
+          <div class="detail-row">
+            <strong>Subject Line:</strong>
+            <div class="detail-value">Param Makerspace — Verification code</div>
+          </div>
+          <div class="detail-row">
+            <strong>Code Display:</strong>
+            <div class="detail-value">Prominent centered box</div>
+          </div>
+          <div class="detail-row">
+            <strong>Variable:</strong>
+            <div class="detail-value">{{ .Token }}</div>
+          </div>
+          <a href="#" class="file-link">email-template-reauthentication.html</a>
+        </div>
+      </div>
+    </div>
+
+    <section class="full-width">
+      <h2>Design System Specifications</h2>
+
+      <h3>Color Palette</h3>
+      <div class="design-grid">
+        <div class="design-item">
+          <h4>Background</h4>
+          <div class="color-swatch" style="background-color: #F5F3EE;"></div>
+          <div class="design-value">#F5F3EE</div>
+        </div>
+        <div class="design-item">
+          <h4>Card / White</h4>
+          <div class="color-swatch" style="background-color: #FFFFFF; border: 2px solid #CCC;"></div>
+          <div class="design-value">#FFFFFF</div>
+        </div>
+        <div class="design-item">
+          <h4>Accent Red</h4>
+          <div class="color-swatch" style="background-color: #C4291E;"></div>
+          <div class="design-value">#C4291E</div>
+        </div>
+        <div class="design-item">
+          <h4>Dark Text</h4>
+          <div class="color-swatch" style="background-color: #111111;"></div>
+          <div class="design-value">#111111</div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px;">Typography</h3>
+      <div class="design-grid">
+        <div class="design-item">
+          <h4>Heading Font</h4>
+          <div class="design-value" style="font-family: 'Space Grotesk', Arial, sans-serif; font-size: 14px; margin-bottom: 8px;">Space Grotesk</div>
+          <div class="design-value">700 weight, -0.04em tracking</div>
+        </div>
+        <div class="design-item">
+          <h4>Mono Font</h4>
+          <div class="design-value" style="font-family: 'Space Mono', monospace; font-size: 14px; margin-bottom: 8px;">Space Mono</div>
+          <div class="design-value">For code, footers, metadata</div>
+        </div>
+        <div class="design-item">
+          <h4>Brand Header</h4>
+          <div class="design-value">22px, 700 weight, uppercase</div>
+          <div class="design-value">With "makersadda" subtitle (10px, mono)</div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px;">Component Specifications</h3>
+      <p><strong>Card Border:</strong> 2px solid rgba(17, 17, 17, 0.08), border-radius: 16px</p>
+      <p><strong>Button Styling:</strong> Background #111111, text #F5F3EE, 14px uppercase, border-radius: 12px</p>
+      <p><strong>Red Accent Bar:</strong> 3px wide, left side of subtitle, rgba(196, 41, 30, 1)</p>
+      <p><strong>Email Footer:</strong> 10px Space Mono, 0.2-0.3 opacity text, centered</p>
+    </section>
+
+    <section class="full-width">
+      <h2>Email Deliverability Features</h2>
+
+      <h3>Best Practices Implemented</h3>
+      <ul style="margin-left: 20px; line-height: 2;">
+        <li>Proper XHTML 1.0 DOCTYPE and meta tags for wide client support</li>
+        <li>Table-based layout (not div-based) for Outlook compatibility</li>
+        <li>Color scheme meta tags for dark mode support</li>
+        <li>Preheader text included (hidden preview snippet)</li>
+        <li>High text-to-image ratio (text only, no images)</li>
+        <li>Clear sender identity in footer with company name and location</li>
+        <li>Professional language avoiding spam trigger words</li>
+        <li>Proper mso conditionals for Outlook button rendering</li>
+        <li>All links use Supabase template variables</li>
+        <li>Fallback text links for clients that don't render buttons</li>
+        <li>"Why received" explanation specific to each template</li>
+        <li>Security notes where appropriate (magic link, reset password)</li>
+      </ul>
+
+      <h3 style="margin-top: 32px;">File Structure</h3>
+      <div class="code-block">
+/sessions/sweet-cool-volta/mnt/param-makerspace-main/
+├── email-template-confirm-signup.html
+├── email-template-invite-user.html
+├── email-template-magic-link.html
+├── email-template-change-email.html
+├── email-template-reset-password.html
+├── email-template-reauthentication.html
+└── EMAIL-TEMPLATES-REFERENCE.html (this file)
+      </div>
+
+      <h3 style="margin-top: 32px;">Supabase Integration</h3>
+      <p>Each template uses standard Supabase template variables:</p>
+      <div class="code-block">{{ .ConfirmationURL }} - Standard link-based confirmations<br/>{{ .Token }} - OTP code for reauthentication only</div>
+    </section>
+
+    <footer>
+      <p>Param Makerspace Email Templates</p>
+      <p>Created for Supabase Authentication</p>
+      <p>All templates comply with email deliverability standards and CAN-SPAM requirements</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -17,6 +17,7 @@ import { Store } from './pages/Store';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ForgotPassword } from './pages/ForgotPassword';
+import { UpdatePassword } from './pages/UpdatePassword';
 import { Dashboard } from './pages/Dashboard';
 import { ProfileSetup } from './pages/ProfileSetup';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
@@ -54,6 +55,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute allowedRoles={['viewer', 'maker', 'mentor', 'admin']} />}>

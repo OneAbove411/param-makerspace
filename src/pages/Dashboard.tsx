@@ -14,6 +14,10 @@ import { isValidVideoUrl } from '../lib/videoUtils';
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Moved outside component to prevent re-renders
+const DOMAINS = ['Electronics', 'AI', 'Robotics', 'Embedded Systems', 'IoT', '3D Printing', 'Automation', 'Woodworks', 'Wireless Comms', 'Quantum Computing', 'Parallel Computing', 'Design', 'Fabrication', 'Bio & Life Sciences', 'Interdisciplinary'];
+const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
+
 export function Dashboard() {
     const { user, role } = useAuth();
     const navigate = useNavigate();
@@ -74,9 +78,7 @@ export function Dashboard() {
         return () => ctx.revert();
     }, [myProjects, stats]);
 
-    // Fixed domain/tier options
-    const DOMAINS = ['Electronics', 'AI', 'Robotics', 'Embedded Systems', 'IoT', '3D Printing', 'Automation', 'Woodworks', 'Wireless Comms', 'Quantum Computing', 'Parallel Computing', 'Design', 'Fabrication', 'Bio & Life Sciences', 'Interdisciplinary'];
-    const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
+    // DOMAINS and TIERS moved outside component
 
     const { data: myProfile } = useMyProfile();
     const { data: rankAccess } = useRankAccess();

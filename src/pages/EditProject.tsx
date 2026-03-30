@@ -331,56 +331,54 @@ export function EditProject() {
         if (!id) return;
         setAddingVideo(true);
         const title = newVideoTitle.trim() || 'Project Video';
-        const { error } = await supabase.from('project_video').insert({
-            project_id: id,
-            title,
-            video_url: trimmed,
-            display_order: videos.length + 1,
-        });
-        if (error) {
-            alert(error.message);
-        } else {
-            setNewVideoUrl('');
-            setNewVideoTitle('');
-            await fetchVideos();
-        }
+        // Optimistic: add video to UI immediately
+        const optimisticVideo = { id: 'temp-' + Date.now(), title, video_url: trimmed, display_order: videos.length + 1 };
+        setVideos(prev => [...prev, optimisticVideo]);
+        setNewVideoUrl('');
+        setNewVideoTitle('');
         setAddingVideo(false);
+        const { error } = await supabase.from('project_video').insert({
+            project_id: id, title, video_url: trimmed, display_order: videos.length + 1,
+        });
+        if (error) alert(error.message);
+        fetchVideos(); // Background sync
     };
 
     const handleDeleteVideo = async (videoId: string) => {
         if (!window.confirm('Remove this video?')) return;
+        // Optimistic: remove from UI immediately
+        setVideos(prev => prev.filter(v => v.id !== videoId));
         await supabase.from('project_video').delete().eq('id', videoId);
-        await fetchVideos();
+        fetchVideos(); // Background sync
     };
 
     // ── Milestone handlers ──
     const handleAddMilestone = async () => {
         if (!id || !newMilestoneTitle.trim()) return;
-        setActionLoading(true);
         const order = milestones.length > 0 ? Math.max(...milestones.map((m) => m.display_order)) + 1 : 1;
-        await supabase.from('project_milestone').insert({
-            project_id: id,
-            title: newMilestoneTitle.trim(),
-            description: newMilestoneDesc.trim() || null,
-            display_order: order,
-        });
+        const title = newMilestoneTitle.trim();
+        const desc = newMilestoneDesc.trim() || null;
+        // Optimistic: add to UI immediately
+        setMilestones(prev => [...prev, { id: 'temp-' + Date.now(), title, description: desc, is_complete: false, display_order: order }]);
         setNewMilestoneTitle('');
         setNewMilestoneDesc('');
-        await fetchMilestones();
-        setActionLoading(false);
         setTimeout(() => {
             milestoneListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
+        await supabase.from('project_milestone').insert({ project_id: id, title, description: desc, display_order: order });
+        fetchMilestones(); // Background sync
     };
 
     const handleToggleMilestone = async (milestoneId: string, currentVal: boolean) => {
+        // Optimistic: toggle in UI immediately
+        setMilestones(prev => prev.map(m => m.id === milestoneId ? { ...m, is_complete: !currentVal } : m));
         await supabase.from('project_milestone').update({ is_complete: !currentVal }).eq('id', milestoneId);
-        await fetchMilestones();
     };
 
     const handleDeleteMilestone = async (milestoneId: string) => {
+        // Optimistic: remove from UI immediately
+        setMilestones(prev => prev.filter(m => m.id !== milestoneId));
         await supabase.from('project_milestone').delete().eq('id', milestoneId);
-        await fetchMilestones();
     };
 
     // ── Contributor handlers ──
@@ -391,27 +389,29 @@ export function EditProject() {
             setSearchQuery('');
             return;
         }
-        setActionLoading(true);
+        // Optimistic: add member to UI immediately
+        setMembers(prev => [...prev, { id: 'temp-' + Date.now(), user_id: selectedUser.id, role: addingRole, name: selectedUser.name }]);
+        setSearchQuery('');
+        setSearchResults([]);
         await supabase.from('project_member').insert({
             project_id: id,
             user_id: selectedUser.id,
             role: addingRole,
         });
-        setSearchQuery('');
-        setSearchResults([]);
-        await fetchMembers();
-        setActionLoading(false);
+        fetchMembers(); // Background sync
     };
 
     const handleRemoveMember = async (memberId: string) => {
         if (!window.confirm('Remove this member?')) return;
+        // Optimistic: remove from UI immediately
+        setMembers(prev => prev.filter(m => m.id !== memberId));
         await supabase.from('project_member').delete().eq('id', memberId);
-        await fetchMembers();
     };
 
     const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
+        // Optimistic: update role in UI immediately
+        setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
         await supabase.from('project_member').update({ role: newRole }).eq('id', memberId);
-        await fetchMembers();
     };
 
     // ── Computed values ──

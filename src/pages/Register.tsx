@@ -41,13 +41,17 @@ export function Register() {
         }
 
         setLoading(true);
-        const { error: err } = await signUp(email, password, name);
-        setLoading(false);
-
-        if (err) {
-            setError(err);
-        } else {
-            setSuccess(true);
+        try {
+            const { error: err } = await signUp(email, password, name);
+            if (err) {
+                setError(typeof err === 'string' ? err : JSON.stringify(err));
+            } else {
+                setSuccess(true);
+            }
+        } catch (e: any) {
+            setError(e?.message || 'An unexpected error occurred.');
+        } finally {
+            setLoading(false);
         }
     };
 

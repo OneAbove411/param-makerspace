@@ -38,10 +38,12 @@ export function ReviewEventSubmissions() {
         }
     }, [role]);
 
-    const handleUpdateStatus = async (id: string, newStatus: string) => {
+    const handleUpdateStatus = async (subId: string, newStatus: string) => {
         setActionLoading(true);
-        await supabase.from('event_submission').update({ status: newStatus }).eq('id', id);
-        await fetchSubmissions();
+        // Optimistic: update status in UI immediately
+        setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: newStatus } : s)
+            .filter(s => ['submitted', 'shortlisted'].includes(s.status)));
+        await supabase.from('event_submission').update({ status: newStatus }).eq('id', subId);
         setActionLoading(false);
     };
 

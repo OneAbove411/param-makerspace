@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import type {
@@ -11,7 +11,7 @@ import type {
     AppUser, Equipment, Inventory, Role, EventType, XPEvent
 } from './database.types';
 
-// ─── Generic fetch hook ───
+// ─── Generic fetch hook (with race condition protection) ───
 
 export function useSupabaseQuery<T>(
     queryFn: () => Promise<{ data: T | null; error: any }>,
@@ -20,16 +20,24 @@ export function useSupabaseQuery<T>(
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const fetchId = useRef(0); // Tracks latest fetch to discard stale results
 
     const refetch = useCallback(async () => {
+        const thisId = ++fetchId.current;
         setLoading(true);
         const { data, error } = await queryFn();
+        // Only apply result if this is still the latest fetch
+        if (thisId !== fetchId.current) return;
         setData(data);
         setError(error?.message || null);
         setLoading(false);
     }, deps);
 
-    useEffect(() => { refetch(); }, [refetch]);
+    useEffect(() => {
+        refetch();
+        // Invalidate any in-flight fetch on cleanup
+        return () => { fetchId.current++; };
+    }, [refetch]);
 
     return { data, loading, error, refetch };
 }
@@ -145,7 +153,6 @@ export function useChallenges(tierFilter?: string, domainFilter?: string) {
             q = q.ilike('tier', tierFilter);
         }
         if (domainFilter && domainFilter !== 'All') {
-            console.log('useChallenges domainFilter (hook):', domainFilter);
             q = q.ilike('domain', domainFilter);
         }
         return q as any;
@@ -359,22 +366,13 @@ export function useMaker(id: string | undefined) {
 
         const profileSelect = 'id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at, x_url, bluesky_url, discord_username, mentor_domains, approval_domains, show_email';
 
-        // id could be maker_profile.id or user_id — try both
+        // id could be maker_profile.id or user_id — single query with or()
         let { data: profile, error } = await supabase
             .from('maker_profile')
             .select(profileSelect)
-            .eq('id', id)
+            .or(`id.eq.${id},user_id.eq.${id}`)
+            .limit(1)
             .single();
-
-        if (!profile) {
-            const res = await supabase
-                .from('maker_profile')
-                .select(profileSelect)
-                .eq('user_id', id)
-                .single();
-            profile = res.data;
-            error = res.error;
-        }
 
         if (error || !profile) return { data: null, error };
         const p = profile as any;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useEvent, useEventRegistration, useComments } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -153,21 +153,31 @@ const BuildChallengeContent = ({ id, event, user, commentsProps, registrationPro
         e.preventDefault();
         if (!user || loadingAction) return;
         setLoadingAction(true);
-        const { data: team } = await supabase.from('event_team').insert({ event_id: id, name: newTeamName, lead_id: user.id }).select().single();
+        const teamName = newTeamName;
+        setNewTeamName(''); // Clear input immediately
+        const { data: team } = await supabase.from('event_team').insert({ event_id: id, name: teamName, lead_id: user.id }).select().single();
         if (team) {
             await supabase.from('event_team_member').insert({ team_id: team.id, user_id: user.id });
-            setNewTeamName('');
-            await fetchTeams();
+            // Optimistic: add team to local state immediately
+            setTeams(prev => [...prev, { ...team, app_user: { name: user.name }, event_team_member: [{ id: 'temp', user_id: user.id, app_user: { name: user.name } }] }]);
         }
         setLoadingAction(false);
+        // Background refetch for accurate data
+        fetchTeams();
     };
 
     const handleJoinTeam = async (teamId: string) => {
         if (!user || loadingAction) return;
         setLoadingAction(true);
+        // Optimistic: add user to team locally
+        setTeams(prev => prev.map(t => t.id === teamId ? {
+            ...t,
+            event_team_member: [...(t.event_team_member || []), { id: 'temp', user_id: user.id, app_user: { name: user.name } }]
+        } : t));
         await supabase.from('event_team_member').insert({ team_id: teamId, user_id: user.id });
-        await fetchTeams();
         setLoadingAction(false);
+        // Background refetch for accurate data
+        fetchTeams();
     };
 
     const handleSubmitProject = async (e: React.FormEvent) => {
@@ -370,18 +380,29 @@ const MakerMeetupContent = ({ id, event, user, commentsProps, registrationProps 
         e.preventDefault();
         if (!user || loadingAction) return;
         setLoadingAction(true);
+        const selectedProject = myProjects.find(p => p.id === selectedProjectId);
+        // Optimistic: show pending slot immediately
+        const optimisticSlot = {
+            id: 'temp-' + Date.now(),
+            status: 'pending',
+            user_id: user.id,
+            project: selectedProject ? { id: selectedProject.id, title: selectedProject.title } : null,
+            app_user: { name: user.name },
+        };
+        setSlots(prev => [...prev, optimisticSlot]);
         await supabase.from('showcase_slot').insert({
             event_id: id,
             user_id: user.id,
             project_id: selectedProjectId || null,
             status: 'pending',
         });
+        setLoadingAction(false);
+        // Background refetch for accurate data
         const { data } = await supabase
             .from('showcase_slot')
             .select('id, status, user_id, project:project!project_id(id, title), app_user:app_user!user_id(name)')
             .eq('event_id', id);
-        setSlots(data || []);
-        setLoadingAction(false);
+        if (data) setSlots(data);
     };
 
     return (

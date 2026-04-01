@@ -16,16 +16,6 @@ gsap.registerPlugin(ScrollTrigger);
  * - Falls back to placeholder cards while loading
  */
 
-// Fallback projects shown while real data loads
-const FALLBACK_PROJECTS = [
-    { id: '', title: 'Robotic Arm Build', domain: 'Robotics', image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500&auto=format&fit=crop&q=80' },
-    { id: '', title: 'LED Matrix Art', domain: 'Electronics', image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=500&auto=format&fit=crop&q=80' },
-    { id: '', title: 'Bio-Reactor v2', domain: 'Bio', image: 'https://images.unsplash.com/photo-1582719471384-894fbb16f461?w=500&auto=format&fit=crop&q=80' },
-    { id: '', title: 'CNC Sculpture', domain: 'Fabrication', image: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=500&auto=format&fit=crop&q=80' },
-    { id: '', title: 'Custom PCB Array', domain: 'Electronics', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80' },
-    { id: '', title: '3D Print Lattice', domain: 'Design', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=500&auto=format&fit=crop&q=80' },
-];
-
 interface CarouselProject {
     id: string;
     title: string;
@@ -33,84 +23,166 @@ interface CarouselProject {
     image: string;
 }
 
-// ─── Orbit Carousel — the ONE interactive element ───
-function OrbitCarousel({ projects }: { projects: CarouselProject[] }) {
-    const [angle, setAngle] = useState(0);
-    const animRef = useRef<number>(0);
+// Placeholder projects shown when no real projects exist yet
+// Images sourced from Pexels (free for commercial use, no attribution required)
+const PLACEHOLDER_PROJECTS: CarouselProject[] = [
+    {
+        id: '', title: 'Line-Following Bot', domain: 'Robotics',
+        image: 'https://images.pexels.com/photos/7869085/pexels-photo-7869085.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
+    },
+    {
+        id: '', title: 'Smart Plant Monitor', domain: 'IoT',
+        image: 'https://images.pexels.com/photos/270621/pexels-photo-270621.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
+    },
+    {
+        id: '', title: 'AI Waste Sorter', domain: 'AI / ML',
+        image: 'https://images.pexels.com/photos/2682683/pexels-photo-2682683.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
+    },
+    {
+        id: '', title: '3D Printed Prosthetic', domain: '3D Printing',
+        image: 'https://images.pexels.com/photos/6153354/pexels-photo-6153354.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
+    },
+    {
+        id: '', title: 'Solar USB Charger', domain: 'Electronics',
+        image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
+    },
+    {
+        id: '', title: 'Gesture-Controlled Drone', domain: 'Robotics',
+        image: 'https://images.pexels.com/photos/724921/pexels-photo-724921.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
+    },
+];
+
+// Domain → emoji icon mapping for placeholder cards
+const DOMAIN_ICONS: Record<string, string> = {
+    'Robotics': '🤖',
+    'IoT': '📡',
+    'AI / ML': '🧠',
+    '3D Printing': '🖨️',
+    'Electronics': '⚡',
+};
+
+// Random scatter positions for each card (pre-computed for consistency)
+const SCATTER_TRANSFORMS = [
+    { x: -180, y: -120, rotate: -12, scale: 0.7 },
+    { x: 140, y: -90, rotate: 8, scale: 0.65 },
+    { x: -100, y: 80, rotate: 15, scale: 0.75 },
+    { x: 200, y: 60, rotate: -6, scale: 0.6 },
+    { x: -220, y: 30, rotate: 10, scale: 0.7 },
+    { x: 160, y: 110, rotate: -14, scale: 0.65 },
+];
+
+// ─── Scatter-to-Grid — projects scatter in, then settle into a masonry grid ───
+function ScatterGrid({ projects }: { projects: CarouselProject[] }) {
+    const gridRef = useRef<HTMLDivElement>(null);
+    const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
+    const hasAnimated = useRef(false);
 
     useEffect(() => {
-        let lastTime = performance.now();
-        const animate = (time: number) => {
-            const delta = time - lastTime;
-            lastTime = time;
-            setAngle(prev => (prev + delta * 0.01) % 360);
-            animRef.current = requestAnimationFrame(animate);
-        };
-        animRef.current = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(animRef.current);
-    }, []);
+        if (!gridRef.current || hasAnimated.current) return;
 
-    const count = projects.length;
-    const radiusX = typeof window !== 'undefined' && window.innerWidth < 640 ? 130 : 240;
-    const radiusY = typeof window !== 'undefined' && window.innerWidth < 640 ? 25 : 45;
+        const cards = cardsRef.current.filter(Boolean) as HTMLElement[];
+        if (cards.length === 0) return;
+
+        // Set initial scattered state
+        cards.forEach((card, i) => {
+            const scatter = SCATTER_TRANSFORMS[i % SCATTER_TRANSFORMS.length];
+            gsap.set(card, {
+                x: scatter.x,
+                y: scatter.y,
+                rotation: scatter.rotate,
+                scale: scatter.scale,
+                opacity: 0,
+            });
+        });
+
+        // Create scroll-triggered animation: scatter → grid
+        const tl = gsap.timeline({
+            scrollTrigger: {
+                trigger: gridRef.current,
+                start: 'top 65%',
+                once: true,
+            },
+            onComplete: () => { hasAnimated.current = true; },
+        });
+
+        // Phase 1: Cards appear at scattered positions
+        tl.to(cards, {
+            opacity: 1,
+            scale: (i: number) => SCATTER_TRANSFORMS[i % SCATTER_TRANSFORMS.length].scale,
+            duration: 0.4,
+            stagger: 0.06,
+            ease: 'power2.out',
+        });
+
+        // Phase 2: Cards settle into grid positions
+        tl.to(cards, {
+            x: 0,
+            y: 0,
+            rotation: 0,
+            scale: 1,
+            duration: 0.9,
+            stagger: 0.08,
+            ease: 'power3.out',
+            delay: 0.3,
+        });
+
+        return () => {
+            tl.kill();
+        };
+    }, [projects]);
 
     return (
         <div
-            className="relative w-full h-48 md:h-60 flex items-center justify-center overflow-hidden"
-            style={{ perspective: '800px' }}
+            ref={gridRef}
+            className="relative w-full grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5 max-w-2xl mx-auto"
         >
             {projects.map((project, i) => {
-                const theta = ((360 / count) * i + angle) * (Math.PI / 180);
-                const x = Math.sin(theta) * radiusX;
-                const z = Math.cos(theta) * radiusY;
-                const normalizedZ = (z + radiusY) / (radiusY * 2);
-                const scale = 0.6 + normalizedZ * 0.5;
-                const opacity = 0.25 + normalizedZ * 0.75;
-                const zIndex = Math.round(normalizedZ * 100);
-                const blur = normalizedZ < 0.25 ? 2 : 0;
+                const icon = DOMAIN_ICONS[project.domain] || '🔧';
 
-                const cardContent = (
+                const cardInner = (
                     <div
-                        className="absolute rounded-xl overflow-hidden border border-brutal-bg/10
+                        ref={el => { cardsRef.current[i] = el; }}
+                        className="rounded-xl overflow-hidden border border-brutal-bg/10
                                    bg-brutal-dark/60 backdrop-blur-sm cursor-pointer
-                                   hover:border-brutal-red/40 transition-colors duration-300"
-                        style={{
-                            width: typeof window !== 'undefined' && window.innerWidth < 640 ? '95px' : '130px',
-                            transform: `translateX(${x}px) translateZ(${z}px) scale(${scale})`,
-                            opacity,
-                            zIndex,
-                            filter: blur > 0 ? `blur(${blur}px)` : 'none',
-                            willChange: 'transform, opacity',
-                        }}
+                                   hover:border-brutal-red/40 hover:-translate-y-1
+                                   transition-all duration-300 will-change-transform"
                     >
-                        <div className="aspect-[3/4] overflow-hidden">
-                            <img
-                                src={project.image}
-                                alt={project.title}
-                                className="w-full h-full object-cover"
-                                loading="eager"
-                            />
-                        </div>
-                        <div className="p-2 bg-brutal-dark/80">
-                            <span className="font-data text-[8px] text-brutal-red uppercase tracking-widest block">
-                                {project.domain}
+                        <div className="aspect-[4/3] overflow-hidden bg-brutal-bg/5 flex items-center justify-center">
+                            {project.image ? (
+                                <img
+                                    src={project.image}
+                                    alt={project.title}
+                                    className="w-full h-full object-cover"
+                                    loading="eager"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                        (e.target as HTMLImageElement).parentElement!.querySelector('span')!.style.display = '';
+                                    }}
+                                />
+                            ) : null}
+                            <span className="text-3xl md:text-4xl opacity-60 select-none" style={project.image ? { display: 'none' } : {}}>
+                                {icon}
                             </span>
-                            <p className="font-heading font-bold text-[10px] md:text-xs text-brutal-bg/80 mt-0.5 truncate">
-                                {project.title}
+                        </div>
+                        <div className="p-2.5 md:p-3 bg-brutal-dark/80">
+                            <span className="font-data text-[9px] md:text-[10px] text-brutal-red uppercase tracking-widest block">
+                                {project.domain || 'Maker'}
+                            </span>
+                            <p className="font-heading font-bold text-xs md:text-sm text-brutal-bg/80 mt-0.5 truncate">
+                                {project.title || 'Untitled Project'}
                             </p>
                         </div>
                     </div>
                 );
 
-                // Only wrap in Link if we have a real project id
                 if (project.id) {
                     return (
-                        <Link key={project.id} to={`/projects/${project.id}`} className="contents">
-                            {cardContent}
+                        <Link key={project.id} to={`/projects/${project.id}`}>
+                            {cardInner}
                         </Link>
                     );
                 }
-                return <div key={project.title + i}>{cardContent}</div>;
+                return <div key={`placeholder-${i}`}>{cardInner}</div>;
             })}
         </div>
     );
@@ -154,7 +226,7 @@ function RotatingWord() {
 // ─── Main Component ───
 export function BuildQuestion() {
     const sectionRef = useRef<HTMLDivElement>(null);
-    const [carouselProjects, setCarouselProjects] = useState<CarouselProject[]>(FALLBACK_PROJECTS);
+    const [carouselProjects, setCarouselProjects] = useState<CarouselProject[]>(PLACEHOLDER_PROJECTS);
 
     // Fetch real projects with their first image
     useEffect(() => {
@@ -189,16 +261,11 @@ export function BuildQuestion() {
                 id: p.id,
                 title: p.title,
                 domain: p.domain || 'Maker',
-                image: imageMap[p.id] || FALLBACK_PROJECTS[i % FALLBACK_PROJECTS.length].image,
+                image: imageMap[p.id] || '',
             }));
 
-            // Ensure we have at least 4 cards for the carousel to look good
-            if (real.length >= 4) {
+            if (real.length > 0) {
                 setCarouselProjects(real);
-            } else if (real.length > 0) {
-                // Pad with fallback if too few real projects
-                const padded = [...real, ...FALLBACK_PROJECTS.slice(0, 6 - real.length)];
-                setCarouselProjects(padded);
             }
         }
         fetchProjects();
@@ -216,13 +283,13 @@ export function BuildQuestion() {
                 }
             );
 
-            // Carousel fades in after headline
+            // Grid container fades in (individual cards animate via ScatterGrid)
             gsap.fromTo('.bq-carousel',
-                { opacity: 0, y: 30 },
+                { opacity: 0 },
                 {
-                    opacity: 1, y: 0,
-                    duration: 1, ease: 'power2.out',
-                    scrollTrigger: { trigger: sectionRef.current, start: 'top 50%' },
+                    opacity: 1,
+                    duration: 0.5, ease: 'power2.out',
+                    scrollTrigger: { trigger: sectionRef.current, start: 'top 55%' },
                 }
             );
 
@@ -272,9 +339,9 @@ export function BuildQuestion() {
                     </div>
                 </div>
 
-                {/* Carousel */}
+                {/* Project Grid — Scatter-to-Grid animation */}
                 <div className="bq-carousel mt-10 md:mt-14 w-full">
-                    <OrbitCarousel projects={carouselProjects} />
+                    <ScatterGrid projects={carouselProjects} />
                 </div>
 
                 {/* Subtitle — static, no fading */}

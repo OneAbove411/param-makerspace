@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef, useEffect, useMemo, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -66,9 +66,11 @@ function MouseTracker() {
 function RobotModel({
   lightsOn,
   intensity,
+  onToggle,
 }: {
   lightsOn: boolean;
   intensity: number;
+  onToggle: () => void;
 }) {
   const { scene } = useGLTF('/models/robot.glb', true);
   const groupRef = useRef<THREE.Group>(null!);
@@ -79,6 +81,28 @@ function RobotModel({
   const rightEyeMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const leftPointRef = useRef<THREE.PointLight>(null!);
   const rightPointRef = useRef<THREE.PointLight>(null!);
+  const { gl, camera } = useThree();
+
+  // Click → raycast against head + body meshes only
+  useEffect(() => {
+    const raycaster = new THREE.Raycaster();
+    const handleClick = (e: MouseEvent) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+      const meshes: THREE.Object3D[] = [];
+      scene.traverse(child => {
+        if ((child as THREE.Mesh).isMesh && child.name.toLowerCase() !== 'plane') {
+          meshes.push(child);
+        }
+      });
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0) onToggle();
+    };
+    gl.domElement.addEventListener('click', handleClick);
+    return () => gl.domElement.removeEventListener('click', handleClick);
+  }, [scene, gl, camera, onToggle]);
 
   // Apply chrome materials on mount
   useEffect(() => {
@@ -414,21 +438,20 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
     flashHint();
   }, [flashHint]);
 
-  // Scroll → ramp intensity from LIGHT_MIN (off) to LIGHT_MAX, works regardless of lightsOn
+  // Scroll → ramp intensity only when lights are ON (click to toggle first)
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const handleWheel = (e: WheelEvent) => {
+      // Only intercept scroll when lights are on
+      if (!lightsOnRef.current) return;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -SCROLL_STEP : SCROLL_STEP;
       const newIntensity = Math.max(LIGHT_MIN, Math.min(LIGHT_MAX, intensityRef.current + delta));
       intensityRef.current = newIntensity;
       setIntensity(newIntensity);
-      // Auto turn lights on when scrolling up, off when back to minimum
-      if (newIntensity > LIGHT_MIN && !lightsOnRef.current) {
-        lightsOnRef.current = true;
-        setLightsOn(true);
-      } else if (newIntensity <= LIGHT_MIN && lightsOnRef.current) {
+      // Turn off lights if scrolled back to minimum
+      if (newIntensity <= LIGHT_MIN) {
         lightsOnRef.current = false;
         setLightsOn(false);
       }
@@ -443,7 +466,7 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
   const mobile = isMobile();
 
   return (
-    <div ref={wrapperRef} className={`relative ${className || ''}`} onClick={handleClick} style={{ overflow: 'visible' }}>
+    <div ref={wrapperRef} className={`relative ${className || ''}`} style={{ overflow: 'visible' }}>
       <Canvas
         camera={{ position: [-0.05, 0.2, 11], fov: 28, near: 0.01, far: 100 }}
         shadows={!mobile}
@@ -480,7 +503,7 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
         <Environment preset="city" background={false} />
 
         <Suspense fallback={null}>
-          <RobotModel lightsOn={lightsOn} intensity={intensity} />
+          <RobotModel lightsOn={lightsOn} intensity={intensity} onToggle={handleClick} />
         </Suspense>
       </Canvas>
 

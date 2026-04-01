@@ -537,13 +537,13 @@ export function useReaction(targetType: TargetType, targetId: string | undefined
 
         // Parallel: counts + user reactions in one batch
         const promises: Promise<any>[] = [
-            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'like'),
-            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'upvote'),
-            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'bookmark'),
+            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'like') as unknown as Promise<any>,
+            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'upvote') as unknown as Promise<any>,
+            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'bookmark') as unknown as Promise<any>,
         ];
         if (user) {
             promises.push(
-                supabase.from('reaction').select('reaction_type').eq('target_type', targetType).eq('target_id', targetId).eq('user_id', user.id)
+                supabase.from('reaction').select('reaction_type').eq('target_type', targetType).eq('target_id', targetId).eq('user_id', user.id) as unknown as Promise<any>
             );
         }
 

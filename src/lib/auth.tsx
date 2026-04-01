@@ -113,6 +113,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let mounted = true;
 
+        // Detect recovery flow from URL hash BEFORE any async work.
+        // Supabase implicit flow puts tokens in the hash fragment:
+        // /update-password#access_token=...&type=recovery
+        // We must detect this synchronously so init() doesn't treat
+        // the recovery session as a full login.
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const isRecoveryUrl = hashParams.get('type') === 'recovery';
+        if (isRecoveryUrl) {
+            isRecoveryRef.current = true;
+            setIsRecovery(true);
+        }
+
         async function init() {
             // 1. Try to get the session from storage
             const { data: { session: s }, error: sessionError } =
@@ -134,7 +146,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // 2. Verify the token is still valid server-side
+            // 2. If this is a recovery flow, store the session but do NOT
+            //    load the app user — the user is NOT "logged in".
+            if (isRecoveryRef.current) {
+                if (mounted) {
+                    setSession(s);
+                    setUser(null);
+                    setIsLoading(false);
+                }
+                initDone.current = true;
+                return;
+            }
+
+            // 3. Verify the token is still valid server-side
             const { error: userError } = await supabase.auth.getUser();
             if (userError) {
                 // Token is expired/revoked — wipe and bail
@@ -149,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // 3. Token is valid — load app user
+            // 4. Token is valid — load app user
             setSession(s);
             const appUser = await fetchAppUser(s.user.id);
             if (mounted) {
@@ -179,23 +203,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Skip events during init to avoid double-loading
             if (!initDone.current && event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') return;
 
-            setSession(s);
-
             // Handle password recovery flow — set flag and skip normal user loading
             if (event === 'PASSWORD_RECOVERY') {
                 isRecoveryRef.current = true;
                 if (mounted) {
                     setIsRecovery(true);
+                    setSession(s);
                     setIsLoading(false);
                 }
                 return;
             }
 
-            // Skip normal auth processing while in recovery mode
+            // Skip ALL auth processing while in recovery mode.
+            // This prevents SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED etc.
+            // from loading the app user and showing a "logged in" navbar.
             if (isRecoveryRef.current) {
-                if (mounted) setIsLoading(false);
+                if (mounted) {
+                    setSession(s);
+                    setIsLoading(false);
+                }
                 return;
             }
+
+            setSession(s);
 
             if (s?.user) {
                 const thisEvent = ++eventCounter.current;

@@ -289,6 +289,23 @@ export interface ShowcaseSlot {
     created_at: string;
 }
 
+export interface EventWebsite {
+    id: string;
+    event_id: string;
+    user_id: string;
+    title: string;
+    description: string | null;
+    html_content: string | null;
+    file_url: string | null;
+    thumbnail_url: string | null;
+    host_names: string[];
+    status: 'pending' | 'approved' | 'rejected';
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 // ─── Community ───
 
 export interface Comment {
@@ -433,6 +450,7 @@ export interface Database {
             event_team_member: { Row: EventTeamMember & Record<string, unknown>; Insert: (Partial<EventTeamMember> & Pick<EventTeamMember, 'team_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventTeamMember> & Record<string, unknown>; Relationships: [] };
             event_submission: { Row: EventSubmission & Record<string, unknown>; Insert: (Partial<EventSubmission> & Pick<EventSubmission, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventSubmission> & Record<string, unknown>; Relationships: [] };
             showcase_slot: { Row: ShowcaseSlot & Record<string, unknown>; Insert: (Partial<ShowcaseSlot> & Pick<ShowcaseSlot, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<ShowcaseSlot> & Record<string, unknown>; Relationships: [] };
+            event_website: { Row: EventWebsite & Record<string, unknown>; Insert: (Partial<EventWebsite> & Pick<EventWebsite, 'event_id' | 'user_id' | 'title'>) & Record<string, unknown>; Update: Partial<EventWebsite> & Record<string, unknown>; Relationships: [] };
             comment: { Row: Comment & Record<string, unknown>; Insert: (Partial<Comment> & Pick<Comment, 'target_type' | 'target_id' | 'user_id' | 'content'>) & Record<string, unknown>; Update: Partial<Comment> & Record<string, unknown>; Relationships: [] };
             reaction: { Row: Reaction & Record<string, unknown>; Insert: (Partial<Reaction> & Pick<Reaction, 'target_type' | 'target_id' | 'user_id' | 'reaction_type'>) & Record<string, unknown>; Update: Partial<Reaction> & Record<string, unknown>; Relationships: [] };
             tag: { Row: Tag & Record<string, unknown>; Insert: (Partial<Tag> & Pick<Tag, 'name'>) & Record<string, unknown>; Update: Partial<Tag> & Record<string, unknown>; Relationships: [] };

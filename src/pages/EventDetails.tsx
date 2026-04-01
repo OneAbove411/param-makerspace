@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useEvent, useEventRegistration, useComments } from '../lib/hooks';
+import { useEvent, useEventRegistration, useComments, useEventWebsites, useMyEventWebsite, useEventWebsiteMutations } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
-import { Calendar, MapPin, Users, ArrowLeft, Send } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowLeft, Send, Globe } from 'lucide-react';
 import { formatEventType } from './Events';
+import { WebsiteShowcaseWall } from '../components/event/WebsiteShowcaseWall';
+import { WebsiteUploadPanel } from '../components/event/WebsiteUploadPanel';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -101,6 +103,83 @@ const RegistrationSidebar = ({ isRegistered, event, user, actionLoading, handleR
         )}
     </div>
 );
+
+// --- Website Showcase Section (shared across all event types) ---
+const WebsiteShowcaseSection = ({ eventId, user, isRegistered, sectionNumber }: { eventId: string; user: any; isRegistered: boolean; sectionNumber: string }) => {
+    const { data: websites, loading: websitesLoading, refetch: refetchWebsites } = useEventWebsites(eventId);
+    const { data: myWebsite, refetch: refetchMyWebsite } = useMyEventWebsite(eventId);
+    const { submitWebsite, deleteWebsite } = useEventWebsiteMutations();
+
+    const handleSubmit = async (data: {
+        title: string;
+        description: string;
+        html_content: string | null;
+        file_url: string | null;
+        host_names: string[];
+    }) => {
+        if (!user) throw new Error('You must be logged in.');
+        const { error } = await submitWebsite({
+            event_id: eventId,
+            user_id: user.id,
+            title: data.title,
+            description: data.description || undefined,
+            html_content: data.html_content || undefined,
+            file_url: data.file_url || undefined,
+            host_names: data.host_names,
+        });
+        if (error) throw new Error(error);
+        // Fire-and-forget refetches so they don't block the caller
+        refetchMyWebsite().catch(() => {});
+        refetchWebsites().catch(() => {});
+    };
+
+    const handleDelete = async () => {
+        if (!myWebsite) return;
+        await deleteWebsite(myWebsite.id);
+        refetchMyWebsite().catch(() => {});
+        refetchWebsites().catch(() => {});
+    };
+
+    return (
+        <>
+            {/* Showcase Wall */}
+            <section className="ed-section">
+                <div className="flex items-center gap-4 mb-6">
+                    <span className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest">{sectionNumber}</span>
+                    <div>
+                        <div className="w-12 h-px bg-brutal-dark/10 mb-2" />
+                        <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading flex items-center gap-2">
+                            <Globe className="w-5 h-5 text-brutal-red" /> Website Showcase
+                        </h2>
+                    </div>
+                </div>
+                <WebsiteShowcaseWall websites={websites || []} loading={websitesLoading} />
+            </section>
+
+            {/* Upload Panel for registered users */}
+            {user && (
+                <section className="ed-section">
+                    <div className="flex items-center gap-4 mb-6">
+                        <span className="font-data text-[10px] text-brutal-dark/30 font-bold uppercase tracking-widest">{String(Number(sectionNumber) + 1).padStart(2, '0')}</span>
+                        <div>
+                            <div className="w-12 h-px bg-brutal-dark/10 mb-2" />
+                            <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading">Submit Your Website</h2>
+                        </div>
+                    </div>
+                    <WebsiteUploadPanel
+                        eventId={eventId}
+                        userId={user.id}
+                        userName={user.name || 'Unknown'}
+                        existingSubmission={myWebsite}
+                        onSubmit={handleSubmit}
+                        onDelete={handleDelete}
+                        isRegistered={isRegistered}
+                    />
+                </section>
+            )}
+        </>
+    );
+};
 
 // --- Layouts ---
 const BuildChallengeContent = ({ id, event, user, commentsProps, registrationProps }: any) => {
@@ -338,6 +417,9 @@ const BuildChallengeContent = ({ id, event, user, commentsProps, registrationPro
                     </section>
                 )}
 
+                {/* Website Showcase */}
+                <WebsiteShowcaseSection eventId={id} user={user} isRegistered={registrationProps.isRegistered} sectionNumber={isPast && submissions.length > 0 ? '05' : '04'} />
+
                 <DiscussionSection {...commentsProps} />
             </div>
             <div className="space-y-6">
@@ -486,6 +568,9 @@ const MakerMeetupContent = ({ id, event, user, commentsProps, registrationProps 
                     )}
                 </section>
 
+                {/* Website Showcase */}
+                <WebsiteShowcaseSection eventId={id} user={user} isRegistered={registrationProps.isRegistered} sectionNumber={approvedSlots.length > 0 ? '04' : '03'} />
+
                 <DiscussionSection {...commentsProps} />
             </div>
             <div className="space-y-6">
@@ -579,6 +664,9 @@ const TechTuesdayContent = ({ id, event, user, commentsProps, registrationProps 
                     <h2 className="font-heading font-bold text-lg uppercase tracking-tight-heading mb-4">Session Details</h2>
                     <p className="font-data text-sm text-brutal-dark/80 whitespace-pre-wrap leading-relaxed">{aboutText.trim()}</p>
                 </section>
+
+                {/* Website Showcase */}
+                <WebsiteShowcaseSection eventId={id!} user={user} isRegistered={true} sectionNumber="03" />
 
                 <DiscussionSection {...commentsProps} />
             </div>

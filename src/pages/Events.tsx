@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useEvents } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
 import { MagneticCard } from '../components/ui/MagneticCard';
@@ -42,10 +42,14 @@ export function Events() {
     const { data: events, loading } = useEvents(filter);
     const pageRef = useRef<HTMLDivElement>(null);
 
-    const now = new Date();
-    const upcomingEvents = (events || []).filter(e => new Date(e.date) >= now);
-    const pastEvents = (events || []).filter(e => new Date(e.date) < now);
-    const pastTechTuesdays = pastEvents.filter(e => e.event_type === 'tech_tuesday');
+    const { upcomingEvents, pastEvents, pastTechTuesdays } = useMemo(() => {
+        const now = Date.now();
+        const all = events || [];
+        const upcoming = all.filter(e => new Date(e.date).getTime() >= now);
+        const past = all.filter(e => new Date(e.date).getTime() < now);
+        const pastTT = past.filter(e => e.event_type === 'tech_tuesday');
+        return { upcomingEvents: upcoming, pastEvents: past, pastTechTuesdays: pastTT };
+    }, [events]);
 
     // GSAP
     useEffect(() => {

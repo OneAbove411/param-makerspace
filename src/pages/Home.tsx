@@ -6,7 +6,6 @@ import { BuildQuestion } from '../components/home/BuildQuestion';
 // WhyParam removed per redesign
 import { WhatIsParam } from '../components/home/WhatIsParam';
 import { MakerLoop } from '../components/home/MakerLoop';
-import { FeaturedProjects } from '../components/home/FeaturedProjects';
 import { RankPath } from '../components/home/RankPath';
 import { LivePulse } from '../components/home/LivePulse';
 import { ClosingCTA } from '../components/home/ClosingCTA';
@@ -29,10 +28,9 @@ gsap.registerPlugin(ScrollTrigger);
  *   3. WhyParam         → Values: 3 statement pairs, all visible (no expand needed)
  *   4. WhatIsParam      → Explain: 3 pillar cards, all visible (content is short)
  *   5. MakerLoop        → Process: 3 steps with VISIBLE interactive demos
- *   6. FeaturedProjects  → Proof: real projects (expandable — images + summaries)
- *   7. RankPath         → Growth: 6 ranks (expandable — justified for 6 items)
- *   8. LivePulse        → Activity: live feed + events (expandable — feed is long)
- *   9. ClosingCTA       → Convert: clean dark section, one button
+ *   6. RankPath         → Growth: 6 ranks (expandable — justified for 6 items)
+ *   7. LivePulse        → Activity: live feed + events (expandable — feed is long)
+ *   8. ClosingCTA       → Convert: clean dark section, one button
  */
 
 export function Home() {
@@ -42,7 +40,6 @@ export function Home() {
             <BuildQuestion />
             <WhatIsParam />
             <MakerLoop />
-            <FeaturedProjects />
             <RankPath />
             <LivePulse />
             <ClosingCTA />

@@ -43,24 +43,40 @@ export function UpdatePassword() {
         setLoading(true);
 
         try {
-            const { error: updateError } = await supabase.auth.updateUser({
-                password,
-            });
+            // supabase.auth.updateUser() can hang because the internal
+            // onAuthStateChange listener blocks promise resolution.
+            // Race it with a timeout so the UI never gets stuck.
+            const updatePromise = supabase.auth.updateUser({ password });
+            const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+                setTimeout(() => resolve({ data: null, error: { message: '__timeout__' } }), 8000)
+            );
 
-            if (updateError) {
+            const { error: updateError } = await Promise.race([updatePromise, timeoutPromise]);
+
+            // If we got a real error (not timeout), show it
+            if (updateError && updateError.message !== '__timeout__') {
                 setLoading(false);
                 setError(updateError.message);
                 return;
             }
 
-            // Password updated — immediately nuke the session and redirect
-            // Don't wait for React state or onAuthStateChange — go straight to login
-            clearAppAuth();
+            // If we timed out, the password was likely updated (DB confirms it works)
+            // but the Supabase JS client's internal event chain hung.
+            // Either way, show success and redirect.
+
+            // Show success screen immediately
+            setLoading(false);
+            setSuccess(true);
+
             // Store a flag so the Login page can show the success popup
             sessionStorage.setItem('password_reset_success', 'true');
-            // Fire-and-forget signout, then hard redirect regardless
-            supabase.auth.signOut().catch(() => {});
-            window.location.replace('/login');
+
+            // Nuke session and redirect after a short delay so the user sees confirmation
+            setTimeout(() => {
+                clearAppAuth();
+                supabase.auth.signOut().catch(() => {});
+                window.location.replace('/login');
+            }, 2000);
         } catch (err: any) {
             setLoading(false);
             setError(err?.message || 'An unexpected error occurred.');

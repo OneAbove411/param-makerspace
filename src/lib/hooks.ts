@@ -8,10 +8,11 @@ import type {
     ChallengeStep, ChallengeMaterial, ChallengeSkill,
     ChallengeVocabulary, ChallengeLevel, UserBadge,
     Tag, EntityTag, ReactionType, TargetType, Comment,
-    AppUser, Equipment, Inventory, Role, EventType, XPEvent
+    AppUser, Equipment, Inventory, Role, EventType, XPEvent,
+    EventWebsite
 } from './database.types';
 
-// ─── Generic fetch hook (with race condition protection) ───
+// ─── Generic fetch hook (with race condition protection + stale-while-revalidate) ───
 
 export function useSupabaseQuery<T>(
     queryFn: () => Promise<{ data: T | null; error: any }>,
@@ -20,17 +21,28 @@ export function useSupabaseQuery<T>(
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const fetchId = useRef(0); // Tracks latest fetch to discard stale results
+    const fetchId = useRef(0);
+    const hasFetchedOnce = useRef(false);
 
     const refetch = useCallback(async () => {
         const thisId = ++fetchId.current;
-        setLoading(true);
-        const { data, error } = await queryFn();
-        // Only apply result if this is still the latest fetch
-        if (thisId !== fetchId.current) return;
-        setData(data);
-        setError(error?.message || null);
-        setLoading(false);
+        // Stale-while-revalidate: only show loading spinner on first fetch
+        // Subsequent refetches keep showing old data while new data loads
+        if (!hasFetchedOnce.current) setLoading(true);
+        try {
+            const { data, error } = await queryFn();
+            // Only apply result if this is still the latest fetch
+            if (thisId !== fetchId.current) return;
+            setData(data);
+            setError(error?.message || null);
+            hasFetchedOnce.current = true;
+        } catch (err: any) {
+            if (thisId !== fetchId.current) return;
+            setError(err.message || 'Unknown error');
+        } finally {
+            if (thisId === fetchId.current) setLoading(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, deps);
 
     useEffect(() => {
@@ -259,21 +271,23 @@ export function useEvent(id: string | undefined) {
     return useSupabaseQuery<(Event & { registration_count: number }) | null>(async () => {
         if (!id) return { data: null, error: null };
 
-        const { data: event, error } = await supabase
-            .from('event')
-            .select('id, title, description, event_type, date, end_date, location, capacity, cover_image_url, registration_status, auto_badge_id, created_by, created_at, updated_at')
-            .eq('id', id)
-            .single();
+        // Parallel: event + registration count in one batch
+        const [eventRes, countRes] = await Promise.all([
+            supabase
+                .from('event')
+                .select('id, title, description, event_type, date, end_date, location, capacity, cover_image_url, registration_status, auto_badge_id, created_by, created_at, updated_at')
+                .eq('id', id)
+                .single(),
+            supabase
+                .from('event_registration')
+                .select('id', { count: 'exact', head: true })
+                .eq('event_id', id),
+        ]);
 
-        if (error || !event) return { data: null, error };
-
-        const { count } = await supabase
-            .from('event_registration')
-            .select('id', { count: 'exact', head: true })
-            .eq('event_id', id);
+        if (eventRes.error || !eventRes.data) return { data: null, error: eventRes.error };
 
         return {
-            data: { ...(event as Event), registration_count: count || 0 },
+            data: { ...(eventRes.data as Event), registration_count: countRes.count || 0 },
             error: null,
         };
     }, [id]);
@@ -516,28 +530,29 @@ export function useReaction(targetType: TargetType, targetId: string | undefined
     const { user } = useAuth();
     const [myReactions, setMyReactions] = useState<ReactionType[]>([]);
     const [counts, setCounts] = useState({ likes: 0, upvotes: 0, bookmarks: 0 });
+    const hasFetchedOnce = useRef(false);
 
     const fetchReactions = useCallback(async () => {
         if (!targetId) return;
 
-        // Get counts
-        const [likesRes, upvotesRes, bookmarksRes] = await Promise.all([
+        // Parallel: counts + user reactions in one batch
+        const promises: Promise<any>[] = [
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'like'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'upvote'),
             supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', targetId).eq('reaction_type', 'bookmark'),
-        ]);
-        setCounts({ likes: likesRes.count || 0, upvotes: upvotesRes.count || 0, bookmarks: bookmarksRes.count || 0 });
-
-        // Get user's own reactions
+        ];
         if (user) {
-            const { data } = await supabase
-                .from('reaction')
-                .select('reaction_type')
-                .eq('target_type', targetType)
-                .eq('target_id', targetId)
-                .eq('user_id', user.id);
-            setMyReactions((data || []).map((r: any) => r.reaction_type));
+            promises.push(
+                supabase.from('reaction').select('reaction_type').eq('target_type', targetType).eq('target_id', targetId).eq('user_id', user.id)
+            );
         }
+
+        const results = await Promise.all(promises);
+        setCounts({ likes: results[0].count || 0, upvotes: results[1].count || 0, bookmarks: results[2].count || 0 });
+        if (user && results[3]) {
+            setMyReactions((results[3].data || []).map((r: any) => r.reaction_type));
+        }
+        hasFetchedOnce.current = true;
     }, [targetType, targetId, user?.id]);
 
     useEffect(() => { fetchReactions(); }, [fetchReactions]);
@@ -545,7 +560,13 @@ export function useReaction(targetType: TargetType, targetId: string | undefined
     const toggle = async (reactionType: ReactionType) => {
         if (!user || !targetId) return;
 
-        if (myReactions.includes(reactionType)) {
+        const isRemoving = myReactions.includes(reactionType);
+        // Optimistic update
+        const countKey = reactionType === 'like' ? 'likes' : reactionType === 'upvote' ? 'upvotes' : 'bookmarks';
+        setMyReactions(prev => isRemoving ? prev.filter(r => r !== reactionType) : [...prev, reactionType]);
+        setCounts(prev => ({ ...prev, [countKey]: prev[countKey] + (isRemoving ? -1 : 1) }));
+
+        if (isRemoving) {
             await supabase
                 .from('reaction')
                 .delete()
@@ -561,7 +582,8 @@ export function useReaction(targetType: TargetType, targetId: string | undefined
                 reaction_type: reactionType,
             });
         }
-        await fetchReactions();
+        // Background sync — don't block UI
+        fetchReactions().catch(() => {});
     };
 
     return { counts, myReactions, toggle, refetch: fetchReactions };
@@ -572,11 +594,13 @@ export function useReaction(targetType: TargetType, targetId: string | undefined
 export function useComments(targetType: TargetType, targetId: string | undefined) {
     const [comments, setComments] = useState<(Comment & { userName: string })[]>([]);
     const [loading, setLoading] = useState(true);
+    const hasFetchedOnce = useRef(false);
     const { user } = useAuth();
 
     const fetchComments = useCallback(async () => {
         if (!targetId) return;
-        setLoading(true);
+        // Only show loading on first fetch (stale-while-revalidate)
+        if (!hasFetchedOnce.current) setLoading(true);
         const { data } = await supabase
             .from('comment')
             .select('*, app_user:app_user(name)')
@@ -590,6 +614,7 @@ export function useComments(targetType: TargetType, targetId: string | undefined
                 userName: c.app_user?.name || 'Unknown',
             }))
         );
+        hasFetchedOnce.current = true;
         setLoading(false);
     }, [targetType, targetId]);
 
@@ -656,14 +681,18 @@ export function useEventRegistration(eventId: string | undefined) {
 
     const register = async () => {
         if (!user || !eventId) return;
-        await supabase.from('event_registration').insert({ event_id: eventId, user_id: user.id });
+        // Optimistic update — set registered immediately, revert on error
         setIsRegistered(true);
+        const { error } = await supabase.from('event_registration').insert({ event_id: eventId, user_id: user.id });
+        if (error) setIsRegistered(false);
     };
 
     const unregister = async () => {
         if (!user || !eventId) return;
-        await supabase.from('event_registration').delete().eq('event_id', eventId).eq('user_id', user.id);
+        // Optimistic update — set unregistered immediately, revert on error
         setIsRegistered(false);
+        const { error } = await supabase.from('event_registration').delete().eq('event_id', eventId).eq('user_id', user.id);
+        if (error) setIsRegistered(true);
     };
 
     return { isRegistered, loading, register, unregister };
@@ -1046,6 +1075,134 @@ export function useEventMutations() {
     };
 
     return { createEvent, updateEvent, deleteEvent };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ─── EVENT WEBSITES (Showcase) ───
+// ══════════════════════════════════════════════════════════════════
+
+/** Fetch all approved websites for an event (public showcase) */
+export function useEventWebsites(eventId: string | undefined) {
+    return useSupabaseQuery<(EventWebsite & { userName: string; avatarUrl: string | null })[]>(async () => {
+        if (!eventId) return { data: [], error: null };
+
+        // Single query with join for user name; avatar fetched separately to avoid inner-join filtering
+        const { data, error } = await supabase
+            .from('event_website')
+            .select('id, event_id, user_id, title, description, html_content, file_url, thumbnail_url, host_names, status, created_at, updated_at, user:app_user!user_id(name)')
+            .eq('event_id', eventId)
+            .eq('status', 'approved')
+            .order('created_at', { ascending: false });
+
+        if (error || !data) return { data: [], error };
+
+        // Batch fetch avatars in one query (left-join-safe)
+        const userIds = [...new Set((data as any[]).map(d => d.user_id))];
+        const avatarMap: Record<string, string | null> = {};
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('maker_profile')
+                .select('user_id, avatar_url')
+                .in('user_id', userIds);
+            (profiles || []).forEach((p: any) => { avatarMap[p.user_id] = p.avatar_url; });
+        }
+
+        const enriched = (data as any[]).map(w => ({
+            ...w,
+            userName: w.user?.name || 'Unknown',
+            avatarUrl: avatarMap[w.user_id] || null,
+        }));
+
+        return { data: enriched, error: null };
+    }, [eventId]);
+}
+
+/** Fetch the current user's website submission for an event */
+export function useMyEventWebsite(eventId: string | undefined) {
+    const { user } = useAuth();
+    return useSupabaseQuery<EventWebsite | null>(async () => {
+        if (!eventId || !user) return { data: null, error: null };
+        const { data, error } = await supabase
+            .from('event_website')
+            .select('*')
+            .eq('event_id', eventId)
+            .eq('user_id', user.id)
+            .maybeSingle();
+        return { data: data as EventWebsite | null, error };
+    }, [eventId, user?.id]);
+}
+
+/** Fetch ALL website submissions for an event (mentor review — includes pending) */
+export function useEventWebsitesForReview(eventId?: string) {
+    return useSupabaseQuery<(EventWebsite & { userName: string; userEmail: string })[]>(async () => {
+        let q = supabase
+            .from('event_website')
+            .select('id, event_id, user_id, title, description, html_content, file_url, thumbnail_url, host_names, status, reviewed_by, reviewed_at, created_at, updated_at, user:app_user!user_id(name, email)')
+            .order('created_at', { ascending: false });
+
+        if (eventId) {
+            q = q.eq('event_id', eventId);
+        }
+
+        const { data, error } = await q;
+        if (error || !data) return { data: [], error };
+
+        const enriched = (data as any[]).map(w => ({
+            ...w,
+            userName: w.user?.name || 'Unknown',
+            userEmail: w.user?.email || '',
+        }));
+
+        return { data: enriched, error: null };
+    }, [eventId]);
+}
+
+export function useEventWebsiteMutations() {
+    const submitWebsite = async (data: {
+        event_id: string;
+        user_id: string;
+        title: string;
+        description?: string;
+        html_content?: string;
+        file_url?: string;
+        thumbnail_url?: string;
+        host_names?: string[];
+    }) => {
+        const { data: rows, error } = await supabase
+            .from('event_website')
+            .insert({
+                ...data,
+                host_names: data.host_names || [],
+                status: 'pending',
+            })
+            .select();
+        const website = rows?.[0] ?? null;
+        return { data: website as EventWebsite | null, error: error?.message || null };
+    };
+
+    const updateWebsite = async (id: string, updates: Partial<EventWebsite>) => {
+        const { error } = await supabase.from('event_website').update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+        }).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const deleteWebsite = async (id: string) => {
+        const { error } = await supabase.from('event_website').delete().eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    const reviewWebsite = async (id: string, status: 'approved' | 'rejected', reviewerId: string) => {
+        const { error } = await supabase.from('event_website').update({
+            status,
+            reviewed_by: reviewerId,
+            reviewed_at: new Date().toISOString(),
+        }).eq('id', id);
+        return { error: error?.message || null };
+    };
+
+    return { submitWebsite, updateWebsite, deleteWebsite, reviewWebsite };
 }
 
 // ══════════════════════════════════════════════════════════════════

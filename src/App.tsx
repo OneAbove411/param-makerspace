@@ -32,6 +32,7 @@ import { ManageInventory } from './pages/admin/ManageInventory';
 import { ReviewProjects } from './pages/admin/ReviewProjects';
 import { ReviewChallenges } from './pages/admin/ReviewChallenges';
 import { ReviewEventSubmissions } from './pages/admin/ReviewEventSubmissions';
+import { ReviewWebsiteSubmissions } from './pages/admin/ReviewWebsiteSubmissions';
 import { ManageProjects } from './pages/admin/ManageProjects';
 
 function App() {
@@ -69,6 +70,7 @@ function App() {
               <Route path="/admin/review-projects" element={<ReviewProjects />} />
               <Route path="/admin/review-challenges" element={<ReviewChallenges />} />
               <Route path="/admin/review-submissions" element={<ReviewEventSubmissions />} />
+              <Route path="/admin/review-websites" element={<ReviewWebsiteSubmissions />} />
               <Route path="/admin/events" element={<ManageEvents />} />
               <Route path="/admin/inventory" element={<ManageInventory />} />
               <Route path="/admin/challenges" element={<ManageChallenges />} />

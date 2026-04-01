@@ -9,7 +9,7 @@ import { Card } from '../components/ui/Card';
 import { RankBadge } from '../components/ui/RankBadge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award } from 'lucide-react';
+import { Settings, Plus, Calendar, Trophy, Zap, AlertTriangle, X, ClipboardCheck, Users, Award, Globe } from 'lucide-react';
 import { isValidVideoUrl } from '../lib/videoUtils';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -426,6 +426,14 @@ export function Dashboard() {
                                 </div>
                                 <p className="font-data text-sm text-brutal-dark/60 mb-4">Review and shortlist Build Challenge submissions.</p>
                                 <Link to="/admin/review-submissions"><Button variant="outline" size="sm" className="w-full">Review Submissions</Button></Link>
+                            </Card>
+                            <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Globe className="w-5 h-5 text-yellow-600" />
+                                    <h3 className="font-heading font-bold text-lg uppercase">Website Submissions</h3>
+                                </div>
+                                <p className="font-data text-sm text-brutal-dark/60 mb-4">Review participant website uploads for event showcases.</p>
+                                <Link to="/admin/review-websites"><Button variant="outline" size="sm" className="w-full">Review Websites</Button></Link>
                             </Card>
                             <Card className="p-5 border-2 border-yellow-500/30 bg-yellow-500/5">
                                 <div className="flex items-center gap-2 mb-4">

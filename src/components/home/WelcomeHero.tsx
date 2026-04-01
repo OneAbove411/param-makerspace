@@ -124,7 +124,7 @@ export function WelcomeHero() {
             ref={sectionRef}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            className="min-h-[100dvh] w-full relative flex items-center px-6 md:px-12 lg:px-24 py-20 md:py-0 overflow-hidden"
+            className="min-h-[100dvh] w-full relative flex items-center px-6 md:px-12 lg:px-24 py-20 md:py-0"
         >
             {/* Dark bg with dot grid */}
             <div
@@ -141,9 +141,17 @@ export function WelcomeHero() {
                 className="absolute inset-0 pointer-events-none z-[1]"
             />
 
-            {/* Content — stacks vertically on mobile, side-by-side on md+ */}
-            <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col md:flex-row items-center">
-                {/* Left column — text */}
+            {/* 3D Robot — absolute layer covering the right side + bleeding into the full hero
+                 Positioned to start from the left-center so the beam can reach across the whole section */}
+            <div className="hidden md:block absolute top-0 bottom-0 left-0 right-0 z-[2]">
+                <InteractiveRobotSpline
+                    scene="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode"
+                    className="w-full h-full"
+                />
+            </div>
+
+            {/* Content — text sits above the robot canvas */}
+            <div className="relative z-10 w-full max-w-7xl mx-auto">
                 <div className="w-full md:w-3/5 lg:w-1/2 max-w-3xl">
                     {/* Main headline */}
                     <h1 className="font-drama italic text-4xl sm:text-6xl md:text-8xl lg:text-[8rem] text-brutal-bg leading-[0.95] tracking-tight">
@@ -176,15 +184,6 @@ export function WelcomeHero() {
                             See What's Possible ↓
                         </button>
                     </div>
-                </div>
-
-                {/* 3D Robot — below text on mobile, beside text on md+
-                     Dynamically scales: small on mobile, full column on desktop */}
-                <div className="welcome-cta w-full md:w-2/5 lg:w-1/2 h-[340px] sm:h-[380px] md:h-[400px] lg:h-[500px] xl:h-[600px] relative flex-shrink-0 mt-2 md:mt-0">
-                    <InteractiveRobotSpline
-                        scene="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode"
-                        className="w-full h-full"
-                    />
                 </div>
             </div>
 

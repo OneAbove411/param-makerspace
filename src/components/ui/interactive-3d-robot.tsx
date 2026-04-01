@@ -126,7 +126,7 @@ function RobotModel({
   // Volumetric headlamp beam shader — realistic car headlight effect
   const { leftCone, rightCone, leftConeMat, rightConeMat } = useMemo(() => {
     // Cone radius matches eye sphere diameter exactly
-    const geo = new THREE.ConeGeometry(1.5, 12, 48, 20, true);
+    const geo = new THREE.ConeGeometry(2.25, 22, 48, 20, true);
 
     const volumetricShader = {
       uniforms: {
@@ -146,8 +146,8 @@ function RobotModel({
           vPosition = position;
 
           // Distance from cone axis (center line)
-          float maxRadius = 2.2;
-          float heightNorm = (position.y + 6.0) / 12.0; // 0 at tip, 1 at base
+          float maxRadius = 2.8;
+          float heightNorm = (position.y + 11.0) / 22.0; // 0 at tip, 1 at base
           float currentMaxR = maxRadius * heightNorm;
           vDistFromAxis = currentMaxR > 0.0 ? length(position.xz) / currentMaxR : 0.0;
 
@@ -359,20 +359,21 @@ function RobotModel({
       leftCone.position.copy(v);
       targetDir.current.set(coneTargetX - 0.3, coneTargetY, coneTargetZ).sub(v).normalize();
       leftCone.quaternion.setFromUnitVectors(coneUp.current, targetDir.current);
-      leftCone.position.addScaledVector(targetDir.current, 5);
+      leftCone.position.addScaledVector(targetDir.current, 10);
     }
     if (rightEyeRef.current) {
       rightEyeRef.current.getWorldPosition(v);
       rightCone.position.copy(v);
       targetDir.current.set(coneTargetX + 0.3, coneTargetY, coneTargetZ).sub(v).normalize();
       rightCone.quaternion.setFromUnitVectors(coneUp.current, targetDir.current);
-      rightCone.position.addScaledVector(targetDir.current, 5);
+      rightCone.position.addScaledVector(targetDir.current, 10);
     }
+
   });
 
   return (
     <group ref={groupRef}>
-      <primitive object={scene} scale={1.15} position={[0, 1.5, 1.8]} />
+      <primitive object={scene} scale={1.0} position={[3.0, 1.0, 1.8]} />
 
       {/* Point lights at eye positions — cast warm light on robot face/body */}
       <pointLight ref={leftPointRef} color="#ffcc00" intensity={0} distance={8} decay={2} />
@@ -383,6 +384,7 @@ function RobotModel({
 
 // Preload the model
 useGLTF.preload('/models/robot.glb', true);
+
 
 // ─── Main exported component ───
 interface InteractiveRobotSplineProps {
@@ -441,14 +443,18 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
   const mobile = isMobile();
 
   return (
-    <div ref={wrapperRef} className={`relative overflow-hidden ${className || ''}`} onClick={handleClick}>
+    <div ref={wrapperRef} className={`relative ${className || ''}`} onClick={handleClick} style={{ overflow: 'visible' }}>
       <Canvas
-        camera={{ position: [-4, 0.2, 11], fov: 28, near: 0.01, far: 100 }}
+        camera={{ position: [-0.05, 0.2, 11], fov: 28, near: 0.01, far: 100 }}
         shadows={!mobile}
         frameloop="always"
         dpr={mobile ? [1, 1] : [1, 1.5]}
         gl={{ antialias: !mobile, alpha: true, powerPreference: 'high-performance' }}
-        style={{ cursor: 'pointer' }}
+        style={{ cursor: 'pointer', background: 'transparent' }}
+        onCreated={({ gl, scene }) => {
+          gl.setClearColor(0x000000, 0);
+          scene.background = null;
+        }}
       >
         <MouseTracker />
 
@@ -470,8 +476,8 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
         {/* Rim light — from behind */}
         <directionalLight position={[0, 2, -4]} intensity={0.6} color="#ffffff" />
 
-        {/* Environment map for chrome reflections */}
-        <Environment preset="city" />
+        {/* Environment map for chrome reflections only — background={false} keeps canvas transparent */}
+        <Environment preset="city" background={false} />
 
         <Suspense fallback={null}>
           <RobotModel lightsOn={lightsOn} intensity={intensity} />
@@ -498,26 +504,6 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
         </div>
       </div>
 
-      {/* Bottom gradient */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
-        style={{
-          height: '50%',
-          background: 'linear-gradient(to top, #111111 0%, #111111 35%, rgba(17,17,17,0.95) 50%, rgba(17,17,17,0.7) 65%, rgba(17,17,17,0.3) 80%, transparent 100%)',
-        }} />
-
-      {/* Right edge fade */}
-      <div className="absolute top-0 bottom-0 right-0 z-10 pointer-events-none"
-        style={{
-          width: '100px',
-          background: 'linear-gradient(to left, #111111 0%, #111111 15%, transparent 100%)',
-        }} />
-
-      {/* Left edge fade */}
-      <div className="absolute top-0 bottom-0 left-0 z-10 pointer-events-none"
-        style={{
-          width: '60px',
-          background: 'linear-gradient(to right, #111111 0%, transparent 100%)',
-        }} />
     </div>
   );
 }

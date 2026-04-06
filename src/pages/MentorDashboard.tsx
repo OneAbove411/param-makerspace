@@ -25,8 +25,10 @@ interface ShowcaseSlot {
 
 export function MentorDashboard() {
   const { user } = useAuth();
-  const { data: events = [], loading: eventsLoading } = useAllEvents();
-  const { data: allSubmissions = [] } = useEventWebsitesForReview();
+  const { data: eventsData, loading: eventsLoading } = useAllEvents();
+  const { data: submissionsData } = useEventWebsitesForReview();
+  const events = eventsData ?? [];
+  const allSubmissions = submissionsData ?? [];
   const [showcaseSlots, setShowcaseSlots] = useState<ShowcaseSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
   const isAuthorized = user && (user.role === 'mentor' || user.role === 'admin');
@@ -44,7 +46,7 @@ export function MentorDashboard() {
           .order('created_at', { ascending: false });
 
         if (data) {
-          setShowcaseSlots(data as ShowcaseSlot[]);
+          setShowcaseSlots(data as unknown as ShowcaseSlot[]);
         }
       } catch (error) {
         console.error('Error fetching showcase slots:', error);
@@ -192,7 +194,7 @@ export function MentorDashboard() {
               {mentorEvents.map((event) => {
                 const eventDate = new Date(event.date);
                 const isPast = eventDate < now;
-                const registrations = event.registration_count || 0;
+                const registrations = (event as { registration_count?: number }).registration_count || 0;
 
                 return (
                   <div

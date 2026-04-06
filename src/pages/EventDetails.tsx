@@ -1358,7 +1358,7 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
         fetchSlots();
     };
 
-    const handleWebsiteAction = async (websiteId: string, newStatus: string) => {
+    const handleWebsiteAction = async (websiteId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
         setActionLoading(websiteId);
         await supabase.from('event_website').update({ status: newStatus, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq('id', websiteId);
         setActionLoading(null);

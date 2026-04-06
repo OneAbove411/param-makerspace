@@ -1,13 +1,12 @@
 import { useCallback, useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, Environment } from '@react-three/drei';
+import { useGLTF, Environment, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ─── Constants ───
 const LIGHT_MIN = 0.2;
 const LIGHT_MAX = 6;
 const LIGHT_DEFAULT = 2;
-const SCROLL_STEP = 0.25;
 
 // ─── Mouse/touch tracker (normalized -1..1), rAF-synced to avoid GC pressure ───
 const mouse = new THREE.Vector2(0, 0);
@@ -79,37 +78,83 @@ function RobotModel({
   const rightEyeRef = useRef<THREE.Object3D | null>(null);
   const leftEyeMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const rightEyeMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const botonRef = useRef<THREE.Mesh | null>(null);
+  const botonMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const textRef = useRef<THREE.Mesh | null>(null);
+  const buttonGroupRef = useRef<THREE.Object3D | null>(null);
+  const clickMeMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const leftPointRef = useRef<THREE.PointLight>(null!);
   const rightPointRef = useRef<THREE.PointLight>(null!);
   const { gl, camera } = useThree();
 
-  // Click → raycast against head + body meshes only
+  // Click → raycast: the entire robot scene toggles the lights.
+  // We raycast recursively against the whole scene and also compute a
+  // screen-space bounding box around the robot — any click inside that box
+  // is treated as a hit, guaranteeing the full capsule/body is clickable.
   useEffect(() => {
     const raycaster = new THREE.Raycaster();
+    const box = new THREE.Box3();
+    const tmpVec = new THREE.Vector3();
+
     const handleClick = (e: MouseEvent) => {
       const rect = gl.domElement.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-      const meshes: THREE.Object3D[] = [];
-      scene.traverse(child => {
-        if ((child as THREE.Mesh).isMesh && child.name.toLowerCase() !== 'plane') {
-          meshes.push(child);
+
+      // Recursive raycast against the entire scene (skip the floor plane).
+      const hits = raycaster.intersectObject(scene, true).filter(h => {
+        let obj: THREE.Object3D | null = h.object;
+        while (obj) {
+          if (obj.name.toLowerCase() === 'plane') return false;
+          obj = obj.parent;
         }
+        return true;
       });
-      const hits = raycaster.intersectObjects(meshes, false);
-      if (hits.length > 0) onToggle();
+
+      if (hits.length > 0) {
+        onToggle();
+        return;
+      }
+
+      // Fallback: project the robot's world bounding box to screen space.
+      // If the click is inside the robot's on-screen silhouette box, count it.
+      box.setFromObject(scene);
+      if (box.isEmpty()) return;
+      const corners: THREE.Vector3[] = [
+        new THREE.Vector3(box.min.x, box.min.y, box.min.z),
+        new THREE.Vector3(box.min.x, box.min.y, box.max.z),
+        new THREE.Vector3(box.min.x, box.max.y, box.min.z),
+        new THREE.Vector3(box.min.x, box.max.y, box.max.z),
+        new THREE.Vector3(box.max.x, box.min.y, box.min.z),
+        new THREE.Vector3(box.max.x, box.min.y, box.max.z),
+        new THREE.Vector3(box.max.x, box.max.y, box.min.z),
+        new THREE.Vector3(box.max.x, box.max.y, box.max.z),
+      ];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const c of corners) {
+        tmpVec.copy(c).project(camera);
+        if (tmpVec.x < minX) minX = tmpVec.x;
+        if (tmpVec.y < minY) minY = tmpVec.y;
+        if (tmpVec.x > maxX) maxX = tmpVec.x;
+        if (tmpVec.y > maxY) maxY = tmpVec.y;
+      }
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+        onToggle();
+      }
     };
     gl.domElement.addEventListener('click', handleClick);
     return () => gl.domElement.removeEventListener('click', handleClick);
   }, [scene, gl, camera, onToggle]);
 
-  // Apply chrome materials on mount
+  // Apply chrome materials on mount + capture Button group
   useEffect(() => {
     scene.traverse((child) => {
       if (child.name === 'Cabeza') headRef.current = child;
       if (child.name === 'Sphere_3') leftEyeRef.current = child;
       if (child.name === 'Sphere_2') rightEyeRef.current = child;
+      // Capture the Button group node (parent of Botón + Text)
+      if (child.name === 'Button') buttonGroupRef.current = child;
 
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -128,6 +173,24 @@ function RobotModel({
           mesh.material = eyeMat;
           if (name === 'sphere_3') leftEyeMatRef.current = eyeMat;
           if (name === 'sphere_2') rightEyeMatRef.current = eyeMat;
+        }
+        // Botón (the physical toggle capsule on the robot arm)
+        else if (name === 'botón' || name === 'boton') {
+          botonRef.current = mesh;
+          const btnMat = new THREE.MeshStandardMaterial({
+            color: '#cccccc',
+            emissive: '#000000',
+            emissiveIntensity: 0,
+            metalness: 0.7,
+            roughness: 0.25,
+          });
+          mesh.material = btnMat;
+          botonMatRef.current = btnMat;
+        }
+        // Original "Get in Touch" text — hide it, we'll replace with "Click Me"
+        else if (name === 'text') {
+          textRef.current = mesh;
+          mesh.visible = false;
         }
         // Floor plane — hide
         else if (name === 'plane') {
@@ -340,6 +403,11 @@ function RobotModel({
       );
     }
 
+    // ── Botón (toggle capsule) — kept at its neutral metallic color, no glow ──
+    // ── "Click Me" text — stenciled look, no glow; keep material fixed ──
+    // Intentionally no-op: text stays dark metallic so it blends with the capsule
+    // like a CNC-etched label.
+
     // ── Point lights at exact eye positions ──
     const v = wp.current;
     const pointTarget = lightsOn ? intensity * 3 : 0;
@@ -395,9 +463,45 @@ function RobotModel({
 
   });
 
+  // Reparent "CLICK ME" text into the Button group so it sits on the capsule
+  const clickMeRef = useRef<THREE.Mesh>(null!);
+  const reparented = useRef(false);
+  useFrame(() => {
+    if (!reparented.current && buttonGroupRef.current && clickMeRef.current) {
+      if (clickMeRef.current.parent) {
+        clickMeRef.current.parent.remove(clickMeRef.current);
+      }
+      buttonGroupRef.current.add(clickMeRef.current);
+      // Sit the text just above the capsule surface, oriented along the capsule length
+      clickMeRef.current.position.set(-0.15, -1.21, 0.62);
+      clickMeRef.current.renderOrder = 2;
+      reparented.current = true;
+    }
+  });
+
   return (
     <group ref={groupRef}>
       <primitive object={scene} scale={1.0} position={[3.0, 1.0, 1.8]} />
+
+      {/* "CLICK ME" text — reparented to the Button group; stenciled onto the capsule */}
+      <Text
+        ref={clickMeRef}
+        fontSize={15.0}
+        anchorX="center"
+        anchorY="middle"
+        letterSpacing={0.08}
+        maxWidth={500}
+      >
+        CLICK ME
+        <meshStandardMaterial
+          ref={clickMeMatRef as any}
+          color="#3a3a3a"
+          emissive="#000000"
+          emissiveIntensity={0}
+          metalness={0.9}
+          roughness={0.3}
+        />
+      </Text>
 
       {/* Point lights at eye positions — cast warm light on robot face/body */}
       <pointLight ref={leftPointRef} color="#ffcc00" intensity={0} distance={8} decay={2} />
@@ -418,50 +522,17 @@ interface InteractiveRobotSplineProps {
 
 export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProps) {
   const [lightsOn, setLightsOn] = useState(false);
-  const [intensity, setIntensity] = useState(LIGHT_MIN);
-  const [showHint, setShowHint] = useState(false);
   const lightsOnRef = useRef(false);
-  const intensityRef = useRef(LIGHT_MIN);
-  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const flashHint = useCallback(() => {
-    setShowHint(true);
-    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    hintTimerRef.current = setTimeout(() => setShowHint(false), 2000);
-  }, []);
+  // Fixed intensity — no longer user-controlled
+  const intensity = LIGHT_DEFAULT;
 
   // Click → toggle lights
   const handleClick = useCallback(() => {
     lightsOnRef.current = !lightsOnRef.current;
     setLightsOn(lightsOnRef.current);
-    flashHint();
-  }, [flashHint]);
-
-  // Scroll → ramp intensity only when lights are ON (click to toggle first)
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-    const handleWheel = (e: WheelEvent) => {
-      // Only intercept scroll when lights are on
-      if (!lightsOnRef.current) return;
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -SCROLL_STEP : SCROLL_STEP;
-      const newIntensity = Math.max(LIGHT_MIN, Math.min(LIGHT_MAX, intensityRef.current + delta));
-      intensityRef.current = newIntensity;
-      setIntensity(newIntensity);
-      // Turn off lights if scrolled back to minimum
-      if (newIntensity <= LIGHT_MIN) {
-        lightsOnRef.current = false;
-        setLightsOn(false);
-      }
-      flashHint();
-    };
-    wrapper.addEventListener('wheel', handleWheel, { passive: false });
-    return () => wrapper.removeEventListener('wheel', handleWheel);
-  }, [flashHint]);
-
-  const intensityPct = Math.round(((intensity - LIGHT_MIN) / (LIGHT_MAX - LIGHT_MIN)) * 100);
+  }, []);
 
   const mobile = isMobile();
 
@@ -506,26 +577,6 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
           <RobotModel lightsOn={lightsOn} intensity={intensity} onToggle={handleClick} />
         </Suspense>
       </Canvas>
-
-      {/* Flashlight status hint */}
-      <div
-        className="absolute top-4 right-4 z-20 pointer-events-none transition-opacity duration-500"
-        style={{ opacity: showHint ? 1 : 0 }}
-      >
-        <div className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-sm
-          font-data text-[10px] font-bold uppercase tracking-widest
-          transition-all duration-300
-          ${lightsOn
-            ? 'bg-yellow-400/10 text-yellow-300/70 border border-yellow-400/20'
-            : 'bg-white/5 text-white/30 border border-white/10'
-          }
-        `}>
-          <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${lightsOn ? 'bg-yellow-400' : 'bg-white/30'
-            }`} />
-          {lightsOn ? `${intensityPct}%` : 'Off'}
-        </div>
-      </div>
 
     </div>
   );

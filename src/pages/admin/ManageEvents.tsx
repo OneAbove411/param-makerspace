@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
-import { useAllEvents, useEventMutations, useSupabaseQuery } from '../../lib/hooks';
+import { useAllEvents, useEventMutations, useSupabaseQuery, useEventHosts, useEventHostMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
 import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Calendar as CalendarIcon, Plus, Trash2, Edit2, X, Image as ImageIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, Edit2, X, Image as ImageIcon, UserPlus, UserMinus } from 'lucide-react';
 import type { Event, EventType, Badge } from '../../lib/database.types';
 
+// ─── Showcase Slots Admin ───
 const ShowcaseSlotsAdmin = ({ eventId }: { eventId: string }) => {
     const [slots, setSlots] = useState<any[]>([]);
     const fetchSlots = async () => {
@@ -59,16 +60,168 @@ const ShowcaseSlotsAdmin = ({ eventId }: { eventId: string }) => {
     );
 };
 
+// ─── Host Mentor Manager ───
+const HostMentorManager = ({ eventId }: { eventId: string }) => {
+    const { data: hosts, refetch } = useEventHosts(eventId);
+    const { addHost, removeHost } = useEventHostMutations();
+    const [mentors, setMentors] = useState<{ id: string; name: string }[]>([]);
+    const [selectedMentorId, setSelectedMentorId] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchMentors = async () => {
+            const { data } = await supabase
+                .from('app_user')
+                .select('id, name')
+                .in('role', ['mentor', 'admin'])
+                .order('name');
+            setMentors(data || []);
+        };
+        fetchMentors();
+    }, []);
+
+    const handleAdd = async () => {
+        if (!selectedMentorId || loading) return;
+        // Prevent duplicates
+        if (hosts?.some(h => h.user_id === selectedMentorId)) return;
+        setLoading(true);
+        await addHost(eventId, selectedMentorId);
+        setSelectedMentorId('');
+        await refetch();
+        setLoading(false);
+    };
+
+    const handleRemove = async (hostId: string) => {
+        setLoading(true);
+        await removeHost(hostId);
+        await refetch();
+        setLoading(false);
+    };
+
+    // Filter out already-assigned mentors
+    const availableMentors = mentors.filter(m => !hosts?.some(h => h.user_id === m.id));
+
+    return (
+        <div className="space-y-4">
+            <div className="flex gap-2">
+                <select
+                    className="flex-1 h-10 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-3 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                    value={selectedMentorId}
+                    onChange={e => setSelectedMentorId(e.target.value)}
+                >
+                    <option value="">Select a mentor to add...</option>
+                    {availableMentors.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                </select>
+                <Button size="sm" onClick={handleAdd} disabled={!selectedMentorId || loading}>
+                    <UserPlus className="w-4 h-4 mr-1" /> Add
+                </Button>
+            </div>
+
+            {hosts && hosts.length > 0 ? (
+                <div className="space-y-2">
+                    {hosts.map(host => (
+                        <div key={host.id} className="flex items-center justify-between p-3 bg-brutal-dark/5 rounded-xl border border-brutal-dark/10">
+                            <div className="flex items-center gap-3">
+                                {host.avatar_url ? (
+                                    <img src={host.avatar_url} alt={host.name} className="w-8 h-8 rounded-full object-cover border-2 border-brutal-dark/20" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-brutal-dark/10 flex items-center justify-center font-data text-xs font-bold">
+                                        {host.name.charAt(0)}
+                                    </div>
+                                )}
+                                <div>
+                                    <span className="font-data text-sm font-bold">{host.name}</span>
+                                    <span className="font-data text-[9px] text-brutal-dark/40 uppercase tracking-widest block">Mentor</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => handleRemove(host.id)}
+                                disabled={loading}
+                                className="p-1.5 text-brutal-red hover:bg-brutal-red/10 rounded-lg transition-colors"
+                                title="Remove host"
+                            >
+                                <UserMinus className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="p-4 bg-brutal-dark/5 border border-dashed border-brutal-dark/20 rounded-xl text-center">
+                    <p className="font-data text-xs text-brutal-dark/50">No hosts assigned yet. Add mentors above.</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Gallery Upload Manager ───
+const GalleryManager = ({ urls, onChange }: { urls: string[]; onChange: (urls: string[]) => void }) => {
+    const [uploading, setUploading] = useState(false);
+    const { user } = useAuth();
+
+    const handleUpload = async (files: FileList | null) => {
+        if (!files || !user) return;
+        setUploading(true);
+        const newUrls = [...urls];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const path = `${user.id}/gallery/${Date.now()}-${file.name}`;
+            const { url } = await uploadFile('event-images', path, file);
+            if (url) newUrls.push(url);
+        }
+        onChange(newUrls);
+        setUploading(false);
+    };
+
+    const handleRemove = (index: number) => {
+        onChange(urls.filter((_, i) => i !== index));
+    };
+
+    return (
+        <div className="space-y-3">
+            {urls.length > 0 && (
+                <div className="grid grid-cols-4 gap-2">
+                    {urls.map((url, i) => (
+                        <div key={i} className="relative aspect-[4/3] rounded-lg overflow-hidden border-2 border-brutal-dark/10 group">
+                            <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                            <button
+                                onClick={() => handleRemove(i)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-brutal-red text-white rounded-full flex items-center justify-center text-[9px] opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div className="relative border-2 border-dashed border-brutal-dark/20 bg-brutal-dark/5 p-4 rounded text-center hover:bg-brutal-dark/10 cursor-pointer transition-colors">
+                <input
+                    type="file" accept="image/*" multiple
+                    onChange={e => handleUpload(e.target.files)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    disabled={uploading}
+                />
+                <div className="flex flex-col items-center justify-center font-data text-sm text-brutal-dark/60 pointer-events-none">
+                    <ImageIcon className="w-5 h-5 mb-1 text-brutal-dark/40" />
+                    <span className="font-bold text-xs">{uploading ? 'Uploading...' : 'Add gallery images'}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Main ManageEvents ───
 export function ManageEvents() {
     const { user, role } = useAuth();
     const { data: events, loading, refetch } = useAllEvents();
     const { createEvent, updateEvent, deleteEvent } = useEventMutations();
-    
-    // Fetch badges for the auto-award dropdown
+
     const { data: badges } = useSupabaseQuery<Partial<Badge>[]>(async () => {
         return supabase.from('badge').select('id, name').order('name');
     }, []);
-    
+
     const [isEditing, setIsEditing] = useState<string | 'new' | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);
@@ -78,17 +231,17 @@ export function ManageEvents() {
             formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }, [isEditing]);
-    
+
     // Form state
     const [form, setForm] = useState<Partial<Event>>({
-        title: '', event_type: 'maker_meetup', date: new Date().toISOString().slice(0, 16), 
-        description: '', location: '', capacity: 0, registration_status: 'open', auto_badge_id: null
+        title: '', event_type: 'maker_meetup', date: new Date().toISOString().slice(0, 16),
+        description: '', location: '', capacity: 0, registration_status: 'open', auto_badge_id: null,
+        tagline: '', gallery_urls: [], results_summary: '', prizes_info: '', learnings: ''
     });
     const [aboutText, setAboutText] = useState('');
     const [recapText, setRecapText] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
 
-    // Both Admin and Mentor can manage events
     if (role !== 'admin' && role !== 'mentor') {
         return <div className="p-24 text-center font-data text-2xl">Access Denied</div>;
     }
@@ -97,19 +250,21 @@ export function ManageEvents() {
         if (event) {
             setForm({
                 ...event,
-                date: event.date.slice(0, 16), // Format for datetime-local input
-                end_date: event.end_date ? event.end_date.slice(0, 16) : undefined
+                date: event.date.slice(0, 16),
+                end_date: event.end_date ? event.end_date.slice(0, 16) : undefined,
+                gallery_urls: event.gallery_urls || [],
             });
-            const [about, recap] = event.description?.includes('---RECAP---') 
-                ? event.description.split('---RECAP---') 
+            const [about, recap] = event.description?.includes('---RECAP---')
+                ? event.description.split('---RECAP---')
                 : [event.description || '', ''];
             setAboutText(about.trim());
             setRecapText(recap?.trim() || '');
             setIsEditing(event.id);
         } else {
-            setForm({ 
-                title: '', event_type: 'maker_meetup', date: new Date().toISOString().slice(0, 16), 
-                capacity: 0, registration_status: 'open', auto_badge_id: null 
+            setForm({
+                title: '', event_type: 'maker_meetup', date: new Date().toISOString().slice(0, 16),
+                capacity: 0, registration_status: 'open', auto_badge_id: null,
+                tagline: '', gallery_urls: [], results_summary: '', prizes_info: '', learnings: ''
             });
             setAboutText('');
             setRecapText('');
@@ -167,7 +322,7 @@ export function ManageEvents() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm("Are you sure? This deletes all event registrations and check-ins.")) return;
+        if (!window.confirm("Are you sure? This deletes all event registrations, hosts, and check-ins.")) return;
         setActionLoading(true);
         await deleteEvent(id);
         await refetch();
@@ -176,7 +331,8 @@ export function ManageEvents() {
 
     if (loading) return <div className="p-24 flex justify-center font-data">Loading events...</div>;
 
-    const eventTypes = ['build_challenge', 'maker_meetup', 'tech_tuesday'];
+    const eventTypes: EventType[] = ['build_challenge', 'maker_meetup', 'tech_tuesday'];
+    const isPastEvent = form.date ? new Date(form.date) < new Date() : false;
 
     return (
         <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
@@ -189,7 +345,7 @@ export function ManageEvents() {
                         Back to Dashboard
                     </Link>
                 </div>
-                
+
                 <div className="flex justify-between items-end">
                     <div>
                         <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading flex items-center gap-4">
@@ -219,26 +375,37 @@ export function ManageEvents() {
                         </div>
 
                         <form onSubmit={handleSave} className="space-y-6">
+                            {/* Basic Info */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input 
-                                    label="Event Title" 
-                                    required 
-                                    value={form.title || ''} 
-                                    onChange={e => setForm({...form, title: e.target.value})} 
+                                <Input
+                                    label="Event Title"
+                                    required
+                                    value={form.title || ''}
+                                    onChange={e => setForm({...form, title: e.target.value})}
+                                />
+                                <Input
+                                    label="Tagline (short description)"
+                                    placeholder="e.g. Build the future of AI at the edge"
+                                    value={form.tagline || ''}
+                                    onChange={e => setForm({...form, tagline: e.target.value})}
                                 />
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Type</label>
-                                    <select 
+                                    <select
                                         className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.event_type || 'maker_meetup'}
                                         onChange={e => setForm({...form, event_type: e.target.value as EventType})}
                                     >
-                                        {eventTypes.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+                                        {eventTypes.map(t => (
+                                            <option key={t} value={t}>
+                                                {t === 'build_challenge' ? 'Build Challenge' : t === 'maker_meetup' ? 'Maker Meetup' : 'Tech Tuesday'}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Start Date & Time</label>
-                                    <input 
+                                    <input
                                         type="datetime-local" required
                                         className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.date || ''}
@@ -247,18 +414,18 @@ export function ManageEvents() {
                                 </div>
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">End Date & Time (Optional)</label>
-                                    <input 
-                                        type="datetime-local" 
+                                    <input
+                                        type="datetime-local"
                                         className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.end_date || ''}
                                         onChange={e => setForm({...form, end_date: e.target.value})}
                                     />
                                 </div>
                                 <div>
-                                    <Input 
-                                        label="Location (e.g. Main Lab Room A)" 
-                                        value={form.location?.startsWith('rsvp:') ? '' : (form.location || '')} 
-                                        onChange={e => setForm({...form, location: e.target.value})} 
+                                    <Input
+                                        label="Location (e.g. Main Lab Room A)"
+                                        value={form.location?.startsWith('rsvp:') ? '' : (form.location || '')}
+                                        onChange={e => setForm({...form, location: e.target.value})}
                                     />
                                     <div className="mt-4">
                                         <Input
@@ -270,14 +437,14 @@ export function ManageEvents() {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 border-2 border-brutal-dark/10 p-2 rounded-lg bg-brutal-dark/5">
-                                    <Input 
-                                        type="number" label="Cap (0 = unlmt)" 
-                                        value={form.capacity?.toString() || '0'} 
-                                        onChange={e => setForm({...form, capacity: parseInt(e.target.value) || 0})} 
+                                    <Input
+                                        type="number" label="Cap (0 = unlmt)"
+                                        value={form.capacity?.toString() || '0'}
+                                        onChange={e => setForm({...form, capacity: parseInt(e.target.value) || 0})}
                                     />
                                     <div>
                                         <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Reg Status</label>
-                                        <select 
+                                        <select
                                             className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                             value={form.registration_status || 'open'}
                                             onChange={e => setForm({...form, registration_status: e.target.value})}
@@ -290,7 +457,7 @@ export function ManageEvents() {
                                     </div>
                                     <div className="col-span-2">
                                         <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Auto-Award Badge on Join (Optional)</label>
-                                        <select 
+                                        <select
                                             className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                             value={form.auto_badge_id || ''}
                                             onChange={e => setForm({...form, auto_badge_id: e.target.value || null})}
@@ -304,52 +471,100 @@ export function ManageEvents() {
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="font-data text-sm font-bold text-brutal-dark mb-1 block">Cover Image</label>
-                                    <div className="flex items-center gap-4">
-                                        {form.cover_image_url && !imageFile && (
-                                            <div className="w-20 h-20 border-2 border-brutal-dark/20 rounded object-cover overflow-hidden">
-                                                <img src={form.cover_image_url} alt="Cover" className="w-full h-full object-cover" />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 relative border-2 border-dashed border-brutal-dark/20 bg-brutal-dark/5 p-4 rounded text-center hover:bg-brutal-dark/10 cursor-pointer transition-colors">
-                                            <input 
-                                                type="file" 
-                                                accept="image/*"
-                                                onChange={e => setImageFile(e.target.files?.[0] || null)}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            />
-                                            <div className="flex flex-col items-center justify-center font-data text-sm text-brutal-dark/60 pointer-events-none">
-                                                <ImageIcon className="w-6 h-6 mb-2 text-brutal-dark/40" />
-                                                <span className="font-bold">{imageFile ? imageFile.name : 'Select new cover image'}</span>
-                                                <span className="text-xs mt-1">PNG, JPG, WEBP • Max 5MB</span>
-                                            </div>
+                            {/* Cover Image */}
+                            <div>
+                                <label className="font-data text-sm font-bold text-brutal-dark mb-1 block">Cover Image</label>
+                                <div className="flex items-center gap-4">
+                                    {form.cover_image_url && !imageFile && (
+                                        <div className="w-20 h-20 border-2 border-brutal-dark/20 rounded object-cover overflow-hidden">
+                                            <img src={form.cover_image_url} alt="Cover" className="w-full h-full object-cover" />
+                                        </div>
+                                    )}
+                                    <div className="flex-1 relative border-2 border-dashed border-brutal-dark/20 bg-brutal-dark/5 p-4 rounded text-center hover:bg-brutal-dark/10 cursor-pointer transition-colors">
+                                        <input
+                                            type="file" accept="image/*"
+                                            onChange={e => setImageFile(e.target.files?.[0] || null)}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <div className="flex flex-col items-center justify-center font-data text-sm text-brutal-dark/60 pointer-events-none">
+                                            <ImageIcon className="w-6 h-6 mb-2 text-brutal-dark/40" />
+                                            <span className="font-bold">{imageFile ? imageFile.name : 'Select new cover image'}</span>
+                                            <span className="text-xs mt-1">PNG, JPG, WEBP</span>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="space-y-4">
+                            {/* Description */}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="font-data text-sm font-bold text-brutal-dark block mb-1">About this Event</label>
+                                    <textarea
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none"
+                                        value={aboutText}
+                                        placeholder="What will makers do in this event?"
+                                        onChange={e => setAboutText(e.target.value)}
+                                    />
+                                </div>
+                                {(form.event_type === 'tech_tuesday' || isPastEvent) && (
                                     <div>
-                                        <label className="font-data text-sm font-bold text-brutal-dark block mb-1">About this Event</label>
-                                        <textarea 
-                                            className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none" 
-                                            value={aboutText} 
-                                            placeholder="What will makers do in this event?"
-                                            onChange={e => setAboutText(e.target.value)} 
+                                        <label className="font-data text-sm font-bold text-brutal-red block mb-1">Post-Event Recap (Visible after event)</label>
+                                        <textarea
+                                            className="w-full bg-brutal-red/5 border-2 border-brutal-red/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none"
+                                            value={recapText}
+                                            placeholder="Summarize what happened, output, winners, etc."
+                                            onChange={e => setRecapText(e.target.value)}
                                         />
                                     </div>
-                                    {(form.event_type === 'tech_tuesday' || (form.date && new Date(form.date) < new Date())) && (
-                                        <div>
-                                            <label className="font-data text-sm font-bold text-brutal-red block mb-1">Post-Event Recap (Visible after event)</label>
-                                            <textarea 
-                                                className="w-full bg-brutal-red/5 border-2 border-brutal-red/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none" 
-                                                value={recapText} 
-                                                placeholder="Summarize what happened, output, winners, etc."
-                                                onChange={e => setRecapText(e.target.value)} 
-                                            />
-                                        </div>
-                                    )}
+                                )}
+                            </div>
+
+                            {/* Post-Event Fields — shown for past events or anytime for forward planning */}
+                            <div className="border-2 border-brutal-dark/10 rounded-xl p-6 space-y-4 bg-brutal-dark/[0.02]">
+                                <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading flex items-center gap-2">
+                                    <span className="bg-brutal-red/10 text-brutal-red text-[9px] font-data font-bold px-2 py-0.5 rounded uppercase">Post-Event</span>
+                                    Results, Prizes & Learnings
+                                </h3>
+                                <p className="font-data text-[10px] text-brutal-dark/40">These fields are displayed after the event concludes. Fill them in when ready.</p>
+
+                                <div>
+                                    <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Results Summary</label>
+                                    <textarea
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:border-brutal-red focus:outline-none"
+                                        value={form.results_summary || ''}
+                                        placeholder="Who won? What were the outcomes?"
+                                        onChange={e => setForm({...form, results_summary: e.target.value})}
+                                    />
+                                </div>
+
+                                {form.event_type === 'build_challenge' && (
+                                    <div>
+                                        <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Prizes & Recognition</label>
+                                        <textarea
+                                            className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:border-brutal-red focus:outline-none"
+                                            value={form.prizes_info || ''}
+                                            placeholder="Describe prizes, awards, and recognitions given."
+                                            onChange={e => setForm({...form, prizes_info: e.target.value})}
+                                        />
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Key Learnings</label>
+                                    <textarea
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:border-brutal-red focus:outline-none"
+                                        value={form.learnings || ''}
+                                        placeholder="What did participants learn? What insights emerged?"
+                                        onChange={e => setForm({...form, learnings: e.target.value})}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Event Gallery</label>
+                                    <GalleryManager
+                                        urls={form.gallery_urls || []}
+                                        onChange={(urls) => setForm({...form, gallery_urls: urls})}
+                                    />
                                 </div>
                             </div>
 
@@ -361,7 +576,17 @@ export function ManageEvents() {
                             </div>
                         </form>
 
-                        {isEditing !== 'new' && form.event_type === 'maker_meetup' && (
+                        {/* Host Mentors — shown when editing existing events */}
+                        {isEditing !== 'new' && (
+                            <div className="mt-12 pt-8 border-t-4 border-brutal-dark/10">
+                                <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-2">Hosted By</h3>
+                                <p className="font-data text-xs text-brutal-dark/50 mb-6">Assign mentors who host this event. Their names and avatars appear on the event page.</p>
+                                <HostMentorManager eventId={isEditing as string} />
+                            </div>
+                        )}
+
+                        {/* Showcase Slots — for maker meetups */}
+                        {isEditing !== 'new' && (form.event_type === 'maker_meetup' || form.event_type === 'tech_tuesday') && (
                             <div className="mt-12 pt-8 border-t-4 border-brutal-dark/10">
                                 <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">Showcase Slots Management</h3>
                                 <ShowcaseSlotsAdmin eventId={isEditing as string} />
@@ -370,54 +595,61 @@ export function ManageEvents() {
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
-                        {events?.map(event => (
-                            <Card key={event.id} className="p-4 border-2 flex items-center justify-between group hover:border-brutal-red/50 transition-colors">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 bg-brutal-dark/10 rounded object-cover overflow-hidden border-2 border-brutal-dark flex-shrink-0">
-                                        {event.cover_image_url ? (
-                                            <img src={event.cover_image_url} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-brutal-dark/20">
-                                                <CalendarIcon className="w-8 h-8" />
+                        {events?.map(event => {
+                            const isPast = new Date(event.date) < new Date();
+                            return (
+                                <Card key={event.id} className={`p-4 border-2 flex items-center justify-between group hover:border-brutal-red/50 transition-colors ${isPast ? 'opacity-70' : ''}`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 bg-brutal-dark/10 rounded object-cover overflow-hidden border-2 border-brutal-dark flex-shrink-0">
+                                            {event.cover_image_url ? (
+                                                <img src={event.cover_image_url} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-brutal-dark/20">
+                                                    <CalendarIcon className="w-8 h-8" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-heading font-bold text-xl uppercase">{event.title}</h3>
+                                            <div className="flex items-center gap-2 mt-1 font-data text-xs font-bold text-brutal-dark/60">
+                                                <span className={`px-2 py-0.5 rounded uppercase ${
+                                                    event.event_type === 'build_challenge' ? 'bg-brutal-red/10 text-brutal-red' :
+                                                    event.event_type === 'maker_meetup' ? 'bg-brutal-dark/10 text-brutal-dark' :
+                                                    'bg-brutal-dark/5 text-brutal-dark/60'
+                                                }`}>
+                                                    {event.event_type === 'build_challenge' ? 'Build Challenge' :
+                                                     event.event_type === 'maker_meetup' ? 'Maker Meetup' : 'Tech Tuesday'}
+                                                </span>
+                                                <span>• {new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                <span className={`px-2 py-0.5 rounded uppercase ${
+                                                    isPast ? 'bg-brutal-dark/10 text-brutal-dark/40' :
+                                                    event.registration_status === 'open' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {isPast ? 'Past' : event.registration_status}
+                                                </span>
+                                                {event.capacity ? <span>• Cap: {event.capacity}</span> : ''}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-heading font-bold text-xl uppercase">{event.title}</h3>
-                                        <div className="flex items-center gap-2 mt-1 font-data text-xs font-bold text-brutal-dark/60">
-                                            <span className="px-2 py-0.5 rounded bg-brutal-dark/10 text-brutal-dark uppercase">
-                                                {event.event_type}
-                                            </span>
-                                            <span>• {new Date(event.date).toLocaleDateString()}</span>
-                                            <span className={`px-2 py-0.5 rounded uppercase ${
-                                                event.registration_status === 'open' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                            }`}>
-                                                {event.registration_status}
-                                            </span>
-                                            {event.capacity ? <span>• Cap: {event.capacity}</span> : ''}
                                         </div>
                                     </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => startEdit(event)}
-                                        className="p-2 border-2 border-brutal-dark/20 rounded hover:bg-brutal-dark hover:text-white transition-colors"
-                                        title="Edit"
-                                        disabled={actionLoading}
-                                    >
-                                        <Edit2 className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(event.id)}
-                                        className="p-2 border-2 border-brutal-red/20 text-brutal-red rounded hover:bg-brutal-red hover:text-white transition-colors"
-                                        title="Delete"
-                                        disabled={actionLoading}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </Card>
-                        ))}
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => startEdit(event)}
+                                            className="p-2 border-2 border-brutal-dark/20 rounded hover:bg-brutal-dark hover:text-white transition-colors"
+                                            title="Edit" disabled={actionLoading}
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(event.id)}
+                                            className="p-2 border-2 border-brutal-red/20 text-brutal-red rounded hover:bg-brutal-red hover:text-white transition-colors"
+                                            title="Delete" disabled={actionLoading}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </Card>
+                            );
+                        })}
                         {events?.length === 0 && (
                             <div className="p-12 text-center border-2 border-dashed border-brutal-dark/20 rounded-xl font-data text-brutal-dark/50">
                                 No events found. Create one above.

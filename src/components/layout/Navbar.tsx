@@ -84,6 +84,19 @@ export function Navbar() {
                             {rankAccess?.rank && (
                                 <RankBadge rank={rankAccess.rank} xp={rankAccess.xp} variant="pill" className="hidden md:inline-flex" />
                             )}
+                            {(user.role === 'mentor' || user.role === 'admin') && (
+                                <Link
+                                    to="/mentor-dashboard"
+                                    className={cn(
+                                        "hidden md:flex items-center gap-1.5 font-data text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider transition-colors interactive-lift border-2",
+                                        (scrolled || !isHome)
+                                            ? "text-brutal-red border-brutal-red/20 hover:bg-brutal-red hover:text-brutal-bg"
+                                            : "text-brutal-bg border-brutal-bg/20 hover:bg-brutal-bg hover:text-brutal-dark"
+                                    )}
+                                >
+                                    Mentor Panel
+                                </Link>
+                            )}
                             <Link
                                 to="/dashboard"
                                 className="hidden sm:flex items-center gap-2 font-data text-sm font-bold hover:text-brutal-red interactive-lift"
@@ -147,6 +160,11 @@ export function Navbar() {
                                 <Link to="/dashboard" className="flex items-center gap-2 text-brutal-dark font-bold hover:text-brutal-red py-2">
                                     <LayoutDashboard className="w-5 h-5" /> Dashboard
                                 </Link>
+                                {(user.role === 'mentor' || user.role === 'admin') && (
+                                    <Link to="/mentor-dashboard" className="flex items-center gap-2 text-brutal-red font-bold hover:text-brutal-dark py-2">
+                                        <LayoutDashboard className="w-5 h-5" /> Mentor Panel
+                                    </Link>
+                                )}
                                 <button onClick={handleSignOut} className="flex items-center gap-2 text-brutal-dark/60 hover:text-brutal-red py-2 font-bold text-left">
                                     <LogOut className="w-5 h-5" /> Sign Out
                                 </button>

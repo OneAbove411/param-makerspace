@@ -151,8 +151,8 @@ export function WelcomeHero() {
             </div>
 
             {/* Content — text sits above the robot canvas */}
-            <div className="relative z-10 w-full max-w-7xl mx-auto">
-                <div className="w-full md:w-3/5 lg:w-1/2 max-w-3xl">
+            <div className="relative z-10 w-full max-w-7xl mx-auto pointer-events-none">
+                <div className="w-full md:w-3/5 lg:w-1/2 max-w-3xl pointer-events-auto">
                     {/* Main headline */}
                     <h1 className="font-drama italic text-4xl sm:text-6xl md:text-8xl lg:text-[8rem] text-brutal-bg leading-[0.95] tracking-tight">
                         {welcomeChars}

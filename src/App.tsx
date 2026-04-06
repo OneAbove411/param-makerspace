@@ -34,6 +34,7 @@ import { ReviewChallenges } from './pages/admin/ReviewChallenges';
 import { ReviewEventSubmissions } from './pages/admin/ReviewEventSubmissions';
 import { ReviewWebsiteSubmissions } from './pages/admin/ReviewWebsiteSubmissions';
 import { ManageProjects } from './pages/admin/ManageProjects';
+import { MentorDashboard } from './pages/MentorDashboard';
 
 function App() {
   return (
@@ -67,6 +68,7 @@ function App() {
 
             {/* Mentor & Admin Routes */}
             <Route element={<ProtectedRoute allowedRoles={['mentor', 'admin']} />}>
+              <Route path="/mentor-dashboard" element={<MentorDashboard />} />
               <Route path="/admin/review-projects" element={<ReviewProjects />} />
               <Route path="/admin/review-challenges" element={<ReviewChallenges />} />
               <Route path="/admin/review-submissions" element={<ReviewEventSubmissions />} />

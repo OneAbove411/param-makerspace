@@ -9,7 +9,7 @@ import type {
     ChallengeVocabulary, ChallengeLevel, UserBadge,
     Tag, EntityTag, ReactionType, TargetType, Comment,
     AppUser, Equipment, Inventory, Role, EventType, XPEvent,
-    EventWebsite
+    EventWebsite, EventHost
 } from './database.types';
 
 // ─── Generic fetch hook (with race condition protection + stale-while-revalidate) ───
@@ -291,6 +291,58 @@ export function useEvent(id: string | undefined) {
             error: null,
         };
     }, [id]);
+}
+
+// ─── EVENT HOSTS ───
+
+export function useEventHosts(eventId: string | undefined) {
+    return useSupabaseQuery<{ id: string; user_id: string; name: string; avatar_url: string | null }[]>(async () => {
+        if (!eventId) return { data: [], error: null };
+
+        const { data: hosts, error } = await supabase
+            .from('event_host')
+            .select('id, user_id, event_id, created_at')
+            .eq('event_id', eventId);
+
+        if (error || !hosts || hosts.length === 0) return { data: [], error };
+
+        const userIds = (hosts as EventHost[]).map(h => h.user_id);
+
+        // Batch fetch mentor names and avatars
+        const [usersRes, profilesRes] = await Promise.all([
+            supabase.from('app_user').select('id, name').in('id', userIds),
+            supabase.from('maker_profile').select('user_id, avatar_url').in('user_id', userIds),
+        ]);
+
+        const nameMap: Record<string, string> = {};
+        (usersRes.data || []).forEach((u: any) => { nameMap[u.id] = u.name; });
+
+        const avatarMap: Record<string, string | null> = {};
+        (profilesRes.data || []).forEach((p: any) => { avatarMap[p.user_id] = p.avatar_url; });
+
+        const enriched = (hosts as EventHost[]).map(h => ({
+            id: h.id,
+            user_id: h.user_id,
+            name: nameMap[h.user_id] || 'Unknown Mentor',
+            avatar_url: avatarMap[h.user_id] || null,
+        }));
+
+        return { data: enriched, error: null };
+    }, [eventId]);
+}
+
+export function useEventHostMutations() {
+    const addHost = async (eventId: string, userId: string) => {
+        const { error } = await supabase.from('event_host').insert({ event_id: eventId, user_id: userId });
+        return { error: error?.message || null };
+    };
+
+    const removeHost = async (hostId: string) => {
+        const { error } = await supabase.from('event_host').delete().eq('id', hostId);
+        return { error: error?.message || null };
+    };
+
+    return { addHost, removeHost };
 }
 
 // ─── MAKERS ───
@@ -1068,6 +1120,7 @@ export function useEventMutations() {
             supabase.from('event_team_member').delete().eq('team_id', id),
             supabase.from('event_submission').delete().eq('event_id', id),
             supabase.from('showcase_slot').delete().eq('event_id', id),
+            supabase.from('event_host').delete().eq('event_id', id),
         ]);
         await supabase.from('event_team').delete().eq('event_id', id);
         const { error } = await supabase.from('event').delete().eq('id', id);

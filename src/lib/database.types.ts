@@ -5,6 +5,7 @@ export type Role = 'viewer' | 'maker' | 'mentor' | 'admin';
 export type ProjectStatus = 'draft' | 'pending_review' | 'active' | 'rejected';
 export type ProjectVisibility = 'public' | 'private';
 export type EventType = 'build_challenge' | 'maker_meetup' | 'tech_tuesday';
+export type EventPhase = 'draft' | 'pre_event' | 'live' | 'post_event';
 export type ReactionType = 'like' | 'upvote' | 'bookmark';
 export type TargetType = 'project' | 'challenge' | 'event' | 'maker_profile';
 
@@ -236,8 +237,21 @@ export interface Event {
     registration_status: string;
     auto_badge_id: string | null;
     created_by: string | null;
+    // Extended fields for the new event page flow
+    tagline: string | null;
+    gallery_urls: string[] | null;
+    results_summary: string | null;
+    prizes_info: string | null;
+    learnings: string | null;
     created_at: string;
     updated_at: string;
+}
+
+export interface EventHost {
+    id: string;
+    event_id: string;
+    user_id: string;
+    created_at: string;
 }
 
 export interface EventRegistration {
@@ -285,6 +299,7 @@ export interface ShowcaseSlot {
     event_id: string;
     user_id: string;
     project_id: string | null;
+    topic: string | null;
     status: string;
     created_at: string;
 }
@@ -444,6 +459,7 @@ export interface Database {
             challenge_video: { Row: ChallengeVideo & Record<string, unknown>; Insert: (Partial<ChallengeVideo> & Pick<ChallengeVideo, 'challenge_id' | 'title' | 'video_url'>) & Record<string, unknown>; Update: Partial<ChallengeVideo> & Record<string, unknown>; Relationships: [] };
             challenge_completion: { Row: ChallengeCompletion & Record<string, unknown>; Insert: (Partial<ChallengeCompletion> & Pick<ChallengeCompletion, 'challenge_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<ChallengeCompletion> & Record<string, unknown>; Relationships: [] };
             event: { Row: Event & Record<string, unknown>; Insert: (Partial<Event> & Pick<Event, 'title' | 'event_type' | 'date'>) & Record<string, unknown>; Update: Partial<Event> & Record<string, unknown>; Relationships: [] };
+            event_host: { Row: EventHost & Record<string, unknown>; Insert: (Partial<EventHost> & Pick<EventHost, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventHost> & Record<string, unknown>; Relationships: [] };
             event_registration: { Row: EventRegistration & Record<string, unknown>; Insert: (Partial<EventRegistration> & Pick<EventRegistration, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventRegistration> & Record<string, unknown>; Relationships: [] };
             event_checkin: { Row: EventCheckin & Record<string, unknown>; Insert: (Partial<EventCheckin> & Pick<EventCheckin, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventCheckin> & Record<string, unknown>; Relationships: [] };
             event_team: { Row: EventTeam & Record<string, unknown>; Insert: (Partial<EventTeam> & Pick<EventTeam, 'event_id' | 'name' | 'lead_id'>) & Record<string, unknown>; Update: Partial<EventTeam> & Record<string, unknown>; Relationships: [] };

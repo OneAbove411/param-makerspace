@@ -219,8 +219,8 @@ export function WelcomeHero() {
         let resolved = intent;
         if (intent === 'Surprise me') {
             // Pick one of the concrete intents at random
-            const concrete = BUILD_INTENTS.filter(i => i !== 'Surprise me');
-            resolved = concrete[Math.floor(Math.random() * concrete.length)];
+            const concrete = BUILD_INTENTS.filter(i => i.label !== 'Surprise me');
+            resolved = concrete[Math.floor(Math.random() * concrete.length)].label;
         }
         setPickedIntent(resolved);
     };

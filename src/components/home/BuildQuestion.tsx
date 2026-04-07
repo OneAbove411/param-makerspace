@@ -323,14 +323,22 @@ export function BuildQuestion() {
             />
 
             <div className="relative z-10 flex flex-col items-center text-center w-full max-w-4xl">
-                {/* Question headline */}
+                {/* Accent line — matches the rest of the system */}
+                <div className="bq-headline w-16 h-0.5 bg-brutal-red mb-8 origin-left mx-auto" />
+                <p className="bq-headline font-data text-xs text-brutal-red uppercase tracking-[0.2em] mb-4">
+                    The Spark
+                </p>
+
+                {/* Question headline — uppercase brutal sans, system voice.
+                    Scale dialed back so the headline supports the scatter grid
+                    (the actual hook) instead of competing with it. */}
                 <div className="bq-headline">
-                    <h2 className="font-drama italic text-3xl sm:text-5xl md:text-7xl lg:text-[5.5rem] text-brutal-bg leading-[1.05]">
+                    <h2 className="font-heading font-bold text-2xl sm:text-4xl md:text-5xl lg:text-[3.75rem] text-brutal-bg leading-[1.05] uppercase tracking-tight-heading">
                         What would you
                     </h2>
                     <div className="mt-1 md:mt-2">
                         <span
-                            className="font-drama italic text-3xl sm:text-5xl md:text-7xl lg:text-[5.5rem] leading-[1.05]"
+                            className="font-heading font-bold text-2xl sm:text-4xl md:text-5xl lg:text-[3.75rem] leading-[1.05] uppercase tracking-tight-heading"
                             style={{ perspective: '600px' }}
                         >
                             <RotatingWord />

@@ -10,11 +10,6 @@ export function Footer() {
                     <p className="font-data text-brutal-bg/60 max-w-md">
                         The Param Makerspace is a community-driven platform designed to equally support structured learning, community event participation, and collaborative project execution.
                     </p>
-
-                    <div className="mt-12 flex items-center gap-3 font-data text-sm bg-brutal-bg/10 inline-flex px-4 py-2 rounded-full">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        System Operational
-                    </div>
                 </div>
 
                 <div className="flex flex-col gap-4 font-data">
@@ -27,9 +22,9 @@ export function Footer() {
 
                 <div className="flex flex-col gap-4 font-data">
                     <h3 className="text-brutal-bg/40 text-sm mb-2 uppercase">Legal</h3>
-                    <Link to="#" className="hover:text-brutal-red transition-colors">Privacy Policy</Link>
-                    <Link to="#" className="hover:text-brutal-red transition-colors">Terms of Service</Link>
-                    <Link to="#" className="hover:text-brutal-red transition-colors">Safety Guidelines</Link>
+                    <Link to="/privacy" className="hover:text-brutal-red transition-colors">Privacy Policy</Link>
+                    <Link to="/terms" className="hover:text-brutal-red transition-colors">Terms of Service</Link>
+                    <Link to="/safety" className="hover:text-brutal-red transition-colors">Safety Guidelines</Link>
                 </div>
             </div>
         </footer>

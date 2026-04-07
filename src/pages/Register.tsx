@@ -56,10 +56,10 @@ export function Register() {
     };
 
     return (
-        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen flex items-center justify-center p-6 pt-32">
-            <Card className="auth-card w-full max-w-md p-8 border-2 border-brutal-dark/10">
-                <h1 className="font-heading font-bold text-3xl uppercase tracking-tight-heading mb-2 text-brutal-dark">Initialize</h1>
-                <p className="font-data text-xs text-brutal-dark/50 border-l-2 border-brutal-red pl-3 mb-8">Create a new identity within the Param Ecosystem.</p>
+        <div ref={pageRef} className="flex-1 w-full bg-gradient-to-br from-brutal-dark via-brutal-dark to-brutal-red/40 min-h-screen flex items-center justify-center p-6 pt-32">
+            <Card className="auth-card w-full max-w-md p-8 bg-white border-4 border-brutal-dark shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
+                <h1 className="font-heading font-bold text-3xl uppercase tracking-tight-heading mb-2 text-brutal-dark">Sign Up</h1>
+                <p className="font-data text-xs text-brutal-dark/60 border-l-2 border-brutal-red pl-3 mb-8">Create a new account within the Param Ecosystem.</p>
 
                 {success ? (
                     <div className="space-y-6 text-center py-6">
@@ -106,7 +106,7 @@ export function Register() {
                             />
 
                             <Button type="submit" className="w-full text-lg uppercase bg-brutal-dark hover:bg-brutal-red" disabled={loading || googleLoading}>
-                                {loading ? 'Creating...' : 'Create Identity'}
+                                {loading ? 'Creating Account...' : 'Sign Up'}
                             </Button>
 
                             {/* Divider */}
@@ -138,8 +138,8 @@ export function Register() {
                             </button>
 
                             <div className="text-center font-data text-xs mt-6">
-                                <span className="text-brutal-dark/60">Already registered? </span>
-                                <Link to="/login" className="font-bold text-brutal-dark hover:underline">Authenticate Here</Link>
+                                <span className="text-brutal-dark/60">Already have an account? </span>
+                                <Link to="/login" className="font-bold text-brutal-red hover:underline">Sign In Here</Link>
                             </div>
                         </form>
                     </>

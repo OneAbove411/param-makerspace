@@ -6,6 +6,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Calendar, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -109,11 +110,30 @@ function ActivityFeed({ items }: { items: ActivityItem[] }) {
 
 export function LivePulse() {
     const containerRef = useRef<HTMLDivElement>(null);
+    const { user } = useAuth();
     const [activityItems, setActivityItems] = useState<ActivityItem[]>(FALLBACK_ACTIVITY);
     const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>(FALLBACK_EVENTS);
+    // Number of distinct makers active in the last 24h. Real value sourced from
+    // xp_event so the pill never lies. Defaults to null until the query lands
+    // (we just don't render the pill until there's a real number to show).
+    const [activeMakers, setActiveMakers] = useState<number | null>(null);
 
     // Fetch real activity and events
     useEffect(() => {
+        async function fetchActiveMakers() {
+            // Distinct users who earned XP in the last 24h = "active makers right now".
+            // No fabrication, no fake counters — we just count what's real.
+            const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            const { data } = await supabase
+                .from('xp_event')
+                .select('user_id')
+                .gte('created_at', since);
+            if (data) {
+                const distinct = new Set(data.map((r: any) => r.user_id)).size;
+                setActiveMakers(distinct);
+            }
+        }
+
         async function fetchActivity() {
             const { data: xpEvents } = await supabase
                 .from('xp_event')
@@ -173,7 +193,25 @@ export function LivePulse() {
 
         fetchActivity();
         fetchEvents();
+        fetchActiveMakers();
     }, []);
+
+    // Counter rolls up from 0 → real value once it lands
+    const counterRef = useRef<HTMLSpanElement>(null);
+    useEffect(() => {
+        if (activeMakers === null || !counterRef.current) return;
+        const obj = { val: 0 };
+        gsap.to(obj, {
+            val: activeMakers,
+            duration: 1.4,
+            ease: 'power2.out',
+            onUpdate: () => {
+                if (counterRef.current) {
+                    counterRef.current.textContent = String(Math.round(obj.val));
+                }
+            },
+        });
+    }, [activeMakers]);
 
     useEffect(() => {
         const ctx = gsap.context(() => {
@@ -202,7 +240,7 @@ export function LivePulse() {
     const completedCount = upcomingEvents.filter(e => e.completed).length;
 
     return (
-        <section ref={containerRef} className="py-24 md:py-32 px-6 md:px-12 lg:px-24 bg-brutal-bg">
+        <section ref={containerRef} className="pt-32 md:pt-40 pb-24 md:pb-32 px-6 md:px-12 lg:px-24 bg-brutal-bg">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="mb-14">
@@ -216,6 +254,35 @@ export function LivePulse() {
                     <p className="lp-header font-data text-sm text-brutal-dark/50 mt-4 max-w-lg">
                         The lab is always active. Here's a live look at what makers are building and sharing.
                     </p>
+
+                    {/* ─── Live presence pill ───
+                        Logged-out only. Pairs Cialdini-style social proof with a
+                        same-unit CTA. Number is real (distinct active makers in
+                        the last 24h, sourced from xp_event). The pill only renders
+                        once we have a real, non-zero count — no zeros, no fakes. */}
+                    {!user && activeMakers !== null && activeMakers > 0 && (
+                        <div className="lp-header mt-6 inline-flex items-center gap-3 pl-3 pr-2 py-2
+                                        rounded-full border border-brutal-red/25 bg-brutal-red/5
+                                        hover:border-brutal-red/50 transition-all duration-300 group/pill">
+                            <span className="relative flex h-2 w-2 flex-shrink-0">
+                                <span className="absolute inline-flex h-full w-full rounded-full bg-brutal-red opacity-60 animate-ping" />
+                                <span className="relative inline-flex h-2 w-2 rounded-full bg-brutal-red" />
+                            </span>
+                            <span className="font-data text-[11px] sm:text-xs text-brutal-dark uppercase tracking-wider">
+                                <span ref={counterRef} className="font-bold text-brutal-red tabular-nums">0</span>
+                                <span className="text-brutal-dark/60">{' '}makers active in the lab today</span>
+                            </span>
+                            <Link
+                                to="/register"
+                                className="ml-1 inline-flex items-center gap-1 px-3 py-1 rounded-full
+                                           bg-brutal-red text-brutal-bg font-data text-[10px] font-bold
+                                           uppercase tracking-wider hover:bg-brutal-dark transition-colors duration-300"
+                            >
+                                Join them
+                                <ArrowRight size={10} className="group-hover/pill:translate-x-0.5 transition-transform duration-300" />
+                            </Link>
+                        </div>
+                    )}
                 </div>
 
                 {/* Two columns — both always open */}

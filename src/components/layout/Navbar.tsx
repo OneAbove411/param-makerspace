@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../lib/auth';
-import { LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
+import { LogOut, LayoutDashboard, Menu, X, Shield, ChevronDown } from 'lucide-react';
 // ParamLogo removed from navbar per redesign
 import { useRankAccess } from '../../lib/hooks';
 import { RankBadge } from '../ui/RankBadge';
+import { XPHudPill } from './XPHudPill';
 
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [avatarOpen, setAvatarOpen] = useState(false);
+    const avatarMenuRef = useRef<HTMLDivElement>(null);
     const location = useLocation();
     const navigate = useNavigate();
     const isHome = location.pathname === '/';
@@ -29,41 +32,59 @@ export function Navbar() {
     // Close mobile menu on route change
     useEffect(() => {
         setMobileOpen(false);
+        setAvatarOpen(false);
     }, [location.pathname]);
+
+    // Click-outside for avatar dropdown
+    useEffect(() => {
+        if (!avatarOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target as Node)) {
+                setAvatarOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [avatarOpen]);
 
     const handleSignOut = () => {
         signOut(); // State clears instantly (setUser(null) is synchronous in signOut)
         navigate('/', { replace: true });
     };
 
+    // Top-level nav: 5 items only. Badges merged into Store per product direction.
+    // "Explorer Hub" renamed to "Challenges" — matches the URL and removes jargon.
     const navLinks = [
         { to: '/projects', label: 'Projects' },
-        { to: '/challenges', label: 'Explorer Hub' },
+        { to: '/challenges', label: 'Challenges' },
         { to: '/events', label: 'Events' },
         { to: '/makers', label: 'Makers' },
-        { to: '/badges', label: 'Badges' },
         { to: '/store', label: 'Store' },
     ];
+
+    // Hero (logged out) needs a low-opacity tint + blur so the nav is legible
+    // against the dark slab. Keep transparent feel, just bump contrast.
+    const onDarkHero = isHome && !scrolled;
 
     return (
         <header className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
             <nav
                 className={cn(
-                    "pointer-events-auto flex items-center justify-between px-6 py-3 rounded-full transition-all duration-500 w-full max-w-5xl",
+                    "pointer-events-auto flex items-center justify-between px-5 py-2.5 rounded-full transition-all duration-500 w-full max-w-5xl",
                     scrolled || !isHome
                         ? "bg-brutal-bg/80 backdrop-blur-xl border-2 border-brutal-dark/10 shadow-lg text-brutal-dark"
-                        : "bg-transparent text-brutal-bg"
+                        : "bg-brutal-dark/35 backdrop-blur-md border-2 border-brutal-bg/10 text-brutal-bg"
                 )}
             >
-                <Link to="/" className="font-heading font-bold tracking-tight-heading flex flex-col items-start leading-none interactive-lift">
-                    <span className="text-xl">PARAM</span>
+                <Link to="/" className="font-heading font-bold tracking-tight-heading flex flex-col items-start leading-[0.95] interactive-lift">
+                    <span className="text-base">PARAM</span>
                     <span className={cn(
-                        "font-data text-[9px] uppercase tracking-[0.25em] font-bold -mt-0.5",
-                        (scrolled || !isHome) ? "text-brutal-dark/40" : "text-brutal-bg/40"
+                        "font-data text-[8px] uppercase tracking-[0.25em] font-bold -mt-px",
+                        (scrolled || !isHome) ? "text-brutal-dark/40" : "text-brutal-bg/50"
                     )}>makersadda</span>
                 </Link>
 
-                <div className="hidden lg:flex items-center gap-6 font-data font-medium text-sm">
+                <div className="hidden lg:flex items-center gap-7 font-data font-medium text-[13px]">
                     {navLinks.map(link => (
                         <Link
                             key={link.to}
@@ -79,29 +100,31 @@ export function Navbar() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Layer3-style XP HUD pill — replaces the old secondary status bar.
+                        Lives inside the nav pill so logged-in users see XP/rank in-line. */}
+                    {!isLoading && user && rankAccess?.rank && (
+                        <XPHudPill
+                            rank={rankAccess.rank}
+                            xp={rankAccess.xp ?? 0}
+                            onDark={onDarkHero}
+                        />
+                    )}
                     {!isLoading && user ? (
-                        <>
-                            {rankAccess?.rank && (
-                                <RankBadge rank={rankAccess.rank} xp={rankAccess.xp} variant="pill" className="hidden md:inline-flex" />
-                            )}
-                            {(user.role === 'mentor' || user.role === 'admin') && (
-                                <Link
-                                    to="/mentor-dashboard"
-                                    className={cn(
-                                        "hidden md:flex items-center gap-1.5 font-data text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider transition-colors interactive-lift border-2",
-                                        (scrolled || !isHome)
-                                            ? "text-brutal-red border-brutal-red/20 hover:bg-brutal-red hover:text-brutal-bg"
-                                            : "text-brutal-bg border-brutal-bg/20 hover:bg-brutal-bg hover:text-brutal-dark"
-                                    )}
-                                >
-                                    Mentor Panel
-                                </Link>
-                            )}
-                            <Link
-                                to="/dashboard"
-                                className="hidden sm:flex items-center gap-2 font-data text-sm font-bold hover:text-brutal-red interactive-lift"
+                        <div ref={avatarMenuRef} className="relative">
+                            <button
+                                onClick={() => setAvatarOpen(o => !o)}
+                                className={cn(
+                                    "hidden sm:flex items-center gap-2 font-data text-sm font-bold transition-colors interactive-lift",
+                                    onDarkHero ? "hover:text-brutal-bg" : "hover:text-brutal-red"
+                                )}
+                                aria-haspopup="menu"
+                                aria-expanded={avatarOpen}
                             >
-                                <div className="w-7 h-7 rounded-full overflow-hidden bg-brutal-dark border-2 border-brutal-dark/20 flex items-center justify-center flex-shrink-0">
+                                {/* Avatar with rank ring — rank label lives in dropdown, not floating chip */}
+                                <div className={cn(
+                                    "w-7 h-7 rounded-full overflow-hidden bg-brutal-dark border-2 flex items-center justify-center flex-shrink-0",
+                                    rankAccess?.rank ? "border-brutal-red" : "border-brutal-dark/20"
+                                )}>
                                     {user.avatar ? (
                                         <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                                     ) : (
@@ -110,20 +133,51 @@ export function Navbar() {
                                         </span>
                                     )}
                                 </div>
-                                {user.name?.split(' ')[0]}
-                            </Link>
-                            <button
-                                onClick={handleSignOut}
-                                className={cn(
-                                    "hidden sm:flex items-center gap-1 font-data text-xs font-bold px-3 py-2 rounded-full transition-colors interactive-lift border-2",
-                                    (scrolled || !isHome)
-                                        ? "text-brutal-dark/70 hover:text-brutal-red border-brutal-dark/10 hover:border-brutal-red/30"
-                                        : "text-brutal-bg/70 hover:text-brutal-bg border-brutal-bg/20 hover:border-brutal-bg/40"
-                                )}
-                            >
-                                <LogOut className="w-3 h-3" /> Sign Out
+                                <span className="hidden md:inline text-[13px]">{user.name?.split(' ')[0]}</span>
+                                <ChevronDown size={13} className={cn("transition-transform opacity-60", avatarOpen && "rotate-180")} />
                             </button>
-                        </>
+
+                            {/* Dropdown menu */}
+                            {avatarOpen && (
+                                <div className="absolute right-0 top-[calc(100%+12px)] w-64 bg-brutal-bg border-2 border-brutal-dark/10 rounded-2xl shadow-2xl overflow-hidden">
+                                    {/* User identity strip */}
+                                    <div className="px-4 py-3 border-b border-brutal-dark/8 bg-brutal-dark/[0.02]">
+                                        <p className="font-heading font-bold text-sm text-brutal-dark truncate">{user.name}</p>
+                                        <p className="font-data text-[10px] text-brutal-dark/40 uppercase tracking-wider truncate">{user.email}</p>
+                                        {rankAccess?.rank && (
+                                            <div className="mt-2">
+                                                <RankBadge rank={rankAccess.rank} xp={rankAccess.xp} variant="pill" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="py-2">
+                                        <Link
+                                            to="/dashboard"
+                                            onClick={() => setAvatarOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2.5 font-data text-sm font-bold text-brutal-dark hover:bg-brutal-red/5 hover:text-brutal-red transition-colors"
+                                        >
+                                            <LayoutDashboard size={15} /> Dashboard
+                                        </Link>
+                                        {(user.role === 'mentor' || user.role === 'admin') && (
+                                            <Link
+                                                to="/mentor-dashboard"
+                                                onClick={() => setAvatarOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2.5 font-data text-sm font-bold text-brutal-red hover:bg-brutal-red/5 transition-colors"
+                                            >
+                                                <Shield size={15} /> Mentor Panel
+                                            </Link>
+                                        )}
+                                        <button
+                                            onClick={() => { setAvatarOpen(false); handleSignOut(); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 font-data text-sm font-bold text-brutal-dark/60 hover:bg-brutal-red/5 hover:text-brutal-red transition-colors text-left"
+                                        >
+                                            <LogOut size={15} /> Sign Out
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     ) : !isLoading ? (
                         <>
                             <Link to="/login" className="hidden sm:block font-data text-sm font-bold hover:underline interactive-lift">Log In</Link>
@@ -162,7 +216,7 @@ export function Navbar() {
                                 </Link>
                                 {(user.role === 'mentor' || user.role === 'admin') && (
                                     <Link to="/mentor-dashboard" className="flex items-center gap-2 text-brutal-red font-bold hover:text-brutal-dark py-2">
-                                        <LayoutDashboard className="w-5 h-5" /> Mentor Panel
+                                        <Shield className="w-5 h-5" /> Mentor Panel
                                     </Link>
                                 )}
                                 <button onClick={handleSignOut} className="flex items-center gap-2 text-brutal-dark/60 hover:text-brutal-red py-2 font-bold text-left">

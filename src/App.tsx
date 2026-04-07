@@ -35,6 +35,9 @@ import { ReviewEventSubmissions } from './pages/admin/ReviewEventSubmissions';
 import { ReviewWebsiteSubmissions } from './pages/admin/ReviewWebsiteSubmissions';
 import { ManageProjects } from './pages/admin/ManageProjects';
 import { MentorDashboard } from './pages/MentorDashboard';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { SafetyGuidelines } from './pages/SafetyGuidelines';
 
 function App() {
   return (
@@ -58,6 +61,9 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/update-password" element={<UpdatePassword />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/safety" element={<SafetyGuidelines />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute allowedRoles={['viewer', 'maker', 'mentor', 'admin']} />}>

@@ -50,17 +50,35 @@ export function Navbar() {
     const handleSignOut = () => {
         signOut(); // State clears instantly (setUser(null) is synchronous in signOut)
         navigate('/', { replace: true });
+        // If already on '/', navigate() is a no-op and the page stays
+        // scrolled at the bottom — force a scroll to the top so the user
+        // lands back at the hero.
+        window.scrollTo({ top: 0, behavior: 'auto' });
     };
 
     // Top-level nav: 5 items only. Badges merged into Store per product direction.
     // "Explorer Hub" renamed to "Challenges" — matches the URL and removes jargon.
+    //
+    // Each entry also carries a `prefetch` that triggers the route's lazy
+    // chunk download on hover/focus. The lazy route chunks are tiny on their
+    // own but adding ~150-250ms network latency between click and first
+    // paint is what made navigation feel "laggy" in the user's testing. By
+    // warming the chunk before the click lands, the navigation flips to the
+    // new route on the next frame.
     const navLinks = [
-        { to: '/projects', label: 'Projects' },
-        { to: '/challenges', label: 'Challenges' },
-        { to: '/events', label: 'Events' },
-        { to: '/makers', label: 'Makers' },
-        { to: '/store', label: 'Store' },
+        { to: '/projects', label: 'Projects', prefetch: () => import('../../pages/Projects') },
+        { to: '/challenges', label: 'Explorer Hub', prefetch: () => import('../../pages/Challenges') },
+        { to: '/events', label: 'Events', prefetch: () => import('../../pages/Events') },
+        { to: '/makers', label: 'Makers', prefetch: () => import('../../pages/Makers') },
+        { to: '/store', label: 'Store', prefetch: () => import('../../pages/Store') },
     ];
+    const prefetchedRoutes = useRef(new Set<string>());
+    const prefetchRoute = (to: string, loader: () => Promise<unknown>) => {
+        if (prefetchedRoutes.current.has(to)) return;
+        prefetchedRoutes.current.add(to);
+        // Swallow errors — prefetch is best-effort and must never block UI.
+        loader().catch(() => { prefetchedRoutes.current.delete(to); });
+    };
 
     // Hero (logged out) needs a low-opacity tint + blur so the nav is legible
     // against the dark slab. Keep transparent feel, just bump contrast.
@@ -89,6 +107,9 @@ export function Navbar() {
                         <Link
                             key={link.to}
                             to={link.to}
+                            onMouseEnter={() => prefetchRoute(link.to, link.prefetch)}
+                            onFocus={() => prefetchRoute(link.to, link.prefetch)}
+                            onTouchStart={() => prefetchRoute(link.to, link.prefetch)}
                             className={cn(
                                 "hover:text-brutal-red transition-colors interactive-lift",
                                 location.pathname.startsWith(link.to) && "text-brutal-red font-bold"
@@ -204,7 +225,12 @@ export function Navbar() {
                 <div className="pointer-events-auto lg:hidden fixed top-24 left-4 right-4 bg-brutal-bg/95 backdrop-blur-xl border-2 border-brutal-dark/10 rounded-3xl shadow-2xl p-6 z-50">
                     <div className="flex flex-col gap-4 font-data text-lg font-medium">
                         {navLinks.map(link => (
-                            <Link key={link.to} to={link.to} className="hover:text-brutal-red transition-colors py-2 border-b border-brutal-dark/10">
+                            <Link
+                                key={link.to}
+                                to={link.to}
+                                onTouchStart={() => prefetchRoute(link.to, link.prefetch)}
+                                className="hover:text-brutal-red transition-colors py-2 border-b border-brutal-dark/10"
+                            >
                                 {link.label}
                             </Link>
                         ))}

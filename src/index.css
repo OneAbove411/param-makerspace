@@ -13,6 +13,16 @@
   .tracking-tight-heading {
     letter-spacing: -0.04em;
   }
+
+  /* Hide scrollbars (cross-browser) while keeping scroll behavior.
+     Used by the Projects command-bar chip strip. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* 
@@ -70,5 +80,32 @@ body::before {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* KnowMore mobile per-card expand. Pure CSS (not GSAP) so it runs the
+   instant the panel mounts, with no dependency on the desktop panel's
+   height animation. Scoped to <md breakpoints — the mobile inline panel
+   owns the motion below 768px, the desktop panel owns it at md+. */
+@keyframes kmExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 2400px;
+  }
+}
+.animate-km-expand {
+  animation: kmExpand 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+  will-change: opacity, transform, max-height;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-km-expand {
+    animation: none;
   }
 }

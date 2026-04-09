@@ -53,6 +53,32 @@ export function getProgressToNextRank(xp: number, currentRank: string): number {
   return Math.min(100, Math.round((progress / range) * 100))
 }
 
+// §7 F-304 — idempotency guard for awardXP.
+//
+// `xp_event_dedup` does not yet exist as a table in the schema, so until
+// that migration ships we enforce idempotency at two levels:
+//
+//   1. An in-memory in-flight map keyed by `userId|reason|referenceId`
+//      collapses double-clicks (same call fired twice before the first
+//      promise resolves) onto a single network round-trip.
+//   2. A pre-insert `xp_event` SELECT using the same key confirms no row
+//      with the same (user_id, reason, reference_id, reference_type)
+//      already exists. If it does, we return the existing state instead
+//      of inserting a second xp_event row.
+//
+// Net effect: double-clicking `awardXP` results in exactly ONE xp_event
+// row — the acceptance criterion for section 7.
+const inFlightAwardXP = new Map<string, Promise<{
+  newXP: number
+  newRank: string
+  rankAdvanced: boolean
+  previousRank: string
+}>>()
+
+function buildDedupKey(userId: string, reason: string, referenceId?: string, referenceType?: string) {
+  return `${userId}|${reason}|${referenceId ?? ''}|${referenceType ?? ''}`
+}
+
 // Core function — award XP and check for rank advance
 // Returns { newXP, newRank, rankAdvanced, previousRank }
 export async function awardXP(
@@ -67,6 +93,32 @@ export async function awardXP(
   rankAdvanced: boolean
   previousRank: string
 }> {
+  const dedupKey = buildDedupKey(userId, reason, referenceId, referenceType)
+
+  // (1) In-flight dedup: collapse rapid double-calls onto a single promise.
+  const existing = inFlightAwardXP.get(dedupKey)
+  if (existing) return existing
+
+  const run = (async () => {
+    // (2) Durable dedup: if an xp_event with this exact key already exists,
+    // do not insert another. Fetch current state and return it instead.
+    let existingEventQuery = supabase
+      .from('xp_event')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('reason', reason)
+    if (referenceId) {
+      existingEventQuery = existingEventQuery.eq('reference_id', referenceId)
+    } else {
+      existingEventQuery = existingEventQuery.is('reference_id', null)
+    }
+    if (referenceType) {
+      existingEventQuery = existingEventQuery.eq('reference_type', referenceType)
+    } else {
+      existingEventQuery = existingEventQuery.is('reference_type', null)
+    }
+    const { data: existingEvent } = await existingEventQuery.maybeSingle()
+
   // Get current user state
   const { data: user } = await supabase
     .from('app_user')
@@ -78,6 +130,18 @@ export async function awardXP(
 
   const u = user as any
   const previousRank = u.rank || 'Curious'
+
+    // If we already have an event with this exact key, return current state
+    // WITHOUT inserting or mutating XP. This makes awardXP idempotent.
+    if (existingEvent) {
+      return {
+        newXP: u.xp || 0,
+        newRank: previousRank,
+        rankAdvanced: false,
+        previousRank,
+      }
+    }
+
   const newXP = (u.xp || 0) + amount
 
   // Log the XP event
@@ -121,6 +185,14 @@ export async function awardXP(
   }
 
   return { newXP, newRank, rankAdvanced, previousRank }
+  })()
+
+  inFlightAwardXP.set(dedupKey, run)
+  try {
+    return await run
+  } finally {
+    inFlightAwardXP.delete(dedupKey)
+  }
 }
 
 // Check and award one-time profile completion XP

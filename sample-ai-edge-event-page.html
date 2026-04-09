@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hardware Hackathon 3.0 — Edge of Intelligence</title>
+<style>
+  :root {
+    --bg: #F5F3EE;
+    --dark: #1A1A1A;
+    --red: #C4291E;
+    --muted: rgba(26,26,26,0.55);
+    --line: rgba(26,26,26,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--dark); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  a { color: var(--red); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.02em; }
+  .uppercase { text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* HERO */
+  .hero {
+    background: var(--dark);
+    color: var(--bg);
+    padding: 80px 0 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle, rgba(245,243,238,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none;
+  }
+  .hero-inner { position: relative; z-index: 1; }
+  .tag {
+    display: inline-block;
+    background: var(--red);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 900;
+    line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--red); }
+  .hero .sub {
+    font-size: clamp(14px, 1.6vw, 18px);
+    color: rgba(245,243,238,0.65);
+    max-width: 640px;
+    margin-bottom: 32px;
+  }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 28px; font-size: 12px; }
+  .meta-row .item .label { display: block; color: rgba(245,243,238,0.4); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; }
+  .meta-row .item .val { font-weight: 700; font-size: 13px; color: var(--bg); }
+
+  /* SECTION */
+  section { padding: 60px 0; border-top: 1px solid var(--line); }
+  section.hero { border: none; }
+  section h2 {
+    font-size: clamp(24px, 3.5vw, 38px);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+  section .lead {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 32px;
+    max-width: 640px;
+  }
+
+  /* TRACKS */
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--bg);
+    border: 2px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 4px 4px 0 0 rgba(196,41,30,0.12);
+  }
+  .card h3 {
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 10px;
+  }
+  .card .idx {
+    display: inline-block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .card p { color: var(--muted); font-size: 14px; }
+
+  /* PRIZES */
+  .prize-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .prize {
+    background: var(--dark);
+    color: var(--bg);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .prize.first { border: 3px solid var(--red); }
+  .prize .rank { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(245,243,238,0.5); margin-bottom: 6px; display: block; }
+  .prize .amt { font-size: 36px; font-weight: 900; color: var(--red); line-height: 1; margin: 8px 0 4px; }
+  .prize .note { font-size: 12px; color: rgba(245,243,238,0.55); }
+
+  /* SCHEDULE */
+  .schedule { display: flex; flex-direction: column; gap: 10px; }
+  .day {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg);
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    align-items: start;
+  }
+  .day .dlabel {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--red);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .day .dtitle { font-size: 15px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; }
+  .day .ddesc { font-size: 13px; color: var(--muted); }
+
+  /* CRITERIA */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    background: var(--bg);
+    border: 2px solid var(--line);
+    border-radius: 99px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* BENEFITS */
+  .bullets { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; list-style: none; }
+  .bullets li {
+    background: var(--bg);
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .bullets li strong { display: block; text-transform: uppercase; font-size: 11px; letter-spacing: 0.1em; color: var(--red); margin-bottom: 4px; }
+
+  /* FOOTER */
+  footer {
+    background: var(--dark);
+    color: rgba(245,243,238,0.6);
+    padding: 40px 0;
+    text-align: center;
+    font-size: 12px;
+  }
+  footer .brand { color: var(--bg); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; display: block; }
+
+  @media (max-width: 560px) {
+    .day { grid-template-columns: 1fr; }
+    .hero { padding: 60px 0 40px; }
+    section { padding: 44px 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap hero-inner">
+    <span class="tag">Build Challenge · Edition 3.0</span>
+    <h1>Hardware<br/>Hackathon 3.0<br/><span>Edge of Intelligence</span></h1>
+    <p class="sub">Where AI meets real hardware. Three days. Three tracks. One goal — build something that runs on the edge and actually works.</p>
+    <div class="meta-row">
+      <div class="item">
+        <span class="label">When</span>
+        <span class="val">April 10–12, 2026</span>
+      </div>
+      <div class="item">
+        <span class="label">Where</span>
+        <span class="val">DSATM Makerspace, Bengaluru</span>
+      </div>
+      <div class="item">
+        <span class="label">Team Fee</span>
+        <span class="val">₹4,000 / team</span>
+      </div>
+      <div class="item">
+        <span class="label">Prize Pool</span>
+        <span class="val">₹3,50,000</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRACKS -->
+<section>
+  <div class="wrap">
+    <h2>Three Tracks</h2>
+    <p class="lead">Pick the layer of the AI-hardware stack that excites you most. Teams can pivot between tracks until selection closes.</p>
+    <div class="grid3">
+      <div class="card">
+        <span class="idx">Track 01</span>
+        <h3>Cloud AI + Hardware</h3>
+        <p>Connect physical devices to powerful cloud models. Latency, bandwidth, and API design are your battlefield.</p>
+      </div>
+      <div class="card">
+        <span class="idx">Track 02</span>
+        <h3>Edge AI + Hardware</h3>
+        <p>Run inference at the boundary. TinyML, quantisation, accelerators, and real-time constraints.</p>
+      </div>
+      <div class="card">
+        <span class="idx">Track 03</span>
+        <h3>Local AI + Hardware</h3>
+        <p>Ship a self-contained device that thinks on-device. No cloud, no excuses — just smart silicon.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRIZES -->
+<section>
+  <div class="wrap">
+    <h2>Prize Pool</h2>
+    <p class="lead">Cash prizes across three places, with bonus recognition from our partners for standout builds.</p>
+    <div class="prize-row">
+      <div class="prize first">
+        <span class="rank">1st Place</span>
+        <div class="amt">₹1,00,000</div>
+        <span class="note">Plus LionCircuits credits</span>
+      </div>
+      <div class="prize">
+        <span class="rank">2nd Place</span>
+        <div class="amt">₹70,000</div>
+        <span class="note">Plus PCB Cupid manufacturing pack</span>
+      </div>
+      <div class="prize">
+        <span class="rank">3rd Place</span>
+        <div class="amt">₹50,000</div>
+        <span class="note">Plus Sarvam AI credits</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCHEDULE -->
+<section>
+  <div class="wrap">
+    <h2>Three Days, One Sprint</h2>
+    <p class="lead">Workshops in the morning, building in the afternoon, mentor feedback every evening.</p>
+    <div class="schedule">
+      <div class="day">
+        <div class="dlabel">Day 01 · Apr 10</div>
+        <div>
+          <div class="dtitle">Kickoff + Foundations</div>
+          <div class="ddesc">Team forming, problem statement reveal, workshop on edge AI tooling, mentor office hours.</div>
+        </div>
+      </div>
+      <div class="day">
+        <div class="dlabel">Day 02 · Apr 11</div>
+        <div>
+          <div class="dtitle">Build Sprint</div>
+          <div class="ddesc">Full-day hacking with mid-day checkpoint. Hardware assembly, model deployment, integration testing.</div>
+        </div>
+      </div>
+      <div class="day">
+        <div class="dlabel">Day 03 · Apr 12</div>
+        <div>
+          <div class="dtitle">Demo + Judging</div>
+          <div class="ddesc">Final polish, demo recording, live pitch to judges, prize ceremony in the evening.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SELECTION CRITERIA -->
+<section>
+  <div class="wrap">
+    <h2>Selection Criteria</h2>
+    <p class="lead">Applications are reviewed on team strength and prior work — no theoretical knowledge tests.</p>
+    <div class="pill-row">
+      <span class="pill">LinkedIn Profile</span>
+      <span class="pill">GitHub Activity</span>
+      <span class="pill">Past Projects</span>
+      <span class="pill">Team Composition</span>
+      <span class="pill">Problem Fit</span>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section>
+  <div class="wrap">
+    <h2>What Participants Get</h2>
+    <p class="lead">Everything you need so you can focus on building, not logistics.</p>
+    <ul class="bullets">
+      <li><strong>Stay</strong>Accommodation for out-of-town teams across all three days.</li>
+      <li><strong>Meals</strong>Breakfast, lunch, dinner, and unlimited caffeine.</li>
+      <li><strong>Tools</strong>Access to the DSATM Makerspace — soldering, 3D print, CNC, oscilloscopes.</li>
+      <li><strong>Mentorship</strong>1:1 time with industry mentors from LionCircuits, PCB Cupid, and Sarvam AI.</li>
+      <li><strong>Hardware Kits</strong>Starter kits with microcontrollers, sensors, and edge accelerators.</li>
+      <li><strong>Swag</strong>Event tee, stickers, and a certificate of completion for every team.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- PARTNERS -->
+<section>
+  <div class="wrap">
+    <h2>Powered By</h2>
+    <p class="lead">A collaboration between hardware manufacturing specialists and frontier AI teams.</p>
+    <div class="pill-row">
+      <span class="pill">LionCircuits</span>
+      <span class="pill">PCB Cupid</span>
+      <span class="pill">Sarvam AI — AI Partner</span>
+      <span class="pill">DSATM Makerspace — Venue</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="brand">PARAM Makerspace · Build Challenge</span>
+    Registration, team formation, and judging are handled on the main event page. This page is the event brief.
+  </div>
+</footer>
+
+</body>
+</html>

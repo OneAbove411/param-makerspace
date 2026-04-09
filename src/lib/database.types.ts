@@ -6,7 +6,12 @@ export type ProjectStatus = 'draft' | 'pending_review' | 'active' | 'rejected';
 export type ProjectVisibility = 'public' | 'private';
 export type EventType = 'build_challenge' | 'maker_meetup' | 'tech_tuesday';
 export type EventPhase = 'draft' | 'pre_event' | 'live' | 'post_event';
-export type ReactionType = 'like' | 'upvote' | 'bookmark';
+// NOTE: The database CHECK constraint in supabase-schema.sql still accepts
+// 'upvote' for backwards compatibility with historical rows. The application
+// intentionally narrows the TS union to only the reaction types it will
+// write going forward. Historical 'upvote' rows in the database become
+// dormant data — they are not rendered anywhere in the UI.
+export type ReactionType = 'like' | 'bookmark';
 export type TargetType = 'project' | 'challenge' | 'event' | 'maker_profile';
 
 // ─── Core ───
@@ -90,6 +95,8 @@ export interface Project {
     tier: string | null;
     github_url: string | null;
     duration: string | null;
+    remixed_from_id: string | null;
+    is_hardware: boolean;
     status: ProjectStatus;
     visibility: ProjectVisibility;
     created_at: string;
@@ -139,6 +146,53 @@ export interface ProjectFile {
     file_name: string;
     file_size: number | null;
     created_at: string;
+}
+
+export interface ProjectBomLine {
+    id: string;
+    project_id: string;
+    reference: string;
+    part: string;
+    quantity: number;
+    source_url: string | null;
+    cost_cents: number | null;
+    notes: string | null;
+    display_order: number;
+    created_at: string;
+}
+
+export interface ProjectMake {
+    id: string;
+    project_id: string;
+    user_id: string;
+    image_url: string | null;
+    caption: string;
+    build_notes: string | null;
+    created_at: string;
+}
+
+export interface ProjectCommentPin {
+    id: string;
+    project_id: string;
+    target_type: 'image' | 'log' | 'bom_row';
+    target_id: string;
+    x_pct: number | null;
+    y_pct: number | null;
+    comment_id: string | null;
+    created_at: string;
+}
+
+export interface ProjectMergeRequest {
+    id: string;
+    source_project_id: string;
+    target_project_id: string;
+    submitter_id: string;
+    title: string;
+    body: string | null;
+    status: 'open' | 'accepted' | 'rejected' | 'withdrawn';
+    diff_snapshot: any;
+    created_at: string;
+    resolved_at: string | null;
 }
 
 // ─── Challenges ───
@@ -449,6 +503,10 @@ export interface Database {
             project_image: { Row: ProjectImage & Record<string, unknown>; Insert: (Partial<ProjectImage> & Pick<ProjectImage, 'project_id' | 'image_url'>) & Record<string, unknown>; Update: Partial<ProjectImage> & Record<string, unknown>; Relationships: [] };
             project_video: { Row: ProjectVideo & Record<string, unknown>; Insert: (Partial<ProjectVideo> & Pick<ProjectVideo, 'project_id' | 'title' | 'video_url'>) & Record<string, unknown>; Update: Partial<ProjectVideo> & Record<string, unknown>; Relationships: [] };
             project_file: { Row: ProjectFile & Record<string, unknown>; Insert: (Partial<ProjectFile> & Pick<ProjectFile, 'project_id' | 'file_url' | 'file_name'>) & Record<string, unknown>; Update: Partial<ProjectFile> & Record<string, unknown>; Relationships: [] };
+            project_bom_line: { Row: ProjectBomLine & Record<string, unknown>; Insert: (Partial<ProjectBomLine> & Pick<ProjectBomLine, 'project_id' | 'reference' | 'part' | 'quantity'>) & Record<string, unknown>; Update: Partial<ProjectBomLine> & Record<string, unknown>; Relationships: [] };
+            project_make: { Row: ProjectMake & Record<string, unknown>; Insert: (Partial<ProjectMake> & Pick<ProjectMake, 'project_id' | 'user_id' | 'caption'>) & Record<string, unknown>; Update: Partial<ProjectMake> & Record<string, unknown>; Relationships: [] };
+            project_comment_pin: { Row: ProjectCommentPin & Record<string, unknown>; Insert: (Partial<ProjectCommentPin> & Pick<ProjectCommentPin, 'project_id' | 'target_type' | 'target_id'>) & Record<string, unknown>; Update: Partial<ProjectCommentPin> & Record<string, unknown>; Relationships: [] };
+            project_merge_request: { Row: ProjectMergeRequest & Record<string, unknown>; Insert: (Partial<ProjectMergeRequest> & Pick<ProjectMergeRequest, 'source_project_id' | 'target_project_id' | 'submitter_id' | 'title'>) & Record<string, unknown>; Update: Partial<ProjectMergeRequest> & Record<string, unknown>; Relationships: [] };
             challenge: { Row: Challenge & Record<string, unknown>; Insert: (Partial<Challenge> & Pick<Challenge, 'title'>) & Record<string, unknown>; Update: Partial<Challenge> & Record<string, unknown>; Relationships: [] };
             challenge_step: { Row: ChallengeStep & Record<string, unknown>; Insert: (Partial<ChallengeStep> & Pick<ChallengeStep, 'challenge_id' | 'step_text'>) & Record<string, unknown>; Update: Partial<ChallengeStep> & Record<string, unknown>; Relationships: [] };
             challenge_material: { Row: ChallengeMaterial & Record<string, unknown>; Insert: (Partial<ChallengeMaterial> & Pick<ChallengeMaterial, 'challenge_id' | 'name'>) & Record<string, unknown>; Update: Partial<ChallengeMaterial> & Record<string, unknown>; Relationships: [] };

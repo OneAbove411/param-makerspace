@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { RankUpModal } from '../ui/RankUpModal';
+import { Toaster } from '../ui/Toaster';
 import { SessionGuard } from './SessionGuard';
 
 export function RootLayout() {
@@ -24,6 +25,7 @@ export function RootLayout() {
             </main>
             <Footer />
             <SessionGuard />
+            <Toaster />
             {rankUp && (
                 <RankUpModal
                     previousRank={rankUp.previousRank}

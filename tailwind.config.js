@@ -29,7 +29,13 @@ export default {
       transitionTimingFunction: {
         'magnetic': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
         'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-      }
+      },
+      keyframes: {
+        fadeInScale: {
+          '0%': { opacity: '0', transform: 'scale(0.85)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+      },
     },
   },
   plugins: [],

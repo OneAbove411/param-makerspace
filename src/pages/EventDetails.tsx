@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useEvent, useEventRegistration, useComments, useEventWebsites, useMyEventWebsite, useEventWebsiteMutations, useEventWebsitesForReview, useEventHosts } from '../lib/hooks';
+import { useEvent, useEventRegistration, useComments, useEventWebsites, useMyEventWebsite, useEventWebsiteMutations, useEventHosts } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
-import { Calendar, MapPin, Users, ArrowLeft, ArrowRight, Send, Globe, Clock, Trophy, Image as ImageIcon, BookOpen, Star, UserCheck, Wrench, Award, ChevronRight, ExternalLink, Shield, Check, X, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowLeft, ArrowRight, Send, Globe, Clock, Trophy, Image as ImageIcon, BookOpen, Star, UserCheck, Wrench, Award, ChevronRight, ExternalLink, Shield, Check, X, Eye, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
 import { formatEventType } from './Events';
 import { WebsiteUploadPanel } from '../components/event/WebsiteUploadPanel';
 import { gsap } from 'gsap';
@@ -90,11 +90,11 @@ const CountdownHero = ({ date }: { date: string }) => {
     ];
 
     return (
-        <div className="flex gap-3">
+        <div className="flex gap-2">
             {blocks.map(b => (
                 <div key={b.label} className="text-center">
-                    <div className="bg-brutal-dark text-brutal-bg w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(196,41,30,0.4)]">
-                        <span className="font-heading font-bold text-2xl leading-none">{String(b.value).padStart(2, '0')}</span>
+                    <div className="bg-brutal-dark text-brutal-bg w-12 h-12 md:w-14 md:h-14 rounded-lg flex flex-col items-center justify-center shadow-[3px_3px_0px_rgba(196,41,30,0.4)]">
+                        <span className="font-heading font-bold text-lg md:text-xl leading-none">{String(b.value).padStart(2, '0')}</span>
                         <span className="font-data text-[7px] font-bold uppercase tracking-widest text-brutal-bg/40 mt-0.5">{b.label}</span>
                     </div>
                 </div>
@@ -104,18 +104,100 @@ const CountdownHero = ({ date }: { date: string }) => {
 };
 
 // ════════════════════════════════════════════════════════════════
+// SHARED: Sticky Register Bar — appears after user scrolls past hero
+// ════════════════════════════════════════════════════════════════
+
+const StickyRegisterBar = ({ event, isRegistered, user, actionLoading, handleRegister, handleUnregister, capacityRemaining }: any) => {
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        const onScroll = () => {
+            // Show after scrolling past 60% of viewport
+            setVisible(window.scrollY > window.innerHeight * 0.55);
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+
+    const externalRsvpUrl = event.location?.startsWith('rsvp:') ? event.location.replace('rsvp:', '') : null;
+    const isPast = new Date(event.date) < new Date();
+    if (isPast) return null;
+
+    return (
+        <div
+            aria-hidden={!visible}
+            className={`fixed left-0 right-0 bottom-0 z-40 lg:hidden transition-transform duration-300 ${
+                visible ? 'translate-y-0' : 'translate-y-full'
+            }`}
+        >
+            <div className="mx-auto max-w-5xl m-3 md:m-4 bg-brutal-dark text-brutal-bg rounded-xl border-2 border-brutal-red/40 shadow-[6px_6px_0_0_rgba(196,41,30,0.4)] px-4 md:px-5 py-3 flex items-center gap-3 md:gap-4">
+                <div className="flex-1 min-w-0">
+                    <div className="font-heading font-bold text-sm md:text-base uppercase tracking-tight-heading truncate leading-tight">
+                        {event.title}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 font-data text-[10px] text-brutal-bg/55">
+                        <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        {capacityRemaining !== null && (
+                            <span className="flex items-center gap-1 tabular-nums">
+                                <Users className="w-3 h-3" />
+                                {capacityRemaining > 0 ? `${capacityRemaining} left` : 'Full'}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                {externalRsvpUrl ? (
+                    <a href={externalRsvpUrl} target="_blank" rel="noreferrer">
+                        <Button size="sm" className="bg-brutal-red text-brutal-bg hover:bg-brutal-bg hover:text-brutal-dark whitespace-nowrap">
+                            RSVP <ExternalLink className="w-3 h-3 ml-1" />
+                        </Button>
+                    </a>
+                ) : isRegistered ? (
+                    <button
+                        onClick={handleUnregister}
+                        disabled={actionLoading}
+                        className="font-data text-[10px] text-brutal-bg/60 hover:text-brutal-red uppercase font-bold tracking-widest transition-colors whitespace-nowrap"
+                    >
+                        {actionLoading ? '...' : '✓ You\'re in · Cancel'}
+                    </button>
+                ) : event.registration_status === 'open' && (capacityRemaining === null || capacityRemaining > 0) ? (
+                    user ? (
+                        <Button
+                            size="sm"
+                            className="bg-brutal-red text-brutal-bg hover:bg-brutal-bg hover:text-brutal-dark whitespace-nowrap"
+                            onClick={handleRegister}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? '...' : 'Register'} <ArrowRight className="w-3 h-3 ml-1" />
+                        </Button>
+                    ) : (
+                        <Link to="/login">
+                            <Button size="sm" className="bg-brutal-bg text-brutal-dark hover:bg-brutal-red hover:text-brutal-bg whitespace-nowrap">
+                                Log in
+                            </Button>
+                        </Link>
+                    )
+                ) : (
+                    <span className="font-data text-[10px] text-brutal-bg/40 uppercase font-bold tracking-widest whitespace-nowrap">Closed</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ════════════════════════════════════════════════════════════════
 // SHARED: Section dividers & helpers
 // ════════════════════════════════════════════════════════════════
 
-const SectionAnchor = ({ id, number, title, icon, dark }: { id: string; number: string; title: string; icon?: React.ReactNode; dark?: boolean }) => (
-    <div id={id} className="scroll-mt-24 flex items-center gap-4 mb-8">
-        <span className={`font-data text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-brutal-bg/30' : 'text-brutal-dark/20'}`}>{number}</span>
-        <div>
-            <div className={`w-12 h-px ${dark ? 'bg-brutal-bg/10' : 'bg-brutal-dark/10'} mb-2`} />
-            <h2 className={`font-heading font-bold text-xl uppercase tracking-tight-heading flex items-center gap-2 ${dark ? 'text-brutal-bg' : ''}`}>
-                {icon} {title}
-            </h2>
-        </div>
+const SectionAnchor = ({ id, title, icon, dark }: { id: string; number?: string; title: string; icon?: React.ReactNode; dark?: boolean }) => (
+    <div id={id} className="scroll-mt-24 mb-5">
+        <div className={`w-10 h-px ${dark ? 'bg-brutal-bg/15' : 'bg-brutal-dark/15'} mb-2`} />
+        <h2 className={`font-heading font-bold text-base md:text-lg uppercase tracking-tight-heading flex items-center gap-2 ${dark ? 'text-brutal-bg' : ''}`}>
+            {icon} {title}
+        </h2>
     </div>
 );
 
@@ -159,12 +241,34 @@ const RecapToC = ({ sections }: { sections: { id: string; label: string }[] }) =
 // SHARED: Discussion
 // ════════════════════════════════════════════════════════════════
 
-const DiscussionSection = ({ comments, user, deleteComment, handleComment, commentText, setCommentText, sectionId, sectionNum }: any) => (
+const DiscussionSection = ({ comments, user, deleteComment, handleComment, commentText, setCommentText, sectionId }: any) => (
     <section id={sectionId}>
-        <SectionAnchor id={`${sectionId}-anchor`} number={sectionNum} title="Discussion" />
-        <div className="space-y-3 mb-6">
+        <SectionAnchor id={`${sectionId}-anchor`} title="Discussion" icon={<Send className="w-4 h-4 text-brutal-red" />} />
+
+        {/* Composer — visible before the list so logged-in users always see it */}
+        {user ? (
+            <form onSubmit={handleComment} className="mb-5 p-3 rounded-xl border-2 border-brutal-dark/10 bg-brutal-bg flex gap-2 items-center focus-within:border-brutal-dark/30 transition-colors">
+                <input
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Share a thought, ask a question…"
+                    className="flex-1 bg-transparent px-2 py-1.5 font-data text-xs text-brutal-dark placeholder:text-brutal-dark/35 focus:outline-none"
+                />
+                <Button type="submit" size="sm" disabled={!commentText.trim()}>
+                    <Send className="w-3 h-3 mr-1" /> Post
+                </Button>
+            </form>
+        ) : (
+            <div className="mb-5 p-3 rounded-xl border-2 border-brutal-dark/10 bg-brutal-dark/[0.03] flex items-center justify-between gap-3">
+                <span className="font-data text-xs text-brutal-dark/55">Log in to join the discussion.</span>
+                <Link to="/login" className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red hover:underline">Log in →</Link>
+            </div>
+        )}
+
+        <div className="space-y-3">
             {comments.map((c: any) => (
-                <div key={c.id} className="p-3 bg-brutal-dark/5 rounded-xl border border-brutal-dark/10">
+                <div key={c.id} className="p-3 bg-brutal-dark/[0.03] rounded-xl border border-brutal-dark/10">
                     <div className="flex justify-between items-start mb-2">
                         <span className="font-data text-xs font-bold">{c.userName}</span>
                         <div className="flex items-center gap-2">
@@ -174,51 +278,34 @@ const DiscussionSection = ({ comments, user, deleteComment, handleComment, comme
                             )}
                         </div>
                     </div>
-                    <p className="font-data text-xs text-brutal-dark/80">{c.content}</p>
+                    <p className="font-data text-xs text-brutal-dark/80 whitespace-pre-wrap">{c.content}</p>
                 </div>
             ))}
-            {comments.length === 0 && <p className="font-data text-xs text-brutal-dark/50">No comments yet.</p>}
+            {comments.length === 0 && (
+                <p className="font-data text-xs text-brutal-dark/40 text-center py-4">No comments yet. Be the first.</p>
+            )}
         </div>
-        {user && (
-            <form onSubmit={handleComment} className="flex gap-2">
-                <input
-                    type="text"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="Add a comment..."
-                    className="flex-1 bg-brutal-bg border border-brutal-dark/15 px-3 py-2 rounded-xl font-data text-xs focus:outline-none focus:border-brutal-dark/30"
-                />
-                <Button type="submit" size="sm"><Send className="w-3 h-3" /></Button>
-            </form>
-        )}
     </section>
 );
 
 // ════════════════════════════════════════════════════════════════
-// MENTOR WEBSITE BANNER — renders approved website as event hero
-// Like PCBCupid: large iframe banner with "Register Now" overlay
+// MENTOR WEBSITE BANNER — PCBCupid-style embed of approved website
+// Sits at top of main content column. If no approved website,
+// renders nothing. Visual chrome matches brutalist aesthetic.
+// NOTE: no Register button inside — the right sidebar owns that CTA.
 // ════════════════════════════════════════════════════════════════
 
-const EventWebsiteBanner = ({ eventId, onRegisterClick, isRegistered, isPast, user }: {
-    eventId: string;
-    onRegisterClick?: () => void;
-    isRegistered: boolean;
-    isPast: boolean;
-    user: any;
-}) => {
+const EventWebsiteBanner = ({ eventId, fallback = null }: { eventId: string; fallback?: React.ReactNode }) => {
     const { data: websites, loading } = useEventWebsites(eventId);
-    const [expanded, setExpanded] = useState(false);
 
-    // Get the first approved website (mentor's poster/landing page)
     const website = websites && websites.length > 0 ? websites[0] : null;
-
-    if (loading || !website) return null;
+    if (loading) return null;
+    if (!website) return <>{fallback}</>;
 
     const hasHtml = !!website.html_content;
     const hasThumbnail = !!website.thumbnail_url;
     const hasFileUrl = !!website.file_url;
 
-    // Open the full website in a new tab
     const openFullWebsite = () => {
         if (hasHtml) {
             const w = window.open('', '_blank');
@@ -233,152 +320,90 @@ const EventWebsiteBanner = ({ eventId, onRegisterClick, isRegistered, isPast, us
     };
 
     return (
-        <>
-            {/* Banner container */}
-            <div className="relative w-full rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark/5 group">
-                {/* Iframe or image preview */}
+        <section>
+            {/* Eyebrow */}
+            <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                    <Globe className="w-3.5 h-3.5 text-brutal-red flex-shrink-0" />
+                    <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/55 truncate">
+                        Event Page · by {website.host_names?.join(', ') || website.userName}
+                    </span>
+                </div>
+                {(hasHtml || hasFileUrl) && (
+                    <button
+                        type="button"
+                        onClick={openFullWebsite}
+                        className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/55 hover:text-brutal-red flex items-center gap-1.5 flex-shrink-0"
+                    >
+                        Open full site <ExternalLink className="w-3 h-3" />
+                    </button>
+                )}
+            </div>
+
+            {/* Embedded preview frame */}
+            <div className="relative w-full rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-bg shadow-[6px_6px_0_0_rgba(196,41,30,0.15)] group">
                 {hasHtml ? (
-                    <div className="relative w-full" style={{ height: '70vh', maxHeight: '700px', minHeight: '400px' }}>
+                    <div className="relative w-full" style={{ height: '62vh', maxHeight: '640px', minHeight: '380px' }}>
                         <iframe
                             srcDoc={website.html_content!}
                             title={website.title}
-                            className="absolute inset-0 w-full h-full border-0"
-                            sandbox="allow-scripts allow-same-origin"
-                            style={{ pointerEvents: 'none' }}
+                            className="absolute inset-0 w-full h-full border-0 bg-brutal-bg"
+                            // SECURITY: DO NOT combine `allow-scripts` with
+                            // `allow-same-origin` — that combination lets the
+                            // framed document remove its own sandbox attribute
+                            // from the parent DOM and escape. `allow-scripts`
+                            // alone is sufficient to run JS inside a unique
+                            // null origin, which is what we want for
+                            // untrusted, user-submitted HTML previews.
+                            sandbox="allow-scripts"
+                            referrerPolicy="no-referrer"
                         />
-                        {/* Clickable overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark/60 via-transparent to-transparent" />
+                        {/* Click-to-open overlay */}
+                        <button
+                            type="button"
+                            onClick={openFullWebsite}
+                            className="absolute inset-0 bg-brutal-dark/0 hover:bg-brutal-dark/15 transition-colors flex items-center justify-center"
+                            aria-label="Open in new tab"
+                        >
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-brutal-dark/85 backdrop-blur-sm text-brutal-bg px-4 py-2 rounded-lg font-data text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 border border-brutal-bg/10">
+                                <Maximize2 className="w-3.5 h-3.5" /> Click to open
+                            </span>
+                        </button>
                     </div>
                 ) : hasThumbnail ? (
-                    <div className="relative w-full" style={{ height: '70vh', maxHeight: '700px', minHeight: '400px' }}>
-                        <img
-                            src={website.thumbnail_url!}
-                            alt={website.title}
-                            className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark/60 via-transparent to-transparent" />
+                    <div className="relative w-full">
+                        <img src={website.thumbnail_url!} alt={website.title} className="w-full h-auto object-cover" />
                     </div>
-                ) : null}
-
-                {/* Overlay buttons — top right */}
-                <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-                    <button
-                        onClick={openFullWebsite}
-                        className="bg-brutal-dark/70 backdrop-blur-sm text-brutal-bg px-3 py-2 rounded-lg font-data text-[10px] font-bold uppercase tracking-wider hover:bg-brutal-dark transition-colors flex items-center gap-1.5 border border-brutal-bg/10"
-                    >
-                        <ExternalLink className="w-3 h-3" /> View Full Site
-                    </button>
-                </div>
-
-                {/* Overlay: bottom left — title + Register Now */}
-                {!isPast && (
-                    <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 z-10">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-                            <div>
-                                <h3 className="font-heading font-bold text-lg md:text-xl text-brutal-bg uppercase tracking-tight-heading drop-shadow-lg">
-                                    {website.title}
-                                </h3>
-                                {website.host_names && website.host_names.length > 0 && (
-                                    <p className="font-data text-[10px] text-brutal-bg/60 mt-1 uppercase tracking-wider">
-                                        By {website.host_names.join(', ')}
-                                    </p>
-                                )}
+                ) : (
+                    <div className="p-8 flex items-center justify-between gap-4">
+                        <div>
+                            <div className="font-heading font-bold text-base uppercase tracking-tight-heading text-brutal-dark mb-1">
+                                {website.title}
                             </div>
-                            {!isRegistered && !user && (
-                                <Link
-                                    to="/login"
-                                    className="bg-brutal-red text-brutal-bg px-6 py-3 rounded-xl font-heading font-bold text-sm uppercase tracking-wider shadow-[4px_4px_0px_rgba(0,0,0,0.3)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center gap-2 whitespace-nowrap no-underline"
-                                >
-                                    Register Now <ArrowRight className="w-4 h-4" />
-                                </Link>
-                            )}
-                            {!isRegistered && user && onRegisterClick && (
-                                <button
-                                    onClick={onRegisterClick}
-                                    className="bg-brutal-red text-brutal-bg px-6 py-3 rounded-xl font-heading font-bold text-sm uppercase tracking-wider shadow-[4px_4px_0px_rgba(0,0,0,0.3)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center gap-2 whitespace-nowrap"
-                                >
-                                    Register Now <ArrowRight className="w-4 h-4" />
-                                </button>
-                            )}
-                            {isRegistered && (
-                                <div className="bg-green-500/20 border border-green-400/30 text-green-300 px-5 py-2.5 rounded-full font-data text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                                    ✓ Registered
-                                </div>
+                            {website.description && (
+                                <p className="font-data text-xs text-brutal-dark/60 max-w-md line-clamp-2">{website.description}</p>
                             )}
                         </div>
+                        {hasFileUrl && (
+                            <button
+                                type="button"
+                                onClick={openFullWebsite}
+                                className="font-data text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg bg-brutal-dark text-brutal-bg hover:bg-brutal-red flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                                Open <ExternalLink className="w-3 h-3" />
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* Expanded fullscreen modal */}
-            {expanded && (
-                <div className="fixed inset-0 z-50 bg-brutal-dark/95 flex items-center justify-center p-4">
-                    <button
-                        onClick={() => setExpanded(false)}
-                        className="absolute top-6 right-6 bg-brutal-bg/10 text-brutal-bg px-4 py-2 rounded-lg font-data text-xs font-bold uppercase hover:bg-brutal-bg/20 transition-colors"
-                    >
-                        Close
-                    </button>
-                    {hasHtml ? (
-                        <iframe
-                            srcDoc={website.html_content!}
-                            title={website.title}
-                            className="w-full h-full rounded-xl border-0"
-                            sandbox="allow-scripts allow-same-origin"
-                        />
-                    ) : hasThumbnail ? (
-                        <img src={website.thumbnail_url!} alt={website.title} className="max-w-full max-h-full object-contain rounded-xl" />
-                    ) : null}
+            {/* Caption strip */}
+            {website.title && (hasHtml || hasThumbnail) && (
+                <div className="mt-2.5 font-data text-[11px] text-brutal-dark/55">
+                    <span className="font-bold text-brutal-dark/75">{website.title}</span>
+                    {website.description && <> · {website.description}</>}
                 </div>
             )}
-        </>
-    );
-};
-
-// ════════════════════════════════════════════════════════════════
-// MENTOR UPLOAD PANEL — only visible to mentors/admins
-// ════════════════════════════════════════════════════════════════
-
-const MentorWebsiteUploadSection = ({ eventId, user, isRegistered, sectionId, sectionNum }: { eventId: string; user: any; isRegistered: boolean; sectionId: string; sectionNum: string }) => {
-    const { data: myWebsite, refetch: refetchMyWebsite } = useMyEventWebsite(eventId);
-    const { data: websites, refetch: refetchWebsites } = useEventWebsites(eventId);
-    const { submitWebsite, deleteWebsite } = useEventWebsiteMutations();
-
-    // Only mentors and admins can see this
-    if (!user || (user.role !== 'mentor' && user.role !== 'admin')) return null;
-
-    const handleSubmit = async (data: { title: string; description: string; html_content: string | null; file_url: string | null; host_names: string[]; }) => {
-        if (!user) throw new Error('You must be logged in.');
-        const { error } = await submitWebsite({
-            event_id: eventId, user_id: user.id, title: data.title,
-            description: data.description || undefined,
-            html_content: data.html_content || undefined,
-            file_url: data.file_url || undefined,
-            host_names: data.host_names,
-        });
-        if (error) throw new Error(error);
-        refetchMyWebsite().catch(() => {});
-        refetchWebsites().catch(() => {});
-    };
-
-    const handleDelete = async () => {
-        if (!myWebsite) return;
-        await deleteWebsite(myWebsite.id);
-        refetchMyWebsite().catch(() => {});
-        refetchWebsites().catch(() => {});
-    };
-
-    return (
-        <section id={sectionId}>
-            <SectionAnchor id={`${sectionId}-anchor`} number={sectionNum} title="Event Website (Mentor)" icon={<Globe className="w-5 h-5 text-brutal-red" />} />
-            <p className="font-data text-xs text-brutal-dark/50 mb-4">
-                Upload a website or poster for this event. Once approved, it will appear as the event's hero banner for all viewers.
-            </p>
-            <WebsiteUploadPanel
-                eventId={eventId} userId={user.id} userName={user.name || 'Unknown'}
-                existingSubmission={myWebsite} onSubmit={handleSubmit} onDelete={handleDelete}
-                isRegistered={isRegistered}
-            />
         </section>
     );
 };
@@ -391,26 +416,26 @@ const RegistrationCTA = ({ isRegistered, event, user, actionLoading, handleRegis
     if (customRegisterNode) return customRegisterNode;
 
     return (
-        <div className="bg-brutal-dark text-brutal-bg rounded-2xl p-8 md:p-12 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brutal-red/10 rounded-bl-full pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-brutal-bg/5 rounded-tr-full pointer-events-none" />
+        <div className="bg-brutal-dark text-brutal-bg rounded-2xl p-6 md:p-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brutal-red/10 rounded-bl-full pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-brutal-bg/5 rounded-tr-full pointer-events-none" />
 
-            <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+            <div className="relative z-10 flex flex-col md:flex-row items-center gap-5">
                 <div className="flex-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl uppercase tracking-tight-heading mb-3">
+                    <h2 className="font-heading font-bold text-xl md:text-2xl uppercase tracking-tight-heading mb-2">
                         {isRegistered ? "You're In!" : "Secure Your Spot"}
                     </h2>
-                    <p className="font-data text-sm text-brutal-bg/60 max-w-md">
+                    <p className="font-data text-xs md:text-sm text-brutal-bg/60 max-w-md">
                         {isRegistered
-                            ? "You're registered for this event. We'll see you there."
+                            ? "You're registered. We'll see you there."
                             : capacityRemaining !== null
-                                ? `Only ${capacityRemaining} spot${capacityRemaining !== 1 ? 's' : ''} remaining. Don't miss out.`
-                                : `${event.registration_count} makers have already registered. Join them.`
+                                ? `Only ${capacityRemaining} spot${capacityRemaining !== 1 ? 's' : ''} remaining.`
+                                : `${event.registration_count} makers have already joined.`
                         }
                     </p>
                 </div>
 
-                <div className="flex flex-col items-center gap-3 min-w-[200px]">
+                <div className="flex flex-col items-center gap-2 min-w-[180px]">
                     {isRegistered ? (
                         <>
                             <div className="bg-green-500/20 border border-green-400/30 text-green-300 px-6 py-3 rounded-full font-data text-sm font-bold uppercase tracking-wider">
@@ -454,17 +479,319 @@ const RegistrationCTA = ({ isRegistered, event, user, actionLoading, handleRegis
 };
 
 // ════════════════════════════════════════════════════════════════
+// HELPER: Add-to-calendar (inline ICS, no dep) — per audit F-903
+// ════════════════════════════════════════════════════════════════
+
+function formatGCalDate(d: Date) {
+    // YYYYMMDDTHHMMSSZ
+    return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+
+function buildIcsDataUri(event: any) {
+    const start = new Date(event.date);
+    const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    const escape = (s: string) => (s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+    const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//PARAM Makerspace//Events//EN',
+        'BEGIN:VEVENT',
+        `UID:${event.id}@param.makerspace`,
+        `DTSTAMP:${formatGCalDate(new Date())}`,
+        `DTSTART:${formatGCalDate(start)}`,
+        `DTEND:${formatGCalDate(end)}`,
+        `SUMMARY:${escape(event.title)}`,
+        `DESCRIPTION:${escape((event.tagline || '') + (event.description ? '\n' + event.description.split('---RECAP---')[0] : ''))}`,
+        event.location && !event.location.startsWith('rsvp:') ? `LOCATION:${escape(event.location)}` : '',
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ].filter(Boolean).join('\r\n');
+    return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines)}`;
+}
+
+function buildGoogleCalUrl(event: any) {
+    const start = new Date(event.date);
+    const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    const params = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: event.title,
+        dates: `${formatGCalDate(start)}/${formatGCalDate(end)}`,
+        details: (event.tagline || '') + (event.description ? '\n' + event.description.split('---RECAP---')[0] : ''),
+        location: event.location && !event.location.startsWith('rsvp:') ? event.location : '',
+    });
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+const AddToCalendarDropdown = ({ event }: { event: any }) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        if (open) document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [open]);
+
+    const ics = buildIcsDataUri(event);
+    const gcal = buildGoogleCalUrl(event);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className="w-full flex items-center justify-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/60 hover:text-brutal-dark border border-brutal-dark/15 hover:border-brutal-dark/35 rounded-lg py-2 transition-colors bg-brutal-bg"
+            >
+                <Calendar className="w-3 h-3" /> Add to calendar
+                <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div
+                    role="menu"
+                    className="absolute left-0 right-0 mt-1.5 z-30 bg-brutal-bg border-2 border-brutal-dark/15 rounded-lg shadow-[4px_4px_0_0_rgba(196,41,30,0.18)] overflow-hidden"
+                >
+                    <a
+                        role="menuitem"
+                        href={gcal}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setOpen(false)}
+                        className="block px-3 py-2 font-data text-[11px] font-bold text-brutal-dark/75 hover:text-brutal-dark hover:bg-brutal-dark/5 transition-colors"
+                    >
+                        Google Calendar
+                    </a>
+                    <a
+                        role="menuitem"
+                        href={ics}
+                        download={`${(event.title || 'event').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`}
+                        onClick={() => setOpen(false)}
+                        className="block px-3 py-2 font-data text-[11px] font-bold text-brutal-dark/75 hover:text-brutal-dark hover:bg-brutal-dark/5 transition-colors border-t border-brutal-dark/8"
+                    >
+                        Apple Calendar (.ics)
+                    </a>
+                    <a
+                        role="menuitem"
+                        href={ics}
+                        download={`${(event.title || 'event').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`}
+                        onClick={() => setOpen(false)}
+                        className="block px-3 py-2 font-data text-[11px] font-bold text-brutal-dark/75 hover:text-brutal-dark hover:bg-brutal-dark/5 transition-colors border-t border-brutal-dark/8"
+                    >
+                        Outlook / .ics
+                    </a>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ════════════════════════════════════════════════════════════════
+// SHARED: ActionSidebar — Luma / Eventbrite-style sticky right rail
+// Holds: countdown, date/time/location, capacity bar, register CTA,
+//        add-to-calendar, hosts, share.
+// ════════════════════════════════════════════════════════════════
+
+const ActionSidebar = ({ event, hosts, registrationProps }: any) => {
+    const {
+        isRegistered, user, actionLoading, handleRegister, handleUnregister, capacityRemaining,
+    } = registrationProps;
+    const date = new Date(event.date);
+    const endDate = event.end_date ? new Date(event.end_date) : null;
+    const externalRsvpUrl = event.location?.startsWith('rsvp:') ? event.location.replace('rsvp:', '') : null;
+    const capacity = event.capacity || 0;
+    const pct = capacity ? Math.min(100, Math.round((event.registration_count / capacity) * 100)) : 0;
+
+    return (
+        <aside className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1 space-y-3 [scrollbar-width:thin]">
+            {/* Countdown card */}
+            <div className="bg-brutal-dark text-brutal-bg rounded-2xl p-4 md:p-5 border-2 border-brutal-dark shadow-[6px_6px_0_0_rgba(196,41,30,0.35)] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-brutal-red/15 rounded-bl-full pointer-events-none" />
+                <span className="relative font-data text-[9px] font-bold uppercase tracking-widest text-brutal-bg/50 block mb-2">
+                    Starts in
+                </span>
+                <div className="relative">
+                    <CountdownHero date={event.date} />
+                </div>
+            </div>
+
+            {/* Meta + Register card — no overflow-hidden so the calendar dropdown can spill out */}
+            <div className="bg-brutal-bg rounded-2xl border-2 border-brutal-dark/15 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]">
+                {/* Meta rows */}
+                <div className="p-4 md:p-5 space-y-2.5 border-b border-brutal-dark/10">
+                    <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-brutal-red/10 border border-brutal-red/20 flex items-center justify-center flex-shrink-0">
+                            <Calendar className="w-4 h-4 text-brutal-red" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">When</div>
+                            <div className="font-data text-xs font-bold text-brutal-dark leading-tight">
+                                {date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            </div>
+                            <div className="font-data text-[11px] text-brutal-dark/55 tabular-nums">
+                                {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {endDate && ` — ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                            </div>
+                        </div>
+                    </div>
+
+                    {event.location && !externalRsvpUrl && (
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-brutal-red/10 border border-brutal-red/20 flex items-center justify-center flex-shrink-0">
+                                <MapPin className="w-4 h-4 text-brutal-red" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">Where</div>
+                                <div className="font-data text-xs font-bold text-brutal-dark leading-tight line-clamp-2">{event.location}</div>
+                            </div>
+                        </div>
+                    )}
+                    {externalRsvpUrl && (
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-brutal-red/10 border border-brutal-red/20 flex items-center justify-center flex-shrink-0">
+                                <ExternalLink className="w-4 h-4 text-brutal-red" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">Registration</div>
+                                <div className="font-data text-xs font-bold text-brutal-dark leading-tight line-clamp-1">External platform</div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-brutal-red/10 border border-brutal-red/20 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-4 h-4 text-brutal-red" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">Attending</div>
+                                <div className="font-data text-[10px] font-bold text-brutal-dark tabular-nums">
+                                    {capacity > 0 ? `${event.registration_count}/${capacity}` : `${event.registration_count}`}
+                                </div>
+                            </div>
+                            {capacity > 0 ? (
+                                <>
+                                    <div className="mt-1 h-1.5 w-full bg-brutal-dark/10 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-brutal-dark' : pct >= 80 ? 'bg-brutal-red' : 'bg-green-500'}`}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                    <div className="font-data text-[10px] text-brutal-dark/55 mt-1">
+                                        {capacityRemaining !== null && capacityRemaining > 0
+                                            ? `${capacityRemaining} spot${capacityRemaining !== 1 ? 's' : ''} left`
+                                            : 'At capacity'}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="font-data text-[10px] text-brutal-dark/55 mt-0.5">
+                                    Unlimited capacity
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Register CTA */}
+                <div className="p-4 md:p-5 space-y-2.5">
+                    {externalRsvpUrl ? (
+                        <a href={externalRsvpUrl} target="_blank" rel="noreferrer" className="block">
+                            <button
+                                type="button"
+                                className="w-full bg-brutal-red text-brutal-bg py-3 rounded-xl font-heading font-bold text-sm uppercase tracking-wider shadow-[3px_3px_0_0_rgba(0,0,0,0.25)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all flex items-center justify-center gap-2"
+                            >
+                                RSVP via External Link <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                        </a>
+                    ) : isRegistered ? (
+                        <>
+                            <div className="w-full bg-green-500/15 border-2 border-green-500/30 text-green-700 py-3 rounded-xl font-data text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                                <Check className="w-4 h-4" /> You're going
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleUnregister}
+                                disabled={actionLoading}
+                                className="w-full font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/45 hover:text-brutal-red transition-colors py-1"
+                            >
+                                {actionLoading ? 'Processing...' : 'Cancel RSVP'}
+                            </button>
+                        </>
+                    ) : event.registration_status === 'open' && (capacityRemaining === null || capacityRemaining > 0) ? (
+                        user ? (
+                            <button
+                                type="button"
+                                onClick={handleRegister}
+                                disabled={actionLoading}
+                                className="w-full bg-brutal-red text-brutal-bg py-3 rounded-xl font-heading font-bold text-sm uppercase tracking-wider shadow-[3px_3px_0_0_rgba(0,0,0,0.25)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {actionLoading ? 'Registering...' : 'Register Now'} <ArrowRight className="w-4 h-4" />
+                            </button>
+                        ) : (
+                            <Link to="/login" className="block">
+                                <button
+                                    type="button"
+                                    className="w-full bg-brutal-dark text-brutal-bg py-3 rounded-xl font-heading font-bold text-sm uppercase tracking-wider shadow-[3px_3px_0_0_rgba(196,41,30,0.4)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all flex items-center justify-center gap-2"
+                                >
+                                    Log in to Register
+                                </button>
+                            </Link>
+                        )
+                    ) : (
+                        <div className="w-full bg-brutal-dark/5 border-2 border-brutal-dark/15 text-brutal-dark/50 py-3 rounded-xl font-data text-xs font-bold uppercase tracking-wider text-center">
+                            Registration Closed
+                        </div>
+                    )}
+
+                    <AddToCalendarDropdown event={event} />
+                </div>
+            </div>
+
+            {/* Hosts card */}
+            {hosts && hosts.length > 0 && (
+                <div className="bg-brutal-bg rounded-2xl border-2 border-brutal-dark/15 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] p-4 md:p-5">
+                    <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40 mb-3">
+                        Hosted by
+                    </div>
+                    <div className="space-y-2">
+                        {hosts.map((host: any) => (
+                            <Link
+                                key={host.id}
+                                to={`/makers/${host.user_id}`}
+                                className="flex items-center gap-2.5 p-2 -mx-2 rounded-lg hover:bg-brutal-dark/5 transition-colors group"
+                            >
+                                {host.avatar_url ? (
+                                    <img src={host.avatar_url} alt={host.name} className="w-9 h-9 rounded-full object-cover border-2 border-brutal-dark/15" />
+                                ) : (
+                                    <div className="w-9 h-9 rounded-full bg-brutal-dark/10 border-2 border-brutal-dark/15 flex items-center justify-center font-data text-xs font-bold text-brutal-dark/60">
+                                        {host.name.charAt(0)}
+                                    </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-data text-xs font-bold text-brutal-dark group-hover:text-brutal-red transition-colors line-clamp-1">
+                                        {host.name}
+                                    </div>
+                                    <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">
+                                        Mentor · Host
+                                    </div>
+                                </div>
+                                <ArrowRight className="w-3 h-3 text-brutal-dark/25 group-hover:text-brutal-red group-hover:translate-x-0.5 transition-all" />
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </aside>
+    );
+};
+
+// ════════════════════════════════════════════════════════════════
 // PRE-EVENT: IMMERSIVE LANDING PAGE
 // ════════════════════════════════════════════════════════════════
 
 const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps }: any) => {
-    const [aboutText] = event.description?.includes('---RECAP---')
-        ? event.description.split('---RECAP---')
-        : [event.description, null];
-
-    const date = new Date(event.date);
-    const capacityRemaining = event.capacity ? event.capacity - event.registration_count : null;
-
     // Category-specific accent
     const accents: Record<string, string> = {
         build_challenge: 'from-brutal-red/20 via-brutal-dark/90 to-brutal-dark',
@@ -472,29 +799,15 @@ const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps
         tech_tuesday: 'from-brutal-dark/10 via-brutal-dark/70 to-brutal-dark',
     };
 
-    const externalRsvpUrl = event.location?.startsWith('rsvp:') ? event.location.replace('rsvp:', '') : null;
-
-    const customRegisterNode = externalRsvpUrl ? (
-        <div className="bg-brutal-dark text-brutal-bg rounded-2xl p-8 md:p-12 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brutal-red/10 rounded-bl-full pointer-events-none" />
-            <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-                <div className="flex-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl uppercase tracking-tight-heading mb-3">RSVP Now</h2>
-                    <p className="font-data text-sm text-brutal-bg/60 max-w-md">This event uses an external registration platform.</p>
-                </div>
-                <a href={externalRsvpUrl} target="_blank" rel="noreferrer">
-                    <Button size="lg" className="bg-brutal-red text-brutal-bg hover:bg-brutal-bg hover:text-brutal-dark transition-all">
-                        RSVP via External Link <ExternalLink className="w-4 h-4 ml-1" />
-                    </Button>
-                </a>
-            </div>
-        </div>
-    ) : null;
+    // Split description into About (strip recap suffix if present)
+    const [aboutText] = event.description?.includes('---RECAP---')
+        ? event.description.split('---RECAP---')
+        : [event.description, null];
 
     return (
         <>
-            {/* ── HERO: Full-width immersive ── */}
-            <section className="relative min-h-[85vh] flex items-end">
+            {/* ── HERO: Shortened, compact ── */}
+            <section className="relative min-h-[55vh] md:min-h-[60vh] flex items-end">
                 {/* Background */}
                 {event.cover_image_url ? (
                     <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -509,126 +822,92 @@ const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps
                 {/* Back button */}
                 <Link
                     to="/events"
-                    className="absolute top-28 left-6 md:left-12 lg:left-24 z-20 inline-flex items-center gap-2 font-data text-xs font-bold uppercase text-brutal-bg/70 hover:text-brutal-bg transition-colors bg-brutal-bg/10 backdrop-blur-sm px-3 py-2 rounded-full border border-brutal-bg/10"
+                    className="absolute top-24 md:top-26 left-6 md:left-12 lg:left-24 z-20 inline-flex items-center gap-2 font-data text-[10px] font-bold uppercase text-brutal-bg/70 hover:text-brutal-bg transition-colors bg-brutal-bg/10 backdrop-blur-sm px-2.5 py-1.5 rounded-full border border-brutal-bg/10"
                 >
                     <ArrowLeft className="w-3 h-3" /> Back
                 </Link>
 
-                {/* Hero content */}
-                <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-16 pt-48 max-w-7xl mx-auto">
-                    <div className="flex flex-col gap-6">
+                {/* Hero content — compact */}
+                <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-8 md:pb-10 pt-32 md:pt-36 max-w-7xl mx-auto">
+                    <div className="flex flex-col gap-3 md:gap-4">
                         {/* Type badge */}
-                        <div className="flex items-center gap-3">
-                            <span className="bg-brutal-red text-brutal-bg px-3 py-1 font-data text-[10px] font-bold rounded-full uppercase tracking-wider">
+                        <div className="ed-hero-text flex items-center gap-2 flex-wrap">
+                            <span className="bg-brutal-red text-brutal-bg px-2.5 py-0.5 font-data text-[10px] font-bold rounded-full uppercase tracking-wider">
                                 {formatEventType(event.event_type)}
                             </span>
                             {event.registration_status === 'open' && (
-                                <span className="bg-green-500/20 text-green-300 border border-green-400/30 px-3 py-1 font-data text-[10px] font-bold rounded-full uppercase tracking-wider">
+                                <span className="bg-green-500/20 text-green-300 border border-green-400/30 px-2.5 py-0.5 font-data text-[10px] font-bold rounded-full uppercase tracking-wider">
                                     Registration Open
                                 </span>
                             )}
                         </div>
 
-                        {/* Title */}
-                        <h1 className="ed-hero-text font-heading font-bold text-4xl sm:text-6xl md:text-8xl uppercase tracking-tight-heading leading-[0.9] text-brutal-bg max-w-4xl">
+                        {/* Title — shrunk */}
+                        <h1 className="ed-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-6xl uppercase tracking-tight-heading leading-[0.92] text-brutal-bg max-w-4xl">
                             {event.title}
                         </h1>
 
                         {/* Tagline */}
                         {event.tagline && (
-                            <p className="ed-hero-text font-data text-base md:text-lg text-brutal-bg/60 max-w-xl">{event.tagline}</p>
+                            <p className="ed-hero-text font-data text-sm md:text-base text-brutal-bg/60 max-w-xl">{event.tagline}</p>
                         )}
 
                         {/* Hosted by */}
                         <div className="ed-hero-text">
                             <HostedBySection hosts={hosts} variant="dark" />
                         </div>
-
-                        {/* Meta info strip */}
-                        <div className="ed-hero-text flex flex-wrap gap-4 font-data text-xs font-bold text-brutal-bg/80">
-                            <div className="flex items-center gap-2 bg-brutal-bg/10 backdrop-blur-sm px-4 py-2 rounded-full">
-                                <Calendar className="w-4 h-4 text-brutal-red" />
-                                {date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                            </div>
-                            <div className="flex items-center gap-2 bg-brutal-bg/10 backdrop-blur-sm px-4 py-2 rounded-full">
-                                <Clock className="w-4 h-4 text-brutal-red" />
-                                {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                            {event.location && !event.location.startsWith('rsvp:') && (
-                                <div className="flex items-center gap-2 bg-brutal-bg/10 backdrop-blur-sm px-4 py-2 rounded-full">
-                                    <MapPin className="w-4 h-4 text-brutal-red" /> {event.location}
-                                </div>
-                            )}
-                            <div className="flex items-center gap-2 bg-brutal-bg/10 backdrop-blur-sm px-4 py-2 rounded-full">
-                                <Users className="w-4 h-4 text-brutal-red" />
-                                {capacityRemaining !== null ? `${capacityRemaining} spots left` : `${event.registration_count} registered`}
-                            </div>
-                        </div>
-
-                        {/* Countdown */}
-                        <div className="ed-hero-text mt-4">
-                            <CountdownHero date={event.date} />
-                        </div>
                     </div>
                 </div>
             </section>
 
-            {/* ── MENTOR WEBSITE BANNER — shown right below hero ── */}
-            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 -mt-8 relative z-20">
-                <EventWebsiteBanner
-                    eventId={id}
-                    user={user}
-                    onRegisterClick={() => {
-                        const regSection = document.getElementById('registration');
-                        if (regSection) regSection.scrollIntoView({ behavior: 'smooth' });
-                        else registrationProps.handleRegister?.();
-                    }}
-                    isRegistered={registrationProps.isRegistered}
-                    isPast={false}
-                />
-            </div>
+            {/* ── BODY: Two-pane layout — content left, sticky action sidebar right ── */}
+            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-10 md:py-12">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8 md:gap-10">
+                    {/* Main content column */}
+                    <div className="min-w-0 space-y-10 md:space-y-12">
+                        {/*
+                          PCBCupid-style flow:
+                          1. Mentor-uploaded website sits at the very top (the event's primary content).
+                             For mentors/admins, this is the page they control.
+                             For everyone else, this is what they see — or nothing at all if not set up.
+                          2. Mentor Workspace is shown only to mentors/admins directly below, so they
+                             can edit their page, review registrations, and manage showcase slots in one
+                             unified area. Non-mentors never see this panel.
+                          3. Description/about is shown only as a fallback when no mentor website exists
+                             (mirroring PCBCupid, where the overview IS the mentor's content).
+                        */}
+                        <EventWebsiteBanner eventId={id!} fallback={!aboutText ? null : (
+                            <section>
+                                <SectionAnchor id="about-anchor" title="About this Event" />
+                                <div className="font-data text-sm md:text-base leading-relaxed text-brutal-dark/80 whitespace-pre-wrap">
+                                    {aboutText}
+                                </div>
+                            </section>
+                        )} />
 
-            {/* ── BODY: Content sections ── */}
-            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-16 space-y-20">
+                        {/* Mentor Workspace — unified website upload + registrations + slots. Renders nothing for non-mentors. */}
+                        <MentorControlsPanel eventId={id} user={user} />
 
-                {/* Registration CTA — front and center */}
-                <section id="registration" className="ed-section">
-                    <RegistrationCTA {...registrationProps} customRegisterNode={customRegisterNode} />
-                </section>
+                        {/* Category-specific pre-event content */}
+                        {event.event_type === 'maker_meetup' && (
+                            <MakerMeetupPreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
+                        )}
+                        {event.event_type === 'build_challenge' && (
+                            <BuildChallengePreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
+                        )}
+                        {event.event_type === 'tech_tuesday' && (
+                            <TechTuesdayPreEvent id={id} event={event} user={user} />
+                        )}
 
-                {/* About / Description */}
-                {aboutText && (
-                    <section className="ed-section">
-                        <SectionAnchor id="about" number="01" title="About" icon={
-                            event.event_type === 'build_challenge' ? <Trophy className="w-5 h-5 text-brutal-red" /> :
-                            event.event_type === 'tech_tuesday' ? <BookOpen className="w-5 h-5 text-brutal-red" /> :
-                            <Wrench className="w-5 h-5 text-brutal-red" />
-                        } />
-                        <div className="max-w-3xl">
-                            <p className="font-data text-sm md:text-base text-brutal-dark/80 whitespace-pre-wrap leading-relaxed">{aboutText.trim()}</p>
-                        </div>
-                    </section>
-                )}
+                        {/* Discussion */}
+                        <DiscussionSection {...commentsProps} sectionId="discussion" />
+                    </div>
 
-                {/* Category-specific pre-event content */}
-                {event.event_type === 'maker_meetup' && (
-                    <MakerMeetupPreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
-                )}
-                {event.event_type === 'build_challenge' && (
-                    <BuildChallengePreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
-                )}
-                {event.event_type === 'tech_tuesday' && (
-                    <TechTuesdayPreEvent id={id} event={event} user={user} />
-                )}
-
-                {/* Mentor Website Upload — only visible to mentors/admins */}
-                <MentorWebsiteUploadSection eventId={id} user={user} isRegistered={registrationProps.isRegistered} sectionId="mentor-upload" sectionNum="05" />
-
-                {/* Mentor Controls */}
-                <MentorControlsPanel eventId={id} user={user} />
-
-                {/* Discussion */}
-                <DiscussionSection {...commentsProps} sectionId="discussion" sectionNum="06" />
+                    {/* Action sidebar — sticky right rail (desktop) / inline top (mobile) */}
+                    <aside className="lg:order-last order-first">
+                        <ActionSidebar event={event} hosts={hosts} registrationProps={registrationProps} />
+                    </aside>
+                </div>
             </div>
         </>
     );
@@ -661,7 +940,7 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
     return (
         <>
             {/* ── HERO: Muted post-event ── */}
-            <section className="relative min-h-[50vh] flex items-end">
+            <section className="relative min-h-[38vh] md:min-h-[42vh] flex items-end">
                 {event.cover_image_url ? (
                     <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover grayscale-[30%] opacity-70" />
                 ) : (
@@ -674,22 +953,22 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
 
                 <Link
                     to="/events"
-                    className="absolute top-28 left-6 md:left-12 lg:left-24 z-20 inline-flex items-center gap-2 font-data text-xs font-bold uppercase text-brutal-bg/70 hover:text-brutal-bg transition-colors bg-brutal-bg/10 backdrop-blur-sm px-3 py-2 rounded-full border border-brutal-bg/10"
+                    className="absolute top-24 md:top-26 left-6 md:left-12 lg:left-24 z-20 inline-flex items-center gap-2 font-data text-[10px] font-bold uppercase text-brutal-bg/70 hover:text-brutal-bg transition-colors bg-brutal-bg/10 backdrop-blur-sm px-2.5 py-1.5 rounded-full border border-brutal-bg/10"
                 >
                     <ArrowLeft className="w-3 h-3" /> Back
                 </Link>
 
-                <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-12 pt-48 max-w-7xl mx-auto">
-                    <div className="flex items-center gap-3 mb-4">
-                        <span className="bg-brutal-dark/70 text-brutal-bg px-3 py-1 font-data text-[10px] font-bold rounded-full uppercase tracking-wider backdrop-blur-sm">
+                <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-8 md:pb-10 pt-32 md:pt-36 max-w-7xl mx-auto">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <span className="bg-brutal-dark/70 text-brutal-bg px-2.5 py-0.5 font-data text-[10px] font-bold rounded-full uppercase tracking-wider backdrop-blur-sm">
                             {formatEventType(event.event_type)}
                         </span>
-                        <span className="bg-brutal-dark text-brutal-bg px-3 py-1 font-data text-[10px] font-bold rounded-full uppercase tracking-wider flex items-center gap-1.5">
-                            <Star className="w-3 h-3" /> Event Concluded
+                        <span className="bg-brutal-dark text-brutal-bg px-2.5 py-0.5 font-data text-[10px] font-bold rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                            <Star className="w-3 h-3" /> Concluded
                         </span>
                     </div>
 
-                    <h1 className="ed-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase tracking-tight-heading leading-[0.9] mb-3 max-w-4xl">
+                    <h1 className="ed-hero-text font-heading font-bold text-3xl sm:text-4xl md:text-5xl uppercase tracking-tight-heading leading-[0.92] mb-2 max-w-4xl">
                         {event.title}
                     </h1>
 
@@ -714,16 +993,16 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                 </div>
             </section>
 
-            {/* ── BODY: Sidebar + Content ── */}
-            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-16">
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-16">
+            {/* ── BODY: Sidebar + Content — tightened ── */}
+            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-10 md:py-12">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-10 md:gap-14">
                     {/* Main content */}
-                    <div className="space-y-20">
+                    <div className="space-y-10 md:space-y-14">
                         {/* Recap */}
                         {recapText && (
                             <section id="recap" className="ed-section">
                                 <SectionAnchor id="recap-anchor" number={String(sectionNum++).padStart(2, '0')} title="Event Recap" icon={<Star className="w-5 h-5 text-brutal-red" />} />
-                                <div className="p-8 bg-brutal-dark text-brutal-bg rounded-2xl shadow-2xl relative overflow-hidden">
+                                <div className="p-6 bg-brutal-dark text-brutal-bg rounded-2xl shadow-xl relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-brutal-red/20 rounded-bl-full pointer-events-none" />
                                     <p className="font-data text-sm md:text-base text-brutal-bg/90 whitespace-pre-wrap leading-relaxed relative z-10">{recapText.trim()}</p>
                                 </div>
@@ -734,7 +1013,7 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                         {event.results_summary && (
                             <section id="results" className="ed-section">
                                 <SectionAnchor id="results-anchor" number={String(sectionNum++).padStart(2, '0')} title="Results" icon={<Trophy className="w-5 h-5 text-brutal-red" />} />
-                                <div className="p-8 bg-brutal-dark text-brutal-bg rounded-2xl shadow-2xl relative overflow-hidden">
+                                <div className="p-6 bg-brutal-dark text-brutal-bg rounded-2xl shadow-xl relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-24 h-24 bg-brutal-red/20 rounded-bl-full pointer-events-none" />
                                     <p className="font-data text-sm text-brutal-bg/90 whitespace-pre-wrap leading-relaxed relative z-10">{event.results_summary}</p>
                                 </div>
@@ -745,7 +1024,7 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                         {event.event_type === 'build_challenge' && event.prizes_info && (
                             <section id="prizes" className="ed-section">
                                 <SectionAnchor id="prizes-anchor" number={String(sectionNum++).padStart(2, '0')} title="Prizes & Recognition" icon={<Award className="w-5 h-5 text-brutal-red" />} />
-                                <div className="p-8 bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-2 border-yellow-400/30 rounded-2xl">
+                                <div className="p-6 bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-2 border-yellow-400/30 rounded-2xl">
                                     <p className="font-data text-sm text-brutal-dark/80 whitespace-pre-wrap leading-relaxed">{event.prizes_info}</p>
                                 </div>
                             </section>
@@ -777,7 +1056,7 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                         {event.learnings && (
                             <section id="learnings" className="ed-section">
                                 <SectionAnchor id="learnings-anchor" number={String(sectionNum++).padStart(2, '0')} title="Key Learnings" icon={<BookOpen className="w-5 h-5 text-brutal-red" />} />
-                                <div className="p-8 bg-gradient-to-br from-brutal-dark/5 to-brutal-dark/10 rounded-2xl border border-brutal-dark/10">
+                                <div className="p-6 bg-gradient-to-br from-brutal-dark/5 to-brutal-dark/10 rounded-2xl border border-brutal-dark/10">
                                     <p className="font-data text-sm text-brutal-dark/80 whitespace-pre-wrap leading-relaxed">{event.learnings}</p>
                                 </div>
                             </section>
@@ -792,9 +1071,6 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                                 </div>
                             </section>
                         )}
-
-                        {/* Mentor Website Upload — only visible to mentors/admins */}
-                        <MentorWebsiteUploadSection eventId={id} user={user} isRegistered={registrationProps.isRegistered} sectionId="mentor-upload-post" sectionNum={String(sectionNum++).padStart(2, '0')} />
 
                         {/* Mentor Controls */}
                         <MentorControlsPanel eventId={id} user={user} />
@@ -828,7 +1104,7 @@ const MakerMeetupPreEvent = ({ id, event, user, isRegistered }: any) => {
     const refetchSlots = async () => {
         const { data } = await supabase
             .from('showcase_slot')
-            .select('id, status, user_id, topic, project:project!project_id(id, title), app_user:app_user!user_id(name)')
+            .select('id, status, user_id, project:project!project_id(id, title), app_user:app_user!user_id(name)')
             .eq('event_id', id);
         setSlots(data || []);
     };
@@ -1308,26 +1584,36 @@ const TechTuesdayPostHighlights = ({ id }: { id: string }) => {
 // MENTOR CONTROLS — inline on event page
 // ════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════
+// MENTOR WORKSPACE — unified panel for mentors/admins
+// Tabs: Page (website upload) · Registrations · Showcase Slots
+// Replaces the old separate MentorControlsPanel + upload section.
+// ════════════════════════════════════════════════════════════════
+
+type MentorTab = 'page' | 'registrations' | 'slots';
+
 const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'registrations' | 'slots' | 'websites'>('registrations');
+    // ─── HOOKS — MUST be called unconditionally, in the same order every render ───
+    const isMentorOrAdmin = !!user && (user.role === 'mentor' || user.role === 'admin');
+
+    const [activeTab, setActiveTab] = useState<MentorTab>('page');
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [slots, setSlots] = useState<any[]>([]);
     const [loadingRegs, setLoadingRegs] = useState(false);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
-    const { data: websiteSubmissions, refetch: refetchWebsites } = useEventWebsitesForReview(eventId);
 
-    // Only show for mentors/admins
-    if (!user || (user.role !== 'mentor' && user.role !== 'admin')) return null;
+    // Pass undefined when not a mentor so the query no-ops, but the hook is still called.
+    const { data: myWebsite, refetch: refetchMyWebsite } = useMyEventWebsite(isMentorOrAdmin ? eventId : undefined as any);
+    const { submitWebsite, updateWebsite, deleteWebsite } = useEventWebsiteMutations();
 
     const fetchRegistrations = async () => {
         setLoadingRegs(true);
         const { data } = await supabase
             .from('event_registration')
-            .select('id, user_id, created_at, app_user:app_user!user_id(name, email)')
+            .select('id, user_id, registered_at, app_user:app_user!user_id(name, email)')
             .eq('event_id', eventId)
-            .order('created_at', { ascending: false });
+            .order('registered_at', { ascending: false });
         setRegistrations(data || []);
         setLoadingRegs(false);
     };
@@ -1336,20 +1622,27 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
         setLoadingSlots(true);
         const { data } = await supabase
             .from('showcase_slot')
-            .select('id, status, user_id, topic, project:project!project_id(id, title), app_user:app_user!user_id(name)')
+            .select('id, status, user_id, project:project!project_id(id, title), app_user:app_user!user_id(name)')
             .eq('event_id', eventId)
             .order('created_at', { ascending: false });
         setSlots(data || []);
         setLoadingSlots(false);
     };
 
-    const handleOpen = () => {
-        if (!isOpen) {
+    // Fetch on tab change (only when data needed). Hook is always called.
+    useEffect(() => {
+        if (!isMentorOrAdmin) return;
+        if (activeTab === 'registrations' && registrations.length === 0 && !loadingRegs) {
             fetchRegistrations();
+        }
+        if (activeTab === 'slots' && slots.length === 0 && !loadingSlots) {
             fetchSlots();
         }
-        setIsOpen(!isOpen);
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, isMentorOrAdmin]);
+
+    // ─── Now we can early-return safely (all hooks have been called) ───
+    if (!isMentorOrAdmin) return null;
 
     const handleSlotAction = async (slotId: string, newStatus: string) => {
         setActionLoading(slotId);
@@ -1358,199 +1651,203 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
         fetchSlots();
     };
 
-    const handleWebsiteAction = async (websiteId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
-        setActionLoading(websiteId);
-        await supabase.from('event_website').update({ status: newStatus, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq('id', websiteId);
-        setActionLoading(null);
-        refetchWebsites();
+    const handleWebsiteSubmit = async (data: { title: string; description: string; html_content: string | null; file_url: string | null; host_names: string[]; }) => {
+        if (myWebsite) {
+            const { error } = await updateWebsite(myWebsite.id, {
+                title: data.title,
+                description: data.description || undefined,
+                html_content: data.html_content || undefined,
+                file_url: data.file_url || undefined,
+                host_names: data.host_names,
+                status: 'approved', // mentors auto-publish their own page
+            } as any);
+            if (error) throw new Error(error);
+        } else {
+            const { data: created, error } = await submitWebsite({
+                event_id: eventId,
+                user_id: user.id,
+                title: data.title,
+                description: data.description || undefined,
+                html_content: data.html_content || undefined,
+                file_url: data.file_url || undefined,
+                host_names: data.host_names,
+            });
+            if (error) throw new Error(error);
+            // Auto-publish: flip status to approved right after insert
+            if (created?.id) {
+                const { error: updErr } = await updateWebsite(created.id, { status: 'approved' } as any);
+                if (updErr) throw new Error(updErr);
+            }
+        }
+        await refetchMyWebsite();
     };
 
-    const tabs = [
-        { key: 'registrations' as const, label: 'Registrations', count: registrations.length },
-        { key: 'slots' as const, label: 'Showcase Slots', count: slots.length },
-        { key: 'websites' as const, label: 'Websites', count: websiteSubmissions?.length || 0 },
+    const handleWebsiteDelete = async () => {
+        if (myWebsite && deleteWebsite) {
+            await deleteWebsite(myWebsite.id);
+            await refetchMyWebsite();
+        }
+    };
+
+    const websiteStatusLabel = myWebsite
+        ? (myWebsite.status === 'approved' ? 'Live' : myWebsite.status === 'pending' ? 'Draft' : 'Rejected')
+        : 'Empty';
+
+    const tabs: { key: MentorTab; label: string; count?: number | string }[] = [
+        { key: 'page', label: 'Event Page', count: websiteStatusLabel },
+        { key: 'registrations', label: 'Registrations', count: registrations.length },
+        { key: 'slots', label: 'Showcase Slots', count: slots.length },
     ];
 
     const pendingSlots = slots.filter(s => s.status === 'pending');
-    const pendingWebsites = (websiteSubmissions || []).filter(w => w.status === 'pending');
-    const totalPending = pendingSlots.length + pendingWebsites.length;
+    const totalPending = pendingSlots.length;
 
     return (
         <section className="ed-section">
-            {/* Toggle bar */}
-            <button
-                onClick={handleOpen}
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-brutal-dark to-brutal-dark/90 text-brutal-bg rounded-xl hover:from-brutal-red hover:to-brutal-red/90 transition-all group"
-            >
-                <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-brutal-red group-hover:text-brutal-bg transition-colors" />
-                    <span className="font-heading font-bold text-sm uppercase tracking-wider">Mentor Controls</span>
+            {/* Header bar — always visible, not collapsible */}
+            <div className="flex items-center justify-between gap-3 mb-3 px-1">
+                <div className="flex items-center gap-2.5">
+                    <Shield className="w-4 h-4 text-brutal-red" />
+                    <span className="font-heading font-bold text-sm uppercase tracking-wider text-brutal-dark">Mentor Workspace</span>
                     {totalPending > 0 && (
                         <span className="bg-brutal-red text-brutal-bg text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse">
                             {totalPending} pending
                         </span>
                     )}
                 </div>
-                {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
+                <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/35">
+                    Only you see this
+                </span>
+            </div>
 
-            {/* Expanded panel */}
-            {isOpen && (
-                <div className="mt-3 border-2 border-brutal-dark/10 rounded-xl overflow-hidden">
-                    {/* Tab bar */}
-                    <div className="flex border-b border-brutal-dark/10 bg-brutal-dark/5">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
-                                className={`flex-1 py-3 px-4 font-data text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                                    activeTab === tab.key
-                                        ? 'bg-brutal-dark text-brutal-bg'
-                                        : 'text-brutal-dark/50 hover:text-brutal-dark hover:bg-brutal-dark/10'
-                                }`}
-                            >
-                                {tab.label}
+            <div className="border-2 border-brutal-dark/10 rounded-2xl overflow-hidden bg-brutal-bg">
+                {/* Tab bar */}
+                <div className="flex border-b-2 border-brutal-dark/10 bg-brutal-dark/[0.03]">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`flex-1 py-3 px-4 font-data text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                                activeTab === tab.key
+                                    ? 'bg-brutal-dark text-brutal-bg'
+                                    : 'text-brutal-dark/50 hover:text-brutal-dark hover:bg-brutal-dark/10'
+                            }`}
+                        >
+                            {tab.label}
+                            {tab.count !== undefined && tab.count !== '' && (
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
                                     activeTab === tab.key ? 'bg-brutal-bg/20' : 'bg-brutal-dark/10'
                                 }`}>{tab.count}</span>
-                            </button>
-                        ))}
-                    </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
 
-                    {/* Tab content */}
-                    <div className="p-4 max-h-[400px] overflow-y-auto">
-                        {/* REGISTRATIONS TAB */}
-                        {activeTab === 'registrations' && (
-                            <div className="space-y-2">
-                                {loadingRegs ? (
-                                    <p className="font-data text-xs text-brutal-dark/40 text-center py-8">Loading registrations...</p>
-                                ) : registrations.length === 0 ? (
-                                    <p className="font-data text-xs text-brutal-dark/40 text-center py-8">No registrations yet.</p>
-                                ) : (
-                                    registrations.map((reg, i) => (
-                                        <div key={reg.id} className="flex items-center justify-between py-2 px-3 bg-brutal-bg rounded-lg border border-brutal-dark/5">
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-data text-[10px] text-brutal-dark/30 w-6">{i + 1}.</span>
-                                                <div>
-                                                    <span className="font-data text-xs font-bold block">{reg.app_user?.name || 'Unknown'}</span>
-                                                    <span className="font-data text-[10px] text-brutal-dark/40">{reg.app_user?.email}</span>
-                                                </div>
+                {/* Tab content */}
+                <div className="p-4 md:p-5">
+                    {/* PAGE (WEBSITE) TAB */}
+                    {activeTab === 'page' && (
+                        <div>
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                                <div>
+                                    <h4 className="font-heading font-bold text-sm uppercase tracking-tight-heading text-brutal-dark">
+                                        {myWebsite ? 'Your Event Page' : 'Set up your event page'}
+                                    </h4>
+                                    <p className="font-data text-[11px] text-brutal-dark/55 mt-0.5">
+                                        {myWebsite
+                                            ? 'This is what everyone sees at the top of the event. Updates go live immediately.'
+                                            : 'Upload an HTML file with your event details — it will render at the top of this page for all visitors.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <WebsiteUploadPanel
+                                eventId={eventId}
+                                userId={user.id}
+                                userName={user.full_name || user.name || user.email || 'Mentor'}
+                                existingSubmission={myWebsite || null}
+                                onSubmit={handleWebsiteSubmit}
+                                onDelete={myWebsite ? handleWebsiteDelete : undefined}
+                                isRegistered={true}
+                                mentorMode={true}
+                            />
+                        </div>
+                    )}
+
+                    {/* REGISTRATIONS TAB */}
+                    {activeTab === 'registrations' && (
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                            {loadingRegs ? (
+                                <p className="font-data text-xs text-brutal-dark/40 text-center py-8">Loading registrations...</p>
+                            ) : registrations.length === 0 ? (
+                                <p className="font-data text-xs text-brutal-dark/40 text-center py-8">No registrations yet.</p>
+                            ) : (
+                                registrations.map((reg, i) => (
+                                    <div key={reg.id} className="flex items-center justify-between py-2 px-3 bg-brutal-dark/[0.03] rounded-lg border border-brutal-dark/5">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <span className="font-data text-[10px] text-brutal-dark/30 w-6 flex-shrink-0">{i + 1}.</span>
+                                            <div className="min-w-0">
+                                                <span className="font-data text-xs font-bold block truncate">{reg.app_user?.name || 'Unknown'}</span>
+                                                <span className="font-data text-[10px] text-brutal-dark/40 truncate">{reg.app_user?.email}</span>
                                             </div>
-                                            <span className="font-data text-[9px] text-brutal-dark/30">
-                                                {new Date(reg.created_at).toLocaleDateString()}
+                                        </div>
+                                        <span className="font-data text-[9px] text-brutal-dark/30 flex-shrink-0 ml-2">
+                                            {new Date(reg.registered_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    {/* SHOWCASE SLOTS TAB */}
+                    {activeTab === 'slots' && (
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                            {loadingSlots ? (
+                                <p className="font-data text-xs text-brutal-dark/40 text-center py-8">Loading slots...</p>
+                            ) : slots.length === 0 ? (
+                                <p className="font-data text-xs text-brutal-dark/40 text-center py-8">No slot requests yet.</p>
+                            ) : (
+                                slots.map(slot => (
+                                    <div key={slot.id} className="flex items-center justify-between py-2 px-3 bg-brutal-dark/[0.03] rounded-lg border border-brutal-dark/5">
+                                        <div className="flex-1 min-w-0">
+                                            <span className="font-data text-xs font-bold block">{slot.app_user?.name || 'Unknown'}</span>
+                                            <span className="font-data text-[10px] text-brutal-dark/50 block truncate">
+                                                {slot.project?.title || 'No project linked'}
                                             </span>
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-
-                        {/* SHOWCASE SLOTS TAB */}
-                        {activeTab === 'slots' && (
-                            <div className="space-y-2">
-                                {loadingSlots ? (
-                                    <p className="font-data text-xs text-brutal-dark/40 text-center py-8">Loading slots...</p>
-                                ) : slots.length === 0 ? (
-                                    <p className="font-data text-xs text-brutal-dark/40 text-center py-8">No slot requests yet.</p>
-                                ) : (
-                                    slots.map(slot => (
-                                        <div key={slot.id} className="flex items-center justify-between py-2 px-3 bg-brutal-bg rounded-lg border border-brutal-dark/5">
-                                            <div className="flex-1 min-w-0">
-                                                <span className="font-data text-xs font-bold block">{slot.app_user?.name || 'Unknown'}</span>
-                                                <span className="font-data text-[10px] text-brutal-dark/50 block truncate">
-                                                    {slot.project?.title || slot.topic || 'No topic specified'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 ml-3 shrink-0">
-                                                {slot.status === 'pending' ? (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleSlotAction(slot.id, 'approved')}
-                                                            disabled={actionLoading === slot.id}
-                                                            className="bg-green-500 text-white p-1.5 rounded-lg hover:bg-green-600 transition-colors"
-                                                            title="Approve"
-                                                        >
-                                                            <Check className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleSlotAction(slot.id, 'rejected')}
-                                                            disabled={actionLoading === slot.id}
-                                                            className="bg-brutal-red text-white p-1.5 rounded-lg hover:bg-red-700 transition-colors"
-                                                            title="Reject"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <span className={`font-data text-[9px] font-bold uppercase px-2 py-1 rounded-full ${
-                                                        slot.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                                    }`}>{slot.status}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-
-                        {/* WEBSITES TAB */}
-                        {activeTab === 'websites' && (
-                            <div className="space-y-3">
-                                {!websiteSubmissions || websiteSubmissions.length === 0 ? (
-                                    <p className="font-data text-xs text-brutal-dark/40 text-center py-8">No website submissions yet.</p>
-                                ) : (
-                                    websiteSubmissions.map(w => (
-                                        <div key={w.id} className="p-3 bg-brutal-bg rounded-lg border border-brutal-dark/5">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div>
-                                                    <span className="font-data text-xs font-bold block">{w.title}</span>
-                                                    <span className="font-data text-[10px] text-brutal-dark/50">by {w.userName}</span>
-                                                </div>
+                                        <div className="flex items-center gap-2 ml-3 shrink-0">
+                                            {slot.status === 'pending' ? (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleSlotAction(slot.id, 'approved')}
+                                                        disabled={actionLoading === slot.id}
+                                                        className="bg-green-500 text-white p-1.5 rounded-lg hover:bg-green-600 transition-colors"
+                                                        title="Approve"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleSlotAction(slot.id, 'rejected')}
+                                                        disabled={actionLoading === slot.id}
+                                                        className="bg-brutal-red text-white p-1.5 rounded-lg hover:bg-red-700 transition-colors"
+                                                        title="Reject"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </>
+                                            ) : (
                                                 <span className={`font-data text-[9px] font-bold uppercase px-2 py-1 rounded-full ${
-                                                    w.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                                    w.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                    'bg-yellow-100 text-yellow-700'
-                                                }`}>{w.status}</span>
-                                            </div>
-                                            {/* Preview thumbnail */}
-                                            {w.html_content && (
-                                                <div className="relative w-full h-32 rounded-lg overflow-hidden bg-brutal-dark/5 border border-brutal-dark/10 mb-2">
-                                                    <iframe
-                                                        srcDoc={w.html_content}
-                                                        title={w.title}
-                                                        className="absolute inset-0 w-full border-0"
-                                                        style={{ height: '400%', width: '100%', transform: 'scale(0.25)', transformOrigin: 'top left', pointerEvents: 'none' }}
-                                                        sandbox="allow-scripts"
-                                                    />
-                                                </div>
-                                            )}
-                                            {/* Actions */}
-                                            {w.status === 'pending' && (
-                                                <div className="flex gap-2 mt-2">
-                                                    <button
-                                                        onClick={() => handleWebsiteAction(w.id, 'approved')}
-                                                        disabled={actionLoading === w.id}
-                                                        className="flex-1 flex items-center justify-center gap-1.5 bg-green-500 text-white py-2 rounded-lg font-data text-[10px] font-bold uppercase hover:bg-green-600 transition-colors"
-                                                    >
-                                                        <Check className="w-3 h-3" /> Approve
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleWebsiteAction(w.id, 'rejected')}
-                                                        disabled={actionLoading === w.id}
-                                                        className="flex-1 flex items-center justify-center gap-1.5 bg-brutal-red text-white py-2 rounded-lg font-data text-[10px] font-bold uppercase hover:bg-red-700 transition-colors"
-                                                    >
-                                                        <X className="w-3 h-3" /> Reject
-                                                    </button>
-                                                </div>
+                                                    slot.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                }`}>{slot.status}</span>
                                             )}
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-                    </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </section>
     );
 };
@@ -1663,6 +1960,8 @@ export function EventDetails() {
                     commentsProps={commentsProps}
                 />
             )}
+            {/* Sticky register bar — appears on scroll, hidden for past events inside component */}
+            <StickyRegisterBar {...registrationProps} />
         </div>
     );
 }

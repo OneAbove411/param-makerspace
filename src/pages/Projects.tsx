@@ -1,120 +1,88 @@
-import { useState, useEffect, useRef } from 'react';
-import { useProjects } from '../lib/hooks';
-import { Card } from '../components/ui/Card';
-import { MagneticCard } from '../components/ui/MagneticCard';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ArrowRight, Plus, ChevronDown } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
+
+import { useProjects, useRankAccess, useMyBookmarkedProjectIds, useToggleProjectBookmark } from '../lib/hooks';
+import type { ProjectListItem } from '../lib/hooks';
+import { canAccess } from '../lib/rankAccess';
+import { cn } from '../lib/utils';
+
+import { Card } from '../components/ui/Card';
+import { ProjectCard } from '../components/projects/ProjectCard';
+import { FacetRail } from '../components/projects/FacetRail';
+import type { ProjectsSort, ProjectsView } from '../components/projects/ProjectsFilterRail';
+import { ProjectsCommandBar } from '../components/projects/ProjectsCommandBar';
+import { MobileFilterSheet } from '../components/projects/MobileFilterSheet';
+import { ProjectQuickPeek } from '../components/projects/ProjectQuickPeek';
+import { RemixModal } from '../components/project/RemixModal';
+import {
+    ProjectsCommandPalette,
+    type ProjectCommand,
+} from '../components/projects/ProjectsCommandPalette';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const DOMAINS = ['All', 'Software & Robotics', 'Fabrication', 'Electronics', 'AI & Machine Learning', 'Bio-Hacking', 'Woodworking', 'Interdisciplinary'];
+// ─────────────────────────────────────────────────────────────
+// §8 Archive Cockpit — Projects page (Phase-1 Step-2 archive visual cleanup).
+//
+// Composes:
+//   • ProjectsCommandBar        — 72px sticky bar (search + sort only)
+//   • FacetRail                 — 220px sticky left sidebar (≥ lg) with domains, tags, view
+//   • MobileFilterSheet         — bottom sheet triggered on <md
+//   • ProjectCard               — merged archive + featured variants, CSS columns layout
+//   • ProjectQuickPeek          — right-drawer preview
+//   • ProjectsCommandPalette    — ⌘K global actions
+//
+// URL state keys (shareable, refreshable):
+//   ?domain=A,B     multi-select domain chips
+//   ?tags=x,y       multi-select tag chips
+//   ?sort=trending  sort mode (newest | oldest | trending)
+//   ?view=list      view mode (grid | list | bookmarks)
+//   ?q=text         search query
+//
+// Keyboard shortcuts (H7 — flexibility/efficiency):
+//   /            focus search input
+//   ⌘K / Ctrl+K  open command palette
+//   g then p     noop (already here)
+//   b            toggle Bookmarks view
+//   v            cycle Grid → List → Bookmarks
+//   Esc          close palette / quick peek
+// ─────────────────────────────────────────────────────────────
 
-// ─── Featured Project Banner ───
+const DOMAINS = [
+    'Software & Robotics',
+    'Fabrication',
+    'Electronics',
+    'AI & Machine Learning',
+    'Bio-Hacking',
+    'Woodworking',
+    'Interdisciplinary',
+];
 
-function FeaturedBanner({ project }: { project: any }) {
-    const bannerRef = useRef<HTMLDivElement>(null);
+// Phase-1 Step-2: default sort is now 'trending' so the most-liked project
+// lands in slot 1 (the 2x featured slot).
+const DEFAULT_SORT: ProjectsSort = 'trending';
+const DEFAULT_VIEW: ProjectsView = 'grid';
 
-    useEffect(() => {
-        if (!bannerRef.current) return;
-        const ctx = gsap.context(() => {
-            gsap.fromTo('.feat-text',
-                { y: 30, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.8, stagger: 0.1, ease: 'power3.out', delay: 0.3 }
-            );
-        }, bannerRef);
-        return () => ctx.revert();
-    }, [project?.id]);
-
-    if (!project) return null;
-
-    const coverImage = (project as any).cover_image_url || (project as any).coverImage;
-
-    return (
-        <Link to={`/projects/${project.id}`} className="block group">
-            <div
-                ref={bannerRef}
-                className="relative rounded-[2rem] overflow-hidden h-[340px] md:h-[420px] bg-brutal-dark mb-16"
-            >
-                {/* Background image */}
-                {coverImage ? (
-                    <img
-                        src={coverImage}
-                        alt={project.title}
-                        className="absolute inset-0 w-full h-full object-cover opacity-60
-                                   group-hover:opacity-75 group-hover:scale-105 transition-all duration-700 ease-out"
-                    />
-                ) : (
-                    <div
-                        className="absolute inset-0"
-                        style={{
-                            backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.05) 1px, transparent 1px)',
-                            backgroundSize: '24px 24px',
-                        }}
-                    />
-                )}
-
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark via-brutal-dark/50 to-transparent" />
-
-                {/* Content */}
-                <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12 flex items-end justify-between">
-                    <div className="max-w-2xl">
-                        <span className="feat-text inline-block bg-brutal-red text-brutal-bg px-3 py-1 font-data text-[10px]
-                                        font-bold uppercase tracking-widest rounded mb-4">
-                            Featured Project
-                        </span>
-                        <h2 className="feat-text font-drama italic text-3xl md:text-5xl text-brutal-bg leading-tight">
-                            {project.title}
-                        </h2>
-                        {project.domain && (
-                            <p className="feat-text font-data text-xs text-brutal-red mt-3 uppercase tracking-widest">
-                                #{project.domain}
-                            </p>
-                        )}
-                    </div>
-                    <div className="feat-text hidden md:flex items-center gap-2 bg-brutal-bg/10 backdrop-blur-sm
-                                    border border-brutal-bg/20 rounded-full px-6 py-3 font-heading font-bold text-sm
-                                    text-brutal-bg uppercase tracking-widest group-hover:bg-brutal-bg/20
-                                    transition-colors duration-300">
-                        View Project
-                        <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-300" />
-                    </div>
-                </div>
-            </div>
-        </Link>
-    );
-}
-
-// ─── "Propose a Project" CTA Card ───
+// ─── "Propose a Project" CTA card (guardrail: preserve italic / dashed) ───
 
 function ProposeCTA() {
     const navigate = useNavigate();
     return (
-        <div
-            onClick={() => navigate('/dashboard')}
-            className="group cursor-pointer h-full"
-        >
-            <Card className="h-full flex flex-col items-center justify-center p-8 border-dashed
-                             border-brutal-dark/15 hover:border-brutal-red/40 transition-all duration-500
-                             bg-brutal-bg hover:bg-brutal-red/[0.03] min-h-[320px]">
-                <div className="w-14 h-14 rounded-full border-2 border-brutal-dark/10 flex items-center justify-center
-                                group-hover:border-brutal-red/30 group-hover:bg-brutal-red/5 transition-all duration-500">
+        <div onClick={() => navigate('/dashboard')} className="group cursor-pointer h-full">
+            <Card className="h-full flex flex-col items-center justify-center p-8 border-dashed border-brutal-dark/15 hover:border-brutal-red/40 transition-all duration-500 bg-brutal-bg hover:bg-brutal-red/[0.03] min-h-[320px]">
+                <div className="w-14 h-14 rounded-full border-2 border-brutal-dark/10 flex items-center justify-center group-hover:border-brutal-red/30 group-hover:bg-brutal-red/5 transition-all duration-500">
                     <Plus size={24} className="text-brutal-dark/25 group-hover:text-brutal-red transition-colors duration-500" />
                 </div>
-                <h3 className="font-heading font-bold text-lg mt-6 text-brutal-dark/50
-                               group-hover:text-brutal-dark transition-colors duration-500 text-center">
+                <h3 className="font-heading font-bold text-lg mt-6 text-brutal-dark/50 group-hover:text-brutal-dark transition-colors duration-500 text-center">
                     Be the first to build<br />something
                 </h3>
-                <p className="font-data text-[10px] text-brutal-dark/30 uppercase tracking-[0.15em] mt-3
-                              group-hover:text-brutal-dark/50 transition-colors duration-500">
+                <p className="font-data text-[10px] text-brutal-dark/30 uppercase tracking-[0.15em] mt-3 group-hover:text-brutal-dark/50 transition-colors duration-500">
                     Start your own legacy
                 </p>
-                <div className="mt-6 px-5 py-2.5 rounded-full border-2 border-brutal-dark/15 font-heading font-bold
-                                text-xs uppercase tracking-widest text-brutal-dark/40
-                                group-hover:bg-brutal-dark group-hover:text-brutal-bg group-hover:border-brutal-dark
-                                transition-all duration-500 flex items-center gap-2">
+                <div className="mt-6 px-5 py-2.5 rounded-full border-2 border-brutal-dark/15 font-heading font-bold text-xs uppercase tracking-widest text-brutal-dark/40 group-hover:bg-brutal-dark group-hover:text-brutal-bg group-hover:border-brutal-dark transition-all duration-500 flex items-center gap-2">
                     Propose a Project
                     <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform duration-300" />
                 </div>
@@ -123,11 +91,14 @@ function ProposeCTA() {
     );
 }
 
-// ─── Skeleton loader ───
-
-function ProjectSkeleton() {
+function ProjectSkeleton({ spanCols = false }: { spanCols?: boolean }) {
     return (
-        <Card className="h-full flex flex-col animate-pulse">
+        <Card
+            className={cn(
+                'h-full flex flex-col animate-pulse',
+                spanCols && 'md:col-span-2 lg:col-span-2',
+            )}
+        >
             <div className="h-48 bg-brutal-dark/5" />
             <div className="p-6 space-y-4 flex-1">
                 <div className="h-3 w-20 bg-brutal-dark/8 rounded" />
@@ -139,229 +110,526 @@ function ProjectSkeleton() {
     );
 }
 
-// ─── Main Projects Page ───
+// ─────────────────────────────────────────────────────────────
+// Memoized card wrappers to prevent re-renders on keystroke
+// ─────────────────────────────────────────────────────────────
+
+interface CardItemProps {
+    project: ProjectListItem;
+    variant?: 'archive' | 'featured';
+    bookmarkedIds: Set<string> | null | undefined;
+    onQuickPeek: (p: ProjectListItem) => void;
+    onRemix?: (p: ProjectListItem) => void;
+    onToggleBookmark?: (p: ProjectListItem, currentlyBookmarked: boolean) => Promise<boolean>;
+}
+
+const CardItem = React.memo(function CardItem({ project, variant = 'archive', bookmarkedIds, onQuickPeek, onRemix, onToggleBookmark }: CardItemProps) {
+    const isBookmarked = bookmarkedIds?.has(project.id) ?? false;
+    return (
+        <ProjectCard
+            project={project}
+            variant={variant}
+            isBookmarked={isBookmarked}
+            onQuickPeek={onQuickPeek}
+            onRemix={onRemix}
+            onToggleBookmark={onToggleBookmark}
+        />
+    );
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Main page
+// ─────────────────────────────────────────────────────────────
 
 export function Projects() {
-    const [filter, setFilter] = useState('All');
-    const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
-    const { data: projects, loading } = useProjects(filter, sortBy);
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // ── URL state parsing ─────────────────────────────────────
+    const parseCsv = (v: string | null) =>
+        (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
+    const selectedDomains = useMemo(
+        () => parseCsv(searchParams.get('domain')),
+        [searchParams]
+    );
+    const selectedTags = useMemo(() => parseCsv(searchParams.get('tags')), [searchParams]);
+    const sort = (searchParams.get('sort') as ProjectsSort) || DEFAULT_SORT;
+    const view = (searchParams.get('view') as ProjectsView) || DEFAULT_VIEW;
+    const query = searchParams.get('q') || '';
+
+    const updateParams = useCallback(
+        (mutator: (p: URLSearchParams) => void) => {
+            const p = new URLSearchParams(searchParams);
+            mutator(p);
+            setSearchParams(p, { replace: true });
+        },
+        [searchParams, setSearchParams]
+    );
+
+    const setDomains = (next: string[]) =>
+        updateParams((p) => {
+            if (next.length === 0) p.delete('domain');
+            else p.set('domain', next.join(','));
+        });
+    const setTags = (next: string[]) =>
+        updateParams((p) => {
+            if (next.length === 0) p.delete('tags');
+            else p.set('tags', next.join(','));
+        });
+    const setSort = (next: ProjectsSort) =>
+        updateParams((p) => {
+            if (next === DEFAULT_SORT) p.delete('sort');
+            else p.set('sort', next);
+        });
+    const setView = (next: ProjectsView) =>
+        updateParams((p) => {
+            if (next === DEFAULT_VIEW) p.delete('view');
+            else p.set('view', next);
+        });
+    const setQuery = (next: string) =>
+        updateParams((p) => {
+            if (!next) p.delete('q');
+            else p.set('q', next);
+        });
+
+    const toggleDomain = (d: string) => {
+        const next = selectedDomains.includes(d)
+            ? selectedDomains.filter((x) => x !== d)
+            : [...selectedDomains, d];
+        setDomains(next);
+    };
+    const toggleTag = (t: string) => {
+        const next = selectedTags.includes(t)
+            ? selectedTags.filter((x) => x !== t)
+            : [...selectedTags, t];
+        setTags(next);
+    };
+
+    const clearAll = () => {
+        setSearchParams(new URLSearchParams(), { replace: true });
+    };
+
+    // ── Data ─────────────────────────────────────────────────
+    // Note: we fetch ALL projects client-side (no server-side domain filter)
+    // so multi-select + search + trending can all be computed in memory.
+    // This is cheap for the archive — one batched fetch, cached by the
+    // stale-while-revalidate useSupabaseQuery.
+    const { data: projects, loading } = useProjects(undefined, sort);
+    const { data: bookmarkedIds, refetch: refetchBookmarks } = useMyBookmarkedProjectIds();
+    const { data: rankInfo } = useRankAccess();
+    const canPropose = !!rankInfo?.rank && canAccess(rankInfo.rank, 'create_project');
+
+    // ── Card-level Save (bookmark) handler ───────────────────
+    const toggleBookmark = useToggleProjectBookmark();
+    const handleToggleBookmark = useCallback(
+        async (p: ProjectListItem, currentlyBookmarked: boolean) => {
+            if (!rankInfo) {
+                navigate('/login');
+                return currentlyBookmarked;
+            }
+            const next = await toggleBookmark(p.id, currentlyBookmarked);
+            // Refresh the parent set so the "Saved" view filter stays in sync
+            refetchBookmarks();
+            return next;
+        },
+        [toggleBookmark, refetchBookmarks, rankInfo, navigate],
+    );
+
+    // ── Derived — available tag universe ─────────────────────
+    const allTags = useMemo(() => {
+        if (!projects) return [] as string[];
+        const set = new Set<string>();
+        for (const p of projects) for (const t of p.tags) set.add(t);
+        return Array.from(set).sort();
+    }, [projects]);
+
+    // ── Filter pipeline ─────────────────────────────────────
+    const filteredProjects = useMemo(() => {
+        if (!projects) return [] as ProjectListItem[];
+        const q = query.trim().toLowerCase();
+        return projects.filter((p) => {
+            if (selectedDomains.length > 0 && !selectedDomains.includes(p.domain || '')) return false;
+            if (selectedTags.length > 0) {
+                const hasAll = selectedTags.every((t) => p.tags.includes(t));
+                if (!hasAll) return false;
+            }
+            if (view === 'bookmarks') {
+                if (!bookmarkedIds || !bookmarkedIds.has(p.id)) return false;
+            }
+            if (q) {
+                const hay = [
+                    p.title,
+                    p.summary || '',
+                    p.domain || '',
+                    p.owner_name || '',
+                    ...p.tags,
+                ]
+                    .join(' ')
+                    .toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [projects, selectedDomains, selectedTags, view, bookmarkedIds, query]);
+
+    const hasActiveFilters =
+        selectedDomains.length > 0 ||
+        selectedTags.length > 0 ||
+        sort !== DEFAULT_SORT ||
+        view !== DEFAULT_VIEW ||
+        !!query;
+
+    // ── Quick peek state ─────────────────────────────────────
+    const [peek, setPeek] = useState<ProjectListItem | null>(null);
+    const openPeek = useCallback((p: ProjectListItem) => setPeek(p), []);
+    const closePeek = useCallback(() => setPeek(null), []);
+
+    // ── Remix modal state ────────────────────────────────────
+    const [remixProject, setRemixProject] = useState<ProjectListItem | null>(null);
+    const openRemix = useCallback((p: ProjectListItem) => setRemixProject(p), []);
+    const closeRemix = useCallback(() => setRemixProject(null), []);
+
+    // ── Command palette state ────────────────────────────────
+    const [paletteOpen, setPaletteOpen] = useState(false);
+
+    // ── Mobile filter sheet state ────────────────────────────
+    const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Cycle view helper used by shortcut + command palette
+    const cycleView = useCallback(() => {
+        const next: ProjectsView =
+            view === 'grid' ? 'list' : view === 'list' ? 'bookmarks' : 'grid';
+        setView(next);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view]);
+
+    // ── Keyboard shortcuts ───────────────────────────────────
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            // Do not interfere while typing in inputs (except for modifier combos).
+            const tgt = e.target as HTMLElement | null;
+            const typing =
+                !!tgt &&
+                (tgt.tagName === 'INPUT' ||
+                    tgt.tagName === 'TEXTAREA' ||
+                    tgt.isContentEditable);
+
+            // ⌘K / Ctrl+K — always works
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                setPaletteOpen((o) => !o);
+                return;
+            }
+
+            if (typing) return;
+
+            if (e.key === '/') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+                return;
+            }
+            if (e.key === 'b') {
+                e.preventDefault();
+                setView(view === 'bookmarks' ? 'grid' : 'bookmarks');
+                return;
+            }
+            if (e.key === 'v') {
+                e.preventDefault();
+                cycleView();
+                return;
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view, cycleView]);
+
+    // ── GSAP intro animations — runs ONCE, respects reduced-motion ────
     const pageRef = useRef<HTMLDivElement>(null);
     const hasAnimated = useRef(false);
 
-    // GSAP scroll animations
     useEffect(() => {
         if (loading || hasAnimated.current) return;
         hasAnimated.current = true;
-
+        const prefersReduced = typeof window !== 'undefined'
+            && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReduced) return;
         const ctx = gsap.context(() => {
-            // Page title entrance
-            gsap.fromTo('.archive-title',
-                { y: 60, opacity: 0 },
-                { y: 0, opacity: 1, duration: 1, ease: 'power3.out', delay: 0.1 }
+            gsap.fromTo(
+                '.filter-rail',
+                { y: -10, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 }
             );
-
-            // Filter bar entrance
-            gsap.fromTo('.filter-bar',
-                { y: 30, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.8, ease: 'power3.out', delay: 0.25 }
-            );
-
-            // Project cards stagger in
-            gsap.fromTo('.project-card-animated',
+            gsap.fromTo(
+                '.project-card-animated',
                 { y: 60, opacity: 0 },
                 {
-                    y: 0, opacity: 1,
-                    duration: 0.7, stagger: 0.08,
+                    y: 0,
+                    opacity: 1,
+                    duration: 0.7,
+                    stagger: 0.08,
                     ease: 'power3.out',
-                    scrollTrigger: { trigger: '.project-grid', start: 'top 80%' }
+                    delay: 0.15,
                 }
             );
         }, pageRef);
-
         return () => ctx.revert();
     }, [loading]);
 
-    // Re-trigger card animations on filter change
-    useEffect(() => {
-        if (loading) return;
-        const cards = document.querySelectorAll('.project-card-animated');
-        gsap.fromTo(cards,
-            { y: 40, opacity: 0 },
-            { y: 0, opacity: 1, duration: 0.5, stagger: 0.06, ease: 'power3.out' }
-        );
-    }, [filter, sortBy, loading]);
+    // ── Command palette command list ─────────────────────────
+    const commands = useMemo<ProjectCommand[]>(() => {
+        const list: ProjectCommand[] = [];
 
-    const featuredProject = projects && projects.length > 0 ? projects[0] : null;
-    const gridProjects = projects ? projects.slice(1) : [];
+        // Navigate — jump to each visible project
+        for (const p of filteredProjects.slice(0, 20)) {
+            list.push({
+                id: `nav:${p.id}`,
+                label: p.title,
+                hint: p.domain || undefined,
+                section: 'Navigate',
+                keywords: p.tags,
+                run: () => navigate(`/projects/${p.id}`),
+            });
+        }
 
+        // Filter — set each domain as the sole filter
+        for (const d of DOMAINS) {
+            list.push({
+                id: `filter:domain:${d}`,
+                label: `Filter → ${d}`,
+                section: 'Filter',
+                keywords: ['domain', d],
+                run: () => setDomains([d]),
+            });
+        }
+
+        // Filter — sorts
+        const sorts: Array<{ id: ProjectsSort; label: string }> = [
+            { id: 'trending', label: 'Sort by Trending' },
+            { id: 'newest', label: 'Sort by Newest' },
+            { id: 'oldest', label: 'Sort by Oldest' },
+        ];
+        for (const s of sorts) {
+            list.push({
+                id: `filter:sort:${s.id}`,
+                label: s.label,
+                section: 'Filter',
+                keywords: ['sort', s.id],
+                run: () => setSort(s.id),
+            });
+        }
+
+        // View
+        const views: Array<{ id: ProjectsView; label: string }> = [
+            { id: 'grid', label: 'Switch to Grid view' },
+            { id: 'list', label: 'Switch to List view' },
+            { id: 'bookmarks', label: 'Show only Bookmarks' },
+        ];
+        for (const v of views) {
+            list.push({
+                id: `view:${v.id}`,
+                label: v.label,
+                section: 'View',
+                keywords: ['view', v.id],
+                run: () => setView(v.id),
+            });
+        }
+
+        // Actions
+        list.push({
+            id: 'action:focus-search',
+            label: 'Focus search',
+            hint: '/',
+            section: 'Actions',
+            run: () => searchInputRef.current?.focus(),
+        });
+        list.push({
+            id: 'action:clear',
+            label: 'Clear all filters',
+            section: 'Actions',
+            run: clearAll,
+        });
+        if (canPropose) {
+            list.push({
+                id: 'action:propose',
+                label: 'Propose a new project',
+                section: 'Actions',
+                run: () => navigate('/dashboard'),
+            });
+        }
+        return list;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredProjects, canPropose, navigate]);
+
+    // ── Render ───────────────────────────────────────────────
     return (
-        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg pt-28 md:pt-32 px-6 md:px-12 lg:px-24 min-h-screen">
+        <div
+            ref={pageRef}
+            className="flex-1 w-full bg-brutal-bg pt-28 md:pt-32 px-6 md:px-12 lg:px-24 min-h-screen"
+        >
             <div className="max-w-7xl mx-auto">
-
-                {/* ─── Page Title ─── */}
-                <h1 className="archive-title font-heading font-bold text-3xl sm:text-5xl md:text-7xl uppercase
-                               tracking-tight-heading mb-4">
-                    Project Archive
-                </h1>
-
-                {/* ─── Filter Bar ─── */}
-                <div className="filter-bar flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12
-                                border-b border-brutal-dark/10 pb-6 mt-10">
-                    {/* Domain dropdown */}
-                    <div className="flex items-center gap-3">
-                        <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
-                            Domain:
-                        </span>
-                        <div className="relative w-full sm:w-auto">
-                            <select
-                                className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
-                                           w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
-                                           focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
-                                value={filter}
-                                onChange={(e) => setFilter(e.target.value)}
-                            >
-                                {DOMAINS.map(d => (
-                                    <option key={d} value={d}>{d}</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
-                        </div>
-                    </div>
-
-                    {/* Sort dropdown */}
-                    <div className="flex items-center gap-3">
-                        <span className="font-data text-[10px] font-bold uppercase text-brutal-dark/40 tracking-widest">
-                            Sort by:
-                        </span>
-                        <div className="relative w-full sm:w-auto">
-                            <select
-                                className="appearance-none bg-brutal-bg border-2 border-brutal-dark/15 rounded-full
-                                           w-full sm:w-auto px-5 py-2 pr-9 font-data text-xs font-bold uppercase tracking-wider
-                                           focus:outline-none focus:border-brutal-dark transition-colors cursor-pointer"
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-                            >
-                                <option value="newest">Newest First</option>
-                                <option value="oldest">Oldest First</option>
-                            </select>
-                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none" />
-                        </div>
+                {/* ─── Project Archive identity ─── */}
+                <div className="flex items-end justify-between mb-6 md:mb-8">
+                    <div>
+                        <p className="font-data text-[10px] font-bold uppercase tracking-[0.25em] text-brutal-dark/50 mb-2">Project Archive</p>
+                        <h1 className="font-heading font-bold text-3xl md:text-4xl uppercase tracking-tight-heading text-brutal-dark">
+                            {filteredProjects.length} build{filteredProjects.length === 1 ? '' : 's'}
+                            <span className="text-brutal-dark/30"> · browse, remix, build</span>
+                        </h1>
                     </div>
                 </div>
 
-                {/* ─── Featured Project Banner ─── */}
-                {!loading && featuredProject && <FeaturedBanner project={featuredProject} />}
+                {/* ─── Sticky Command Bar (full-width) ─── */}
+                <ProjectsCommandBar
+                    search={query}
+                    onSearchChange={setQuery}
+                    searchInputRef={searchInputRef}
+                    sort={sort}
+                    onSortChange={setSort}
+                />
 
-                {/* ─── Project Grid ─── */}
-                {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-32">
-                        {[...Array(6)].map((_, i) => <ProjectSkeleton key={i} />)}
-                    </div>
-                ) : (
-                    <div className="project-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-32">
-                        {gridProjects.map((project) => {
-                            const coverImage = (project as any).cover_image_url || (project as any).coverImage;
+                {/* ─── Facet Rail (left) + Content (right) ─── */}
+                <div className="flex gap-8 relative">
+                    <FacetRail
+                        domains={DOMAINS}
+                        selectedDomains={selectedDomains}
+                        onToggleDomain={toggleDomain}
+                        allTags={allTags}
+                        selectedTags={selectedTags}
+                        onToggleTag={toggleTag}
+                        view={view}
+                        onViewChange={setView}
+                        onClearAll={clearAll}
+                        hasActiveFilters={hasActiveFilters}
+                    />
 
-                            return (
-                                <MagneticCard
-                                    key={project.id}
-                                    intensity={4}
-                                    glowOnHover
-                                    className="project-card-animated"
-                                >
-                                    <Link to={`/projects/${project.id}`} className="block h-full group">
-                                        <Card className="h-full flex flex-col group-hover:border-brutal-red/30
-                                                        transition-colors duration-500">
-                                            {/* Image */}
-                                            <div className="h-52 w-full overflow-hidden bg-brutal-dark relative">
-                                                {coverImage ? (
-                                                    <img
-                                                        src={coverImage}
-                                                        alt={project.title}
-                                                        className="w-full h-full object-cover opacity-75
-                                                                   group-hover:opacity-100 group-hover:scale-105
-                                                                   transition-all duration-700 ease-out"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center"
-                                                         style={{
-                                                             backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.08) 1px, transparent 1px)',
-                                                             backgroundSize: '20px 20px',
-                                                         }}>
-                                                        <span className="font-data text-brutal-bg/15 text-xs uppercase tracking-widest">
-                                                            No Preview
-                                                        </span>
-                                                    </div>
-                                                )}
-
-                                                {/* Hover arrow overlay */}
-                                                <div className="absolute bottom-4 right-4 w-8 h-8 rounded-full bg-brutal-bg/0
-                                                                group-hover:bg-brutal-bg/90 flex items-center justify-center
-                                                                transition-all duration-500 opacity-0 group-hover:opacity-100
-                                                                translate-y-2 group-hover:translate-y-0">
-                                                    <ArrowRight size={14} className="text-brutal-dark" />
-                                                </div>
-                                            </div>
-
-                                            {/* Content */}
-                                            <div className="p-6 flex-1 flex flex-col">
-                                                {project.domain && (
-                                                    <span className="text-[10px] font-data font-bold uppercase tracking-[0.15em] text-brutal-red mb-3">
-                                                        #{project.domain}
-                                                    </span>
-                                                )}
-
-                                                <h3 className="font-heading font-bold text-xl mb-2 line-clamp-2 leading-tight
-                                                               tracking-tight-heading group-hover:text-brutal-red transition-colors duration-300">
-                                                    {project.title}
-                                                </h3>
-                                                <p className="font-data text-sm text-brutal-dark/50 line-clamp-2 mb-6 flex-1 leading-relaxed">
-                                                    {project.summary}
-                                                </p>
-
-                                                <div className="flex items-center justify-between border-t border-brutal-dark/5 pt-4 mt-auto">
-                                                    <div className="font-data text-[10px] font-bold text-brutal-dark/35 uppercase tracking-widest">
-                                                        {project.duration || 'Ongoing'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    </Link>
-                                </MagneticCard>
-                            );
-                        })}
-
-                        {/* Propose a Project CTA card — always last in grid */}
-                        <div className="project-card-animated">
-                            <ProposeCTA />
-                        </div>
-
-                        {/* Empty state */}
-                        {gridProjects.length === 0 && !featuredProject && (
-                            <div className="col-span-full py-24 text-center space-y-4">
+                    <div className="flex-1 min-w-0">
+                        {loading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-32">
+                                {[...Array(6)].map((_, i) => (
+                                    <ProjectSkeleton key={i} spanCols={i === 0} />
+                                ))}
+                            </div>
+                        ) : filteredProjects.length === 0 ? (
+                            <div className="py-24 text-center space-y-4">
                                 <div className="font-heading font-bold text-5xl text-brutal-dark/10 uppercase tracking-tight-heading">
-                                    No Projects Yet
+                                    {view === 'bookmarks' ? 'No Bookmarks' : 'Nothing Found'}
                                 </div>
-                                <p className="font-data text-sm text-brutal-dark/30">
-                                    {filter !== 'All'
-                                        ? `No ${filter} projects found. Try a different domain.`
+                                <p className="font-data text-sm text-brutal-dark/40 max-w-md mx-auto">
+                                    {view === 'bookmarks'
+                                        ? 'Bookmark projects from their detail page and they will show up here.'
+                                        : hasActiveFilters
+                                        ? 'No projects match the current filters. Try clearing some chips.'
                                         : 'Be the first to propose a project and start building.'}
                                 </p>
+                                {hasActiveFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={clearAll}
+                                        className="font-data text-[11px] font-bold uppercase tracking-widest text-brutal-red border-b-2 border-brutal-red/40 pb-0.5 hover:border-brutal-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
+                                    >
+                                        Clear all filters
+                                    </button>
+                                )}
+                            </div>
+                        ) : view === 'list' ? (
+                            <div className="project-grid flex flex-col gap-4 pb-32">
+                                {filteredProjects.map((p) => (
+                                    <div key={p.id} className="project-card-animated">
+                                        <CardItem
+                                            project={p}
+                                            variant="archive"
+                                            bookmarkedIds={bookmarkedIds}
+                                            onQuickPeek={openPeek}
+                                            onRemix={openRemix}
+                                            onToggleBookmark={handleToggleBookmark}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="pb-32">
+                                {/* Featured slot — full-width, OUTSIDE the masonry so the
+                                    horizontal split layout actually has room to breathe.
+                                    Without this the featured card is trapped in a single
+                                    CSS column and all corner icons cluster on top of each
+                                    other (Phase-1 fix). */}
+                                {sort === 'trending' && filteredProjects[0] && (
+                                    <div className="project-card-animated mb-8 md:mb-10">
+                                        <CardItem
+                                            project={filteredProjects[0]}
+                                            variant="featured"
+                                            bookmarkedIds={bookmarkedIds}
+                                            onQuickPeek={openPeek}
+                                            onRemix={openRemix}
+                                            onToggleBookmark={handleToggleBookmark}
+                                        />
+                                    </div>
+                                )}
+                                <div className="project-grid columns-1 md:columns-2 xl:columns-3 gap-6 md:gap-8">
+                                    {filteredProjects
+                                        .slice(sort === 'trending' && filteredProjects[0] ? 1 : 0)
+                                        .map((p) => (
+                                            <div
+                                                key={p.id}
+                                                className="project-card-animated break-inside-avoid mb-6 md:mb-8"
+                                            >
+                                                <CardItem
+                                                    project={p}
+                                                    variant="archive"
+                                                    bookmarkedIds={bookmarkedIds}
+                                                    onQuickPeek={openPeek}
+                                                    onRemix={openRemix}
+                                                    onToggleBookmark={handleToggleBookmark}
+                                                />
+                                            </div>
+                                        ))}
+                                </div>
                             </div>
                         )}
                     </div>
-                )}
+                </div>
 
-                {/* ─── Load More (placeholder for pagination) ─── */}
-                {projects && projects.length > 7 && (
-                    <div className="text-center pb-20 -mt-16">
-                        <button className="font-data text-xs font-bold uppercase tracking-[0.2em] text-brutal-dark/40
-                                           hover:text-brutal-dark transition-colors border-t border-brutal-dark/10 pt-6 px-8">
-                            Load Archive Files ({projects.length - 7} remaining)
-                        </button>
+                {/* ─── Sticky mobile propose ─── */}
+                {canPropose && (
+                    <div className="md:hidden fixed bottom-0 inset-x-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 bg-gradient-to-t from-brutal-bg via-brutal-bg/95 to-transparent pointer-events-none">
+                        <Link
+                            to="/dashboard"
+                            aria-label="Propose a new project"
+                            className="pointer-events-auto flex items-center justify-center gap-2 w-full bg-brutal-dark text-brutal-bg font-heading font-bold uppercase tracking-widest text-sm px-6 py-4 rounded-full border-2 border-brutal-dark shadow-[0_4px_0_rgba(0,0,0,0.15)] min-h-[44px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red active:translate-y-[1px] transition-transform"
+                        >
+                            <Plus size={16} aria-hidden="true" />
+                            Propose Project
+                        </Link>
                     </div>
                 )}
             </div>
+
+            {/* ─── Overlays ─── */}
+            <MobileFilterSheet
+                open={mobileSheetOpen}
+                onClose={() => setMobileSheetOpen(false)}
+                domains={DOMAINS}
+                selectedDomains={selectedDomains}
+                onToggleDomain={toggleDomain}
+                allTags={allTags}
+                selectedTags={selectedTags}
+                onToggleTag={toggleTag}
+                sort={sort}
+                onSortChange={setSort}
+                onClearAll={clearAll}
+                hasActiveFilters={hasActiveFilters}
+                resultCount={filteredProjects.length}
+            />
+            <ProjectQuickPeek project={peek} open={!!peek} onClose={closePeek} />
+            <RemixModal open={!!remixProject} origin={remixProject} onClose={closeRemix} />
+            <ProjectsCommandPalette
+                open={paletteOpen}
+                onClose={() => setPaletteOpen(false)}
+                commands={commands}
+            />
         </div>
     );
 }

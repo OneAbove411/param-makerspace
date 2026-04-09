@@ -1,15 +1,9 @@
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 import { WelcomeHero } from '../components/home/WelcomeHero';
-import { BuildQuestion } from '../components/home/BuildQuestion';
-import { LivePulse } from '../components/home/LivePulse';
-import { KnowMore } from '../components/home/KnowMore';
-
-gsap.registerPlugin(ScrollTrigger);
 
 /**
- * Home — The newcomer journey (v5 — Layer3 HUD pass)
+ * Home — The newcomer journey (v6 — perf pass)
  *
  * Four sections, no secondary nav slabs:
  *  1. WelcomeHero    → Auth-contextual hook. Logged-out: italic-serif "Welcome".
@@ -19,23 +13,130 @@ gsap.registerPlugin(ScrollTrigger);
  *  2. BuildQuestion  → Spark: scatter-to-grid project tiles, "What would you
  *                       [build]?" rotating verb.
  *  3. LivePulse      → Proof of life: live activity + upcoming events.
- *  4. KnowMore       → Three connected node-cards (What is Param / The Maker
- *                       Loop / Six Ranks) collapsed by default, with the final
- *                       convert CTA strip ("You don't need permission...")
- *                       folded into its bottom — replacing the old standalone
- *                       ClosingCTA section.
+ *  4. KnowMore       → Three connected node-cards with the final convert CTA
+ *                       strip folded into its bottom.
  *
- * Tonal rhythm: dark (Hero + BuildQuestion) → light (LivePulse + KnowMore,
- * which closes with a dark convert strip). One major flip instead of two.
+ * PERF: WelcomeHero is the only eagerly-imported section — it owns the LCP
+ * headline. Everything below the fold (BuildQuestion, LivePulse, KnowMore)
+ * is `React.lazy`'d and only streamed in once the hero has painted, so the
+ * critical initial chunk stays small and the "3D robot + italic serif
+ * welcome" lands on first paint without waiting on GSAP timelines, the
+ * project grid query, or the ScrollTrigger setup used by the lower
+ * sections.
+ *
+ * We deliberately do NOT wait for the user to scroll before loading the
+ * below-fold sections — that would cause visible pop-in. Instead we fire an
+ * `idleCallback` (or a short setTimeout fallback) right after the hero
+ * mounts, so the chunks are already warm in cache by the time the user
+ * scrolls.
  */
 
+const BuildQuestion = lazy(() =>
+    import('../components/home/BuildQuestion').then((m) => ({ default: m.BuildQuestion })),
+);
+const LivePulse = lazy(() =>
+    import('../components/home/LivePulse').then((m) => ({ default: m.LivePulse })),
+);
+const KnowMore = lazy(() =>
+    import('../components/home/KnowMore').then((m) => ({ default: m.KnowMore })),
+);
+
+// Reusable `requestIdleCallback` wrapper that falls back to `setTimeout` on
+// browsers (Safari < 17.4) without native idle-callback support.
+type IdleHandle = number;
+const scheduleIdle = (cb: () => void, timeout = 600): IdleHandle => {
+    if (typeof window === 'undefined') return 0;
+    type IdleRequest = (cb: () => void, opts?: { timeout: number }) => number;
+    const ric = (window as unknown as { requestIdleCallback?: IdleRequest })
+        .requestIdleCallback;
+    if (typeof ric === 'function') {
+        return ric(cb, { timeout });
+    }
+    return window.setTimeout(cb, timeout) as unknown as number;
+};
+const cancelIdle = (id: IdleHandle) => {
+    if (typeof window === 'undefined' || !id) return;
+    type CancelIdle = (id: number) => void;
+    const cic = (window as unknown as { cancelIdleCallback?: CancelIdle })
+        .cancelIdleCallback;
+    if (typeof cic === 'function') {
+        cic(id);
+        return;
+    }
+    window.clearTimeout(id);
+};
+
+/**
+ * Lightweight placeholder for lazy-loaded home sections. Matches the page
+ * background exactly so there's no flash. A very short delay prevents
+ * flicker when chunks load in <50ms.
+ */
+function SectionPlaceholder({ minHeight }: { minHeight: string }) {
+    return (
+        <div
+            className="w-full bg-brutal-bg"
+            style={{ minHeight }}
+            aria-hidden="true"
+        />
+    );
+}
+
 export function Home() {
+    // Gate the below-the-fold sections behind either an idle callback OR an
+    // IntersectionObserver on a sentinel just above the fold. Whichever
+    // fires first wins. This means:
+    //   • On a fast connection, idle fires almost immediately and the
+    //     sections are in the DOM before the user scrolls.
+    //   • On a slow connection, idle is delayed by timeout fallback, so
+    //     the user doesn't wait on below-fold chunks for LCP.
+    //   • If the user scrolls aggressively before idle fires, the
+    //     IntersectionObserver catches them and forces the load.
+    const [belowFoldReady, setBelowFoldReady] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (belowFoldReady) return;
+        // Schedule an idle load so the chunks warm up after LCP is safe.
+        const idleId = scheduleIdle(() => setBelowFoldReady(true), 800);
+        return () => cancelIdle(idleId);
+    }, [belowFoldReady]);
+
+    useEffect(() => {
+        if (belowFoldReady) return;
+        const el = sentinelRef.current;
+        if (!el || typeof IntersectionObserver === 'undefined') return;
+        const io = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        setBelowFoldReady(true);
+                        io.disconnect();
+                        return;
+                    }
+                }
+            },
+            // Pre-fetch when the sentinel is within one viewport of the user.
+            { rootMargin: '100% 0px' },
+        );
+        io.observe(el);
+        return () => io.disconnect();
+    }, [belowFoldReady]);
+
     return (
         <div className="flex-1 w-full bg-brutal-bg overflow-hidden relative">
             <WelcomeHero />
-            <BuildQuestion />
-            <LivePulse />
-            <KnowMore />
+            <div ref={sentinelRef} aria-hidden="true" />
+            {belowFoldReady ? (
+                <Suspense fallback={<SectionPlaceholder minHeight="80vh" />}>
+                    <BuildQuestion />
+                    <LivePulse />
+                    <KnowMore />
+                </Suspense>
+            ) : (
+                <SectionPlaceholder minHeight="240vh" />
+            )}
         </div>
     );
 }
+
+export default Home;

@@ -335,48 +335,51 @@ export function ManageEvents() {
     const isPastEvent = form.date ? new Date(form.date) < new Date() : false;
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
-            <div className="max-w-6xl mx-auto space-y-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <span className="bg-brutal-red text-white px-2 py-1 text-xs font-bold font-data rounded uppercase">
+        <div className="flex-1 w-full bg-brutal-bg pt-28 md:pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-24">
+            <div className="max-w-6xl mx-auto space-y-6">
+                <div className="flex items-center gap-3 mb-1">
+                    <span className="bg-brutal-red text-white px-2 py-0.5 text-[10px] font-bold font-data rounded uppercase tracking-wider">
                         {role === 'admin' ? 'Admin Panel' : 'Mentor Tools'}
                     </span>
-                    <Link to="/dashboard" className="text-brutal-dark/60 hover:text-brutal-dark font-data text-sm font-bold ml-auto underline">
+                    <Link to="/dashboard" className="text-brutal-dark/60 hover:text-brutal-dark font-data text-xs font-bold ml-auto underline">
                         Back to Dashboard
                     </Link>
                 </div>
 
-                <div className="flex justify-between items-end">
+                <div className="flex justify-between items-end gap-4">
                     <div>
-                        <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading flex items-center gap-4">
-                            <CalendarIcon className="w-10 h-10 text-brutal-red" />
+                        <p className="font-data text-[10px] font-bold uppercase tracking-[0.25em] text-brutal-dark/50 mb-2">
+                            Admin
+                        </p>
+                        <h1 className="font-heading font-bold text-3xl md:text-4xl uppercase tracking-tight-heading flex items-center gap-3">
+                            <CalendarIcon className="w-7 h-7 md:w-8 md:h-8 text-brutal-red" />
                             Event Management
                         </h1>
-                        <p className="font-data text-lg text-brutal-dark/60 border-l-4 border-brutal-red pl-4 mt-4">
+                        <p className="font-data text-xs md:text-sm text-brutal-dark/55 border-l-4 border-brutal-red pl-3 mt-2">
                             Schedule and format new lab events, workshops, and inductions.
                         </p>
                     </div>
                     {!isEditing && (
-                        <Button onClick={() => startEdit()}>
-                            <Plus className="w-5 h-5 mr-2" /> New Event
+                        <Button size="sm" onClick={() => startEdit()}>
+                            <Plus className="w-4 h-4 mr-1" /> New Event
                         </Button>
                     )}
                 </div>
 
                 {isEditing ? (
-                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="font-heading font-bold text-3xl uppercase">
+                    <Card ref={formRef} className="p-5 md:p-6 border-2 border-brutal-dark/20 border-t-[6px] border-t-brutal-red shadow-lg scroll-mt-32">
+                        <div className="flex justify-between items-center mb-5">
+                            <h2 className="font-heading font-bold text-xl md:text-2xl uppercase tracking-tight-heading">
                                 {isEditing === 'new' ? 'Schedule New Event' : 'Edit Event'}
                             </h2>
-                            <button onClick={cancelEdit} className="p-2 hover:bg-brutal-dark/10 rounded-full transition-colors">
-                                <X className="w-6 h-6" />
+                            <button onClick={cancelEdit} className="p-1.5 hover:bg-brutal-dark/10 rounded-full transition-colors">
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSave} className="space-y-6">
+                        <form onSubmit={handleSave} className="space-y-5">
                             {/* Basic Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input
                                     label="Event Title"
                                     required
@@ -392,7 +395,7 @@ export function ManageEvents() {
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Type</label>
                                     <select
-                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-10 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.event_type || 'maker_meetup'}
                                         onChange={e => setForm({...form, event_type: e.target.value as EventType})}
                                     >
@@ -407,7 +410,7 @@ export function ManageEvents() {
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Start Date & Time</label>
                                     <input
                                         type="datetime-local" required
-                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-10 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.date || ''}
                                         onChange={e => setForm({...form, date: e.target.value})}
                                     />
@@ -416,7 +419,7 @@ export function ManageEvents() {
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">End Date & Time (Optional)</label>
                                     <input
                                         type="datetime-local"
-                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-10 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.end_date || ''}
                                         onChange={e => setForm({...form, end_date: e.target.value})}
                                     />
@@ -445,7 +448,7 @@ export function ManageEvents() {
                                     <div>
                                         <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Reg Status</label>
                                         <select
-                                            className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                            className="w-full h-10 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                             value={form.registration_status || 'open'}
                                             onChange={e => setForm({...form, registration_status: e.target.value})}
                                         >
@@ -458,7 +461,7 @@ export function ManageEvents() {
                                     <div className="col-span-2">
                                         <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Auto-Award Badge on Join (Optional)</label>
                                         <select
-                                            className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                            className="w-full h-10 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-2 font-data text-sm focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                             value={form.auto_badge_id || ''}
                                             onChange={e => setForm({...form, auto_badge_id: e.target.value || null})}
                                         >
@@ -500,7 +503,7 @@ export function ManageEvents() {
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">About this Event</label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[90px] focus:border-brutal-red focus:outline-none"
                                         value={aboutText}
                                         placeholder="What will makers do in this event?"
                                         onChange={e => setAboutText(e.target.value)}
@@ -510,7 +513,7 @@ export function ManageEvents() {
                                     <div>
                                         <label className="font-data text-sm font-bold text-brutal-red block mb-1">Post-Event Recap (Visible after event)</label>
                                         <textarea
-                                            className="w-full bg-brutal-red/5 border-2 border-brutal-red/20 p-3 rounded font-data min-h-[120px] focus:border-brutal-red focus:outline-none"
+                                            className="w-full bg-brutal-red/5 border-2 border-brutal-red/20 p-3 rounded font-data min-h-[70px] focus:border-brutal-red focus:outline-none"
                                             value={recapText}
                                             placeholder="Summarize what happened, output, winners, etc."
                                             onChange={e => setRecapText(e.target.value)}
@@ -520,17 +523,22 @@ export function ManageEvents() {
                             </div>
 
                             {/* Post-Event Fields — shown for past events or anytime for forward planning */}
-                            <div className="border-2 border-brutal-dark/10 rounded-xl p-6 space-y-4 bg-brutal-dark/[0.02]">
-                                <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading flex items-center gap-2">
+                            <details className="border-2 border-brutal-dark/10 rounded-xl bg-brutal-dark/[0.02] group" open={isPastEvent}>
+                                <summary className="cursor-pointer list-none p-4 flex items-center gap-2 select-none">
                                     <span className="bg-brutal-red/10 text-brutal-red text-[9px] font-data font-bold px-2 py-0.5 rounded uppercase">Post-Event</span>
-                                    Results, Prizes & Learnings
-                                </h3>
-                                <p className="font-data text-[10px] text-brutal-dark/40">These fields are displayed after the event concludes. Fill them in when ready.</p>
+                                    <h3 className="font-heading font-bold text-sm md:text-base uppercase tracking-tight-heading">
+                                        Results, Prizes & Learnings
+                                    </h3>
+                                    <span className="ml-auto font-data text-[10px] text-brutal-dark/40 group-open:hidden">Click to expand</span>
+                                    <span className="ml-auto font-data text-[10px] text-brutal-dark/40 hidden group-open:inline">Click to collapse</span>
+                                </summary>
+                                <div className="px-4 pb-4 space-y-4">
+                                    <p className="font-data text-[10px] text-brutal-dark/40">These fields are displayed after the event concludes. Fill them in when ready.</p>
 
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Results Summary</label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:border-brutal-red focus:outline-none"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[70px] focus:border-brutal-red focus:outline-none"
                                         value={form.results_summary || ''}
                                         placeholder="Who won? What were the outcomes?"
                                         onChange={e => setForm({...form, results_summary: e.target.value})}
@@ -541,7 +549,7 @@ export function ManageEvents() {
                                     <div>
                                         <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Prizes & Recognition</label>
                                         <textarea
-                                            className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:border-brutal-red focus:outline-none"
+                                            className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[70px] focus:border-brutal-red focus:outline-none"
                                             value={form.prizes_info || ''}
                                             placeholder="Describe prizes, awards, and recognitions given."
                                             onChange={e => setForm({...form, prizes_info: e.target.value})}
@@ -552,7 +560,7 @@ export function ManageEvents() {
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Key Learnings</label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:border-brutal-red focus:outline-none"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[70px] focus:border-brutal-red focus:outline-none"
                                         value={form.learnings || ''}
                                         placeholder="What did participants learn? What insights emerged?"
                                         onChange={e => setForm({...form, learnings: e.target.value})}
@@ -566,9 +574,10 @@ export function ManageEvents() {
                                         onChange={(urls) => setForm({...form, gallery_urls: urls})}
                                     />
                                 </div>
-                            </div>
+                                </div>
+                            </details>
 
-                            <div className="flex justify-end gap-4 pt-6 border-t-2 border-brutal-dark/10">
+                            <div className="flex justify-end gap-3 pt-5 border-t-2 border-brutal-dark/10">
                                 <Button type="button" variant="ghost" onClick={cancelEdit} disabled={actionLoading}>Cancel</Button>
                                 <Button type="submit" disabled={actionLoading}>
                                     {actionLoading ? 'Saving...' : 'Save Event'}
@@ -578,17 +587,17 @@ export function ManageEvents() {
 
                         {/* Host Mentors — shown when editing existing events */}
                         {isEditing !== 'new' && (
-                            <div className="mt-12 pt-8 border-t-4 border-brutal-dark/10">
-                                <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-2">Hosted By</h3>
-                                <p className="font-data text-xs text-brutal-dark/50 mb-6">Assign mentors who host this event. Their names and avatars appear on the event page.</p>
+                            <div className="mt-8 pt-6 border-t-2 border-brutal-dark/10">
+                                <h3 className="font-heading font-bold text-lg md:text-xl uppercase tracking-tight-heading mb-1">Hosted By</h3>
+                                <p className="font-data text-[11px] text-brutal-dark/50 mb-4">Assign mentors who host this event. Their names and avatars appear on the event page.</p>
                                 <HostMentorManager eventId={isEditing as string} />
                             </div>
                         )}
 
                         {/* Showcase Slots — for maker meetups */}
                         {isEditing !== 'new' && (form.event_type === 'maker_meetup' || form.event_type === 'tech_tuesday') && (
-                            <div className="mt-12 pt-8 border-t-4 border-brutal-dark/10">
-                                <h3 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">Showcase Slots Management</h3>
+                            <div className="mt-8 pt-6 border-t-2 border-brutal-dark/10">
+                                <h3 className="font-heading font-bold text-lg md:text-xl uppercase tracking-tight-heading mb-4">Showcase Slots Management</h3>
                                 <ShowcaseSlotsAdmin eventId={isEditing as string} />
                             </div>
                         )}

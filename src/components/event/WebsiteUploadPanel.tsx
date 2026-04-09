@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Upload, X, Eye, EyeOff, Code, Users, Plus, Trash2, FileCode, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { uploadFile } from '../../lib/storage';
 import { IFRAME_SUBMISSION_STYLE } from './WebsiteShowcaseWall';
 
 interface WebsiteUploadPanelProps {
@@ -18,6 +17,11 @@ interface WebsiteUploadPanelProps {
     }) => Promise<void>;
     onDelete?: () => Promise<void>;
     isRegistered: boolean;
+    /**
+     * When true, this panel is shown to a mentor/admin who owns the event page.
+     * Removes "review / showcase wall" language and treats submissions as immediate publishes.
+     */
+    mentorMode?: boolean;
 }
 
 type Step = 'upload' | 'details' | 'preview';
@@ -30,6 +34,7 @@ export function WebsiteUploadPanel({
     onSubmit,
     onDelete,
     isRegistered,
+    mentorMode = false,
 }: WebsiteUploadPanelProps) {
     // ─── Step state ───
     const [step, setStep] = useState<Step>('upload');
@@ -119,23 +124,18 @@ export function WebsiteUploadPanel({
     const goBack = (to: Step) => { setError(null); setStep(to); };
 
     // ─── Submit ───
+    // Note: we embed the HTML inline via html_content — no storage upload needed.
+    // The raw file is only used client-side to read its text content in processFile().
     const handleSubmit = async () => {
         if (!canProceedToDetails || !canProceedToPreview) return;
         setUploading(true);
         setError(null);
         try {
-            let fileUrl: string | null = null;
-            if (file) {
-                const path = `${userId}/${Date.now()}-${file.name}`;
-                const { url, error: uploadError } = await uploadFile('event-websites', path, file);
-                if (uploadError) { setError(uploadError); return; }
-                fileUrl = url;
-            }
             await onSubmit({
                 title: title.trim(),
                 description: description.trim(),
                 html_content: htmlContent,
-                file_url: fileUrl,
+                file_url: null,
                 host_names: hostNames,
             });
             setJustSubmitted(true);
@@ -158,9 +158,13 @@ export function WebsiteUploadPanel({
                     <div className="w-14 h-14 mx-auto mb-4 bg-green-100 rounded-2xl flex items-center justify-center">
                         <Sparkles className="w-7 h-7 text-green-600" />
                     </div>
-                    <h4 className="font-heading font-bold text-sm uppercase tracking-tight-heading text-green-800">Website Submitted!</h4>
+                    <h4 className="font-heading font-bold text-sm uppercase tracking-tight-heading text-green-800">
+                        {mentorMode ? 'Page Published!' : 'Website Submitted!'}
+                    </h4>
                     <p className="font-data text-xs text-green-600 mt-2 max-w-sm mx-auto">
-                        Your website has been sent for mentor review. Once approved, it will appear on the showcase wall above.
+                        {mentorMode
+                            ? 'Your event page is now live at the top of this event for all visitors.'
+                            : 'Your website has been sent for mentor review. Once approved, it will appear on the showcase wall above.'}
                     </p>
                 </div>
             );
@@ -171,24 +175,32 @@ export function WebsiteUploadPanel({
             <div className="p-6 bg-brutal-dark/5 rounded-xl border border-brutal-dark/10">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h4 className="font-heading font-bold text-sm uppercase tracking-tight-heading">Your Submission</h4>
+                        <h4 className="font-heading font-bold text-sm uppercase tracking-tight-heading">
+                            {mentorMode ? 'Your Event Page' : 'Your Submission'}
+                        </h4>
                         <p className="font-data text-xs text-brutal-dark/60 mt-1">{sub.title}</p>
                     </div>
-                    <span className={`px-3 py-1 text-[10px] font-bold font-data rounded-full uppercase ${
-                        sub.status === 'approved' ? 'bg-green-100 text-green-700 border border-green-300' :
-                        sub.status === 'rejected' ? 'bg-brutal-red/10 text-brutal-red border border-brutal-red/30' :
-                        'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                    }`}>
-                        {sub.status}
-                    </span>
+                    {mentorMode ? (
+                        <span className="px-3 py-1 text-[10px] font-bold font-data rounded-full uppercase bg-green-100 text-green-700 border border-green-300">
+                            Live
+                        </span>
+                    ) : (
+                        <span className={`px-3 py-1 text-[10px] font-bold font-data rounded-full uppercase ${
+                            sub.status === 'approved' ? 'bg-green-100 text-green-700 border border-green-300' :
+                            sub.status === 'rejected' ? 'bg-brutal-red/10 text-brutal-red border border-brutal-red/30' :
+                            'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                        }`}>
+                            {sub.status}
+                        </span>
+                    )}
                 </div>
 
-                {sub.status === 'pending' && (
+                {!mentorMode && sub.status === 'pending' && (
                     <p className="font-data text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                         Awaiting mentor review. Once approved, it will appear on the showcase wall.
                     </p>
                 )}
-                {sub.status === 'rejected' && (
+                {!mentorMode && sub.status === 'rejected' && (
                     <p className="font-data text-xs text-brutal-red bg-brutal-red/5 border border-brutal-red/20 rounded-lg p-3 mb-4">
                         Your submission was not approved. You can delete it and resubmit.
                     </p>
@@ -212,7 +224,36 @@ export function WebsiteUploadPanel({
                     <span>By: {sub.host_names?.join(', ')}</span>
                 </div>
 
-                {(sub.status === 'pending' || sub.status === 'rejected') && onDelete && (
+                {mentorMode && onDelete && (
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                                // Reset state so user can upload a new page
+                                setJustSubmitted(false);
+                                setHtmlContent('');
+                                setFile(null);
+                                setTitle('');
+                                setDescription('');
+                                setStep('upload');
+                                onDelete();
+                            }}
+                        >
+                            <Upload className="w-3 h-3" /> Replace Page
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-brutal-red text-brutal-red hover:bg-brutal-red/5"
+                            onClick={onDelete}
+                        >
+                            <Trash2 className="w-3 h-3" /> Delete
+                        </Button>
+                    </div>
+                )}
+                {!mentorMode && (sub.status === 'pending' || sub.status === 'rejected') && onDelete && (
                     <Button
                         size="sm"
                         variant="outline"
@@ -516,7 +557,9 @@ export function WebsiteUploadPanel({
 
             {/* Info note */}
             <p className="font-data text-[10px] text-brutal-dark/40 text-center uppercase tracking-widest">
-                A mentor will review your website before it goes live on the showcase wall.
+                {mentorMode
+                    ? 'Publishing will make this page live at the top of this event for everyone.'
+                    : 'A mentor will review your website before it goes live on the showcase wall.'}
             </p>
 
             {/* Error */}
@@ -538,7 +581,9 @@ export function WebsiteUploadPanel({
                     className="flex-[2] justify-center"
                     size="md"
                 >
-                    {uploading ? 'Submitting...' : 'Submit for Review'}
+                    {uploading
+                        ? (mentorMode ? 'Publishing...' : 'Submitting...')
+                        : (mentorMode ? 'Publish Page' : 'Submit for Review')}
                 </Button>
             </div>
         </div>

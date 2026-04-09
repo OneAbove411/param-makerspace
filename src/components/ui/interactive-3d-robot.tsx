@@ -66,10 +66,22 @@ function RobotModel({
   lightsOn,
   intensity,
   onToggle,
+  flickerRef,
+  introDoneRef,
 }: {
   lightsOn: boolean;
   intensity: number;
   onToggle: () => void;
+  // Live Wall-E intro flicker amplitude (0..1) written from the parent
+  // every rAF tick. Scales the existing eye glow + cone opacity, so the
+  // robot's headlights flash on/off during the intro, then die. Wired via
+  // a ref instead of a prop so we never re-render the Three scene on every tick.
+  flickerRef: React.MutableRefObject<number>;
+  // Set to true by the parent when the flicker intro timeline completes.
+  // Until then, the head is locked looking DOWN (not cursor-tracking) so
+  // the robot reads as "asleep / dormant" while its headlight stutters.
+  // After it flips, head tracking smoothly lerps back to following the cursor.
+  introDoneRef: React.MutableRefObject<boolean>;
 }) {
   const { scene } = useGLTF('/models/robot.glb', true);
   const groupRef = useRef<THREE.Group>(null!);
@@ -212,8 +224,11 @@ function RobotModel({
 
   // Volumetric headlamp beam shader — realistic car headlight effect
   const { leftCone, rightCone, leftConeMat, rightConeMat } = useMemo(() => {
-    // Cone radius matches eye sphere diameter exactly
-    const geo = new THREE.ConeGeometry(2.25, 22, 48, 20, true);
+    // Cone radius matches eye sphere diameter exactly. The cone's shape is
+    // carried by the shader (dust/fbm/beamShape), not the geometry, so we
+    // can use far fewer tessellation segments and still get identical
+    // visuals — this halves per-frame vertex work for the two cones.
+    const geo = new THREE.ConeGeometry(2.25, 22, 24, 8, true);
 
     const volumetricShader = {
       uniforms: {
@@ -344,7 +359,9 @@ function RobotModel({
     return { leftCone: lCone, rightCone: rCone, leftConeMat: lMat, rightConeMat: rMat };
   }, []);
 
-  // Attach cones to group on mount
+  // Attach cones to the top-level group on mount (world-space parented).
+  // The cones are aimed per-frame using the HEAD's world forward vector,
+  // so wherever the head points, the beams follow — no separate knobs.
   useEffect(() => {
     if (groupRef.current) {
       groupRef.current.add(leftCone);
@@ -365,52 +382,99 @@ function RobotModel({
   const emissiveOn = useRef(new THREE.Color('#ffcc00'));
   const emissiveOff = useRef(new THREE.Color('#111111'));
   const currentEmissive = useRef(new THREE.Color('#ffcc00'));
+  // 0..1 progress of the post-flicker → cursor-tracking handoff blend.
+  const handoffProgress = useRef(0);
 
   // Animate: head tracking + eye glow + point lights + light ray cones
   useFrame(() => {
     if (!headRef.current) return;
 
-    // ── Head tracking — direct assignment, zero delay ──
-    headRef.current.rotation.y = mouse.x * 0.6;
-    headRef.current.rotation.x = -mouse.y * 0.3;
+    // ── Head tracking ──
+    // During the flicker intro the head looks slightly DOWN and to the
+    // CENTER-LEFT (the robot reads as asleep/dormant while its broken
+    // headlight stutters). Once introDoneRef flips, we smoothly blend
+    // from that intro pose into cursor tracking over a short handoff
+    // window so the transition isn't a snap.
+    if (!introDoneRef.current) {
+      // Intro pose: yaw slightly left of center (negative Y), modest
+      // downward pitch.
+      headRef.current.rotation.y = THREE.MathUtils.lerp(headRef.current.rotation.y, -0.25, 0.15);
+      headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, 0.40, 0.15);
+      // Reset handoff progress so the next "done" transition starts fresh.
+      handoffProgress.current = 0;
+    } else {
+      // Smooth handoff: ramp from intro pose into cursor tracking over
+      // ~0.7s, then lock to instant cursor tracking forever.
+      const target_y = mouse.x * 0.6;
+      const target_x = -mouse.y * 0.3;
+      if (handoffProgress.current < 1) {
+        // Advance handoff slowly — ~1.6s at 60fps so the head drifts
+        // back to the cursor naturally rather than snapping.
+        handoffProgress.current = Math.min(1, handoffProgress.current + 0.0105);
+        // Double-smoothstep (smootherstep) for an extra-gentle ease at
+        // both ends — no perceptible start/stop, just a slow glide.
+        const t = handoffProgress.current;
+        const eased = t * t * t * (t * (t * 6 - 15) + 10); // smootherstep
+        // Use the eased value as a small per-frame lerp factor, scaled
+        // down so even at full progress the per-frame motion stays gentle.
+        const lerpAmt = eased * 0.08;
+        headRef.current.rotation.y = THREE.MathUtils.lerp(headRef.current.rotation.y, target_y, lerpAmt);
+        headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, target_x, lerpAmt);
+      } else {
+        // Handoff done — instant cursor tracking, zero delay.
+        headRef.current.rotation.y = target_y;
+        headRef.current.rotation.x = target_x;
+      }
+    }
 
     // ── Eye glow (the main visible effect) ──
-    const normalizedIntensity = lightsOn
+    // The parent writes a 0..1 "flicker" amplitude into flickerRef every
+    // tick. While the intro flicker is running it modulates the eye glow
+    // and cone opacity directly. Once the click toggle is on, we ignore
+    // the flicker and use full intensity (the user has taken control).
+    const flicker = Math.max(0, Math.min(1, flickerRef.current));
+    const effectiveOn = lightsOn || flicker > 0.01;
+    const normalizedIntensity = effectiveOn
       ? (intensity - LIGHT_MIN) / (LIGHT_MAX - LIGHT_MIN)
       : 0;
-    const targetEmissiveIntensity = lightsOn ? 1.0 + normalizedIntensity * 4.0 : 0.05;
+    // When user has clicked: full intensity. During intro flicker: ride amplitude.
+    const intensityScale = lightsOn ? 1 : flicker;
+    const targetEmissiveIntensity = effectiveOn
+      ? (1.0 + normalizedIntensity * 4.0) * intensityScale + 0.05
+      : 0.05;
+
+    // Lerp speed: instant snap during flicker (each keyframe must show as
+    // a hard on/off flash), smooth when the user takes control.
+    const lerpSpeed = lightsOn ? 0.12 : 1.0;
 
     if (leftEyeMatRef.current) {
       leftEyeMatRef.current.emissiveIntensity = THREE.MathUtils.lerp(
-        leftEyeMatRef.current.emissiveIntensity, targetEmissiveIntensity, 0.12
+        leftEyeMatRef.current.emissiveIntensity, targetEmissiveIntensity, lerpSpeed
       );
       currentEmissive.current.lerpColors(
         emissiveOff.current, emissiveOn.current,
-        lightsOn ? 0.5 + normalizedIntensity * 0.5 : 0
+        effectiveOn ? 0.5 + normalizedIntensity * 0.5 * intensityScale : 0
       );
       leftEyeMatRef.current.emissive.copy(currentEmissive.current);
       leftEyeMatRef.current.color.copy(
-        lightsOn ? currentEmissive.current : emissiveOff.current
+        effectiveOn ? currentEmissive.current : emissiveOff.current
       );
     }
     if (rightEyeMatRef.current) {
       rightEyeMatRef.current.emissiveIntensity = THREE.MathUtils.lerp(
-        rightEyeMatRef.current.emissiveIntensity, targetEmissiveIntensity, 0.12
+        rightEyeMatRef.current.emissiveIntensity, targetEmissiveIntensity, lerpSpeed
       );
       rightEyeMatRef.current.emissive.copy(currentEmissive.current);
       rightEyeMatRef.current.color.copy(
-        lightsOn ? currentEmissive.current : emissiveOff.current
+        effectiveOn ? currentEmissive.current : emissiveOff.current
       );
     }
 
-    // ── Botón (toggle capsule) — kept at its neutral metallic color, no glow ──
-    // ── "Click Me" text — stenciled look, no glow; keep material fixed ──
-    // Intentionally no-op: text stays dark metallic so it blends with the capsule
-    // like a CNC-etched label.
+    // ── Botón / "Click Me" — untouched, stays at default metallic ──
 
     // ── Point lights at exact eye positions ──
     const v = wp.current;
-    const pointTarget = lightsOn ? intensity * 3 : 0;
+    const pointTarget = effectiveOn ? intensity * 3 * intensityScale : 0;
     if (leftPointRef.current) {
       leftPointRef.current.intensity = THREE.MathUtils.lerp(
         leftPointRef.current.intensity, pointTarget, 0.12
@@ -431,34 +495,47 @@ function RobotModel({
     }
 
     // ── Volumetric light beams — update shader uniforms ──
-    const coneOpacity = lightsOn ? 0.70 + normalizedIntensity * 0.18 : 0;
+    // Cone opacity rides the same flicker amplitude during the intro so the
+    // headlight beams flash on/off in sync with the eye glow. After the
+    // user clicks, full opacity (existing behavior).
+    const coneOpacity = effectiveOn
+      ? (0.70 + normalizedIntensity * 0.18) * intensityScale
+      : 0;
     const lUniforms = (leftConeMat as THREE.ShaderMaterial).uniforms;
     const rUniforms = (rightConeMat as THREE.ShaderMaterial).uniforms;
-    lUniforms.uOpacity.value = THREE.MathUtils.lerp(lUniforms.uOpacity.value, coneOpacity, 0.12);
-    rUniforms.uOpacity.value = THREE.MathUtils.lerp(rUniforms.uOpacity.value, coneOpacity, 0.12);
+    lUniforms.uOpacity.value = THREE.MathUtils.lerp(lUniforms.uOpacity.value, coneOpacity, lerpSpeed);
+    rUniforms.uOpacity.value = THREE.MathUtils.lerp(rUniforms.uOpacity.value, coneOpacity, lerpSpeed);
     // Animate time for dust/atmosphere movement
     const elapsed = performance.now() * 0.001;
     lUniforms.uTime.value = elapsed;
     rUniforms.uTime.value = elapsed;
 
-    // Cone target — derived from cursor, no spotlights needed
-    const coneTargetX = mouse.x * 5;
-    const coneTargetY = mouse.y * 3 + 1;
-    const coneTargetZ = 10;
+    // ── Cone aim — derived from the HEAD's own forward vector ──
+    // Single source of truth: whatever direction the head is facing,
+    // that's where the beams go. During the intro the head is pitched
+    // down (see head-tracking block above) so beams automatically aim
+    // down. After the intro the head tracks the cursor, so the beams
+    // track with it. No separate downY/fwdZ knobs, no mouse math here.
+    if (headRef.current) {
+      // Local +Z is "forward" for the head bone. Transform to world,
+      // then apply a small downward bias so the beams sit slightly below
+      // the head's eye-line (car-headlight feel).
+      targetDir.current.set(0, -0.15, 1);
+      targetDir.current.transformDirection(headRef.current.matrixWorld);
+      targetDir.current.normalize();
 
-    if (leftEyeRef.current) {
-      leftEyeRef.current.getWorldPosition(v);
-      leftCone.position.copy(v);
-      targetDir.current.set(coneTargetX - 0.3, coneTargetY, coneTargetZ).sub(v).normalize();
-      leftCone.quaternion.setFromUnitVectors(coneUp.current, targetDir.current);
-      leftCone.position.addScaledVector(targetDir.current, 10);
-    }
-    if (rightEyeRef.current) {
-      rightEyeRef.current.getWorldPosition(v);
-      rightCone.position.copy(v);
-      targetDir.current.set(coneTargetX + 0.3, coneTargetY, coneTargetZ).sub(v).normalize();
-      rightCone.quaternion.setFromUnitVectors(coneUp.current, targetDir.current);
-      rightCone.position.addScaledVector(targetDir.current, 10);
+      if (leftEyeRef.current) {
+        leftEyeRef.current.getWorldPosition(v);
+        leftCone.position.copy(v);
+        leftCone.quaternion.setFromUnitVectors(coneUp.current, targetDir.current);
+        leftCone.position.addScaledVector(targetDir.current, 10);
+      }
+      if (rightEyeRef.current) {
+        rightEyeRef.current.getWorldPosition(v);
+        rightCone.position.copy(v);
+        rightCone.quaternion.setFromUnitVectors(coneUp.current, targetDir.current);
+        rightCone.position.addScaledVector(targetDir.current, 10);
+      }
     }
 
   });
@@ -473,7 +550,7 @@ function RobotModel({
       }
       buttonGroupRef.current.add(clickMeRef.current);
       // Sit the text just above the capsule surface, oriented along the capsule length
-      clickMeRef.current.position.set(-0.15, -1.21, 0.62);
+      clickMeRef.current.position.set(0, 1, 1);
       clickMeRef.current.renderOrder = 2;
       reparented.current = true;
     }
@@ -483,16 +560,16 @@ function RobotModel({
     <group ref={groupRef}>
       <primitive object={scene} scale={1.0} position={[3.0, 1.0, 1.8]} />
 
-      {/* "CLICK ME" text — reparented to the Button group; stenciled onto the capsule */}
+      {/* "CLICK ME" text — reparented to the Button group; stenciled onto the capsule. */}
       <Text
         ref={clickMeRef}
-        fontSize={15.0}
+        fontSize={19.0}
         anchorX="center"
         anchorY="middle"
-        letterSpacing={0.08}
+        letterSpacing={0.04}
         maxWidth={500}
       >
-        CLICK ME
+        LIGHT ME UP
         <meshStandardMaterial
           ref={clickMeMatRef as any}
           color="#3a3a3a"
@@ -518,12 +595,31 @@ useGLTF.preload('/models/robot.glb', true);
 interface InteractiveRobotSplineProps {
   scene?: string;
   className?: string;
+  /**
+   * Optional ref written by the parent every rAF tick (0..1) to drive the
+   * intro flicker on the robot's eye lights / headlight cones. If omitted,
+   * the robot starts with lights off and head looking at the cursor.
+   */
+  flickerRef?: React.MutableRefObject<number>;
+  /**
+   * Optional ref the parent flips to true when the flicker intro is done.
+   * Until then, the robot's head is locked looking down. After, head
+   * tracking smoothly lerps back to following the cursor. If omitted,
+   * the head tracks the cursor immediately (legacy behavior).
+   */
+  introDoneRef?: React.MutableRefObject<boolean>;
 }
 
-export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProps) {
+export function InteractiveRobotSpline({ className, flickerRef, introDoneRef }: InteractiveRobotSplineProps) {
   const [lightsOn, setLightsOn] = useState(false);
   const lightsOnRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const localBeatRef = useRef(0);
+  const beatRef = flickerRef ?? localBeatRef;
+  // If parent didn't provide an introDoneRef, default to true (legacy
+  // behavior — head tracks cursor from frame 0).
+  const localIntroDoneRef = useRef(true);
+  const introDoneRefResolved = introDoneRef ?? localIntroDoneRef;
 
   // Fixed intensity — no longer user-controlled
   const intensity = LIGHT_DEFAULT;
@@ -537,12 +633,25 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
   const mobile = isMobile();
 
   return (
-    <div ref={wrapperRef} className={`relative ${className || ''}`} style={{ overflow: 'visible' }}>
+    <div
+      ref={wrapperRef}
+      className={`relative ${className || ''}`}
+      style={{ overflow: 'visible' }}
+      role="img"
+      aria-label="Interactive 3D robot mascot"
+    >
       <Canvas
         camera={{ position: [-0.05, 0.2, 11], fov: 28, near: 0.01, far: 100 }}
-        shadows={!mobile}
+        // Desktop: VSM soft shadows (replaces the deprecated PCFSoftShadowMap
+        // which Three r160+ silently downgrades to hard PCF). Mobile stays
+        // off to protect frame rate.
+        shadows={mobile ? false : { type: THREE.VSMShadowMap }}
         frameloop="always"
-        dpr={mobile ? [1, 1] : [1, 1.5]}
+        // Retina cap: mobile pins to 1x, desktop goes up to min(devicePR, 1.75).
+        // 2.0 on a 4K retina display quadruples the per-frame fragment cost
+        // of the volumetric shaders vs 1.0 — 1.75 is the best tradeoff
+        // between chrome-highlight crispness and smooth frame pacing.
+        dpr={mobile ? [1, 1] : [1, 1.75]}
         gl={{ antialias: !mobile, alpha: true, powerPreference: 'high-performance' }}
         style={{ cursor: 'pointer', background: 'transparent' }}
         onCreated={({ gl, scene }) => {
@@ -555,13 +664,20 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
         {/* Ambient fill — kept low so flashlight contrast is visible */}
         <ambientLight intensity={0.3} />
 
-        {/* Key light — warm from upper-right */}
+        {/* Key light — warm from upper-right. Shadow map dropped from
+            2048² back to 1024² on desktop: the 4× texel count of 2048²
+            was the dominant per-frame GPU cost on mid-range laptops,
+            and VSM at 1024 still looks crisp on the robot's silhouette.
+            Normal bias + bias prevent shadow acne at the lower res. */}
         <directionalLight
           position={[4, 5, 3]}
           intensity={1.2}
           color="#fffaf0"
           castShadow={!mobile}
           shadow-mapSize={mobile ? [512, 512] : [1024, 1024]}
+          shadow-radius={mobile ? 1 : 3}
+          shadow-bias={-0.0005}
+          shadow-normalBias={0.02}
         />
 
         {/* Fill light — cool from left */}
@@ -574,10 +690,21 @@ export function InteractiveRobotSpline({ className }: InteractiveRobotSplineProp
         <Environment preset="city" background={false} />
 
         <Suspense fallback={null}>
-          <RobotModel lightsOn={lightsOn} intensity={intensity} onToggle={handleClick} />
+          <RobotModel
+            lightsOn={lightsOn}
+            intensity={intensity}
+            onToggle={handleClick}
+            flickerRef={beatRef}
+            introDoneRef={introDoneRefResolved}
+          />
         </Suspense>
       </Canvas>
 
+      {/* SR-only fallback so the page is intelligible without the canvas. */}
+      <p className="sr-only">
+        A 3D robot mascot watches the page. Click the robot to toggle its
+        flashlight eyes. The page is fully usable without it.
+      </p>
     </div>
   );
 }

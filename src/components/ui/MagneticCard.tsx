@@ -4,7 +4,20 @@ import { cn } from '../../lib/utils';
 
 interface MagneticCardProps extends React.HTMLAttributes<HTMLDivElement> {
     children: React.ReactNode;
-    intensity?: number; // tilt intensity in degrees, default 8
+    /**
+     * Maximum 3D tilt angle in degrees, applied to both rotateX and rotateY.
+     * Scale is additive: `1` = barely perceptible, `4` = default-strong card
+     * tilt used across the Projects grid, `8` = dramatic hero card, `12`+ =
+     * disorienting — avoid. Default `8`.
+     *
+     * Recommended presets:
+     *   1 — subtle   (form fields, dense lists)
+     *   2 — light    (maker avatars)
+     *   4 — medium   (project cards, challenge cards)
+     *   6 — strong   (featured cards)
+     *   8 — dramatic (hero / landing, default)
+     */
+    intensity?: number;
     liftOnHover?: boolean;
     glowOnHover?: boolean;
     className?: string;

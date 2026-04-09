@@ -31,13 +31,16 @@ interface AuthContextType {
     signUp: (
         email: string,
         password: string,
-        name: string
+        name: string,
+        declaredIntent?: string | null
     ) => Promise<{ error: string | null }>;
     signIn: (
         email: string,
         password: string
     ) => Promise<{ error: string | null }>;
-    signInWithGoogle: () => Promise<{ error: string | null }>;
+    signInWithGoogle: (
+        redirectPath?: string | null
+    ) => Promise<{ error: string | null }>;
     signOut: () => Promise<void>;
     resetPassword: (email: string) => Promise<{ error: string | null }>;
     refreshUser: () => Promise<void>;
@@ -46,10 +49,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // ─── AUTH-ONLY fetch: only hits app_user table ───
+// Returns `null` for missing rows. If the matching row has `is_active=false`
+// (admin-suspended), forcibly clears the session and redirects to /login so
+// the suspended user can NEVER reach an authenticated screen, even on hard
+// refresh or back-nav.
 async function fetchAppUser(authId: string): Promise<User | null> {
     const { data, error, status } = await supabase
         .from('app_user')
-        .select('id, auth_id, email, name, role')
+        .select('id, auth_id, email, name, role, is_active')
         .eq('auth_id', authId)
         .maybeSingle();
 
@@ -58,6 +65,23 @@ async function fetchAppUser(authId: string): Promise<User | null> {
         return null;
     }
     if (!data) return null;
+
+    // Suspended accounts are evicted from the app even if they already
+    // have a valid Supabase access token in localStorage.
+    if ((data as any).is_active === false) {
+        clearAppAuth();
+        supabase.auth.signOut().catch(() => {});
+        try {
+            sessionStorage.setItem(
+                'auth_suspended_message',
+                'This account has been suspended. Please contact an administrator.'
+            );
+        } catch { /* ignore */ }
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+            window.location.replace('/login');
+        }
+        return null;
+    }
 
     return {
         id: data.id,
@@ -82,23 +106,46 @@ async function fetchAvatar(userId: string): Promise<string | undefined> {
 // ─── Ensure maker_profile exists (first login) ───
 async function ensureMakerProfile(
     userId: string,
-    name: string
+    name: string,
+    declaredIntent?: string | null
 ): Promise<void> {
     const { data } = await supabase
         .from('maker_profile')
-        .select('id')
+        .select('id, declared_intent')
         .eq('user_id', userId)
         .maybeSingle();
 
-    if (data) return; // already exists
+    if (data) {
+        // Backfill declared_intent if we have one and the row is missing it.
+        // Idempotent — never overwrites an existing value.
+        if (declaredIntent && !(data as any).declared_intent) {
+            await supabase
+                .from('maker_profile')
+                .update({ declared_intent: declaredIntent })
+                .eq('user_id', userId);
+        }
+        return;
+    }
 
     await supabase.from('maker_profile').insert({
         user_id: userId,
         display_name: name,
         is_public: true,
+        ...(declaredIntent ? { declared_intent: declaredIntent } : {}),
     });
 
     try { await onUserJoined(userId); } catch { /* non-critical */ }
+}
+
+// ─── Read pending declared_intent from auth metadata or sessionStorage ───
+function readPendingDeclaredIntent(authUser: any | null | undefined): string | null {
+    const meta = authUser?.user_metadata?.declared_intent;
+    if (typeof meta === 'string' && meta.trim()) return meta;
+    try {
+        const stash = sessionStorage.getItem('pending_declared_intent');
+        if (stash && stash.trim()) return stash;
+    } catch { /* ignore */ }
+    return null;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -158,22 +205,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // 3. Verify the token is still valid server-side
-            const { error: userError } = await supabase.auth.getUser();
-            if (userError) {
-                // Token is expired/revoked — wipe and bail
-                clearAppAuth();
-                supabase.auth.signOut().catch(() => {});
-                if (mounted) {
-                    setUser(null);
-                    setSession(null);
-                    setIsLoading(false);
-                }
-                initDone.current = true;
-                return;
-            }
+            // 3. Skip the extra supabase.auth.getUser() server round-trip.
+            //    It blocked initial paint on every cold load / back-nav.
+            //    If the token is actually dead, the first data query below
+            //    (fetchAppUser) will 401 and handleAuthError will clean up.
 
-            // 4. Token is valid — load app user
+            // 4. Load app user
             setSession(s);
             const appUser = await fetchAppUser(s.user.id);
             if (mounted) {
@@ -185,8 +222,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         if (mounted && avatar)
                             setUser((prev) => (prev ? { ...prev, avatar } : prev));
                     });
-                    // Fire-and-forget profile ensure
-                    ensureMakerProfile(appUser.id, appUser.name).catch(console.error);
+                    // Fire-and-forget profile ensure (with optional intent backfill)
+                    const pendingIntent = readPendingDeclaredIntent(s.user);
+                    ensureMakerProfile(appUser.id, appUser.name, pendingIntent)
+                        .then(() => {
+                            if (pendingIntent) {
+                                try { sessionStorage.removeItem('pending_declared_intent'); } catch { /* ignore */ }
+                            }
+                        })
+                        .catch(console.error);
                 }
             }
             initDone.current = true;
@@ -239,7 +283,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             setUser((prev) => (prev ? { ...prev, avatar } : prev));
                     });
                     if (event === 'SIGNED_IN') {
-                        ensureMakerProfile(appUser.id, appUser.name).catch(console.error);
+                        const pendingIntent = readPendingDeclaredIntent(s.user);
+                        ensureMakerProfile(appUser.id, appUser.name, pendingIntent)
+                            .then(() => {
+                                if (pendingIntent) {
+                                    try { sessionStorage.removeItem('pending_declared_intent'); } catch { /* ignore */ }
+                                }
+                            })
+                            .catch(console.error);
                     }
                 }
                 setIsLoading(false);
@@ -258,15 +309,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const signUp = async (email: string, password: string, name: string) => {
+    const signUp = async (
+        email: string,
+        password: string,
+        name: string,
+        declaredIntent?: string | null
+    ) => {
         try {
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
-                options: { data: { name } },
+                options: {
+                    data: {
+                        name,
+                        // Persist into auth.users.raw_user_meta_data so it
+                        // survives the email-verification round-trip and is
+                        // available the very first time ensureMakerProfile()
+                        // runs after sign-in.
+                        ...(declaredIntent ? { declared_intent: declaredIntent } : {}),
+                    },
+                },
             });
             if (error) {
                 return { error: error.message || JSON.stringify(error) };
+            }
+            // Stash locally too so the post-verify dashboard can backfill
+            // the column even before the user re-opens this tab.
+            if (declaredIntent) {
+                try {
+                    sessionStorage.setItem('pending_declared_intent', declaredIntent);
+                } catch { /* storage may be unavailable in private mode */ }
             }
             return { error: null };
         } catch (e: any) {
@@ -275,18 +347,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signIn = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
-        return { error: error?.message || null };
+        if (error) return { error: error.message || null };
+
+        // Block suspended accounts at the sign-in gate. Without this check the
+        // admin "Suspend" button only flipped a flag no one enforced — users
+        // could keep logging in normally. Now a suspended login is rejected
+        // with a clear error message and the session is immediately torn down.
+        const authId = data?.session?.user?.id;
+        if (authId) {
+            const { data: row } = await supabase
+                .from('app_user')
+                .select('is_active')
+                .eq('auth_id', authId)
+                .maybeSingle();
+            if (row && (row as any).is_active === false) {
+                clearAppAuth();
+                await supabase.auth.signOut().catch(() => {});
+                return {
+                    error:
+                        'This account has been suspended. Please contact an administrator.',
+                };
+            }
+        }
+        return { error: null };
     };
 
-    const signInWithGoogle = async () => {
+    const signInWithGoogle = async (redirectPath?: string | null) => {
+        // Validate the redirect target the same way Login/Register do —
+        // open-redirect guard. Default to /auth/callback so we can run the
+        // post-OAuth intent backfill + profile gate before sending the
+        // user on to their final destination.
+        const safeRedirect =
+            redirectPath && redirectPath.startsWith('/') && !redirectPath.startsWith('//')
+                ? redirectPath
+                : '/dashboard';
+        const callbackUrl = new URL(`${window.location.origin}/auth/callback`);
+        callbackUrl.searchParams.set('next', safeRedirect);
+
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/dashboard`,
+                redirectTo: callbackUrl.toString(),
             },
         });
         return { error: error?.message || null };

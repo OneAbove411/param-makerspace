@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Calendar, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useAllEvents, useEventWebsitesForReview } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import { toast } from '../lib/toast';
 
 interface ShowcaseSlot {
   id: string;
@@ -26,18 +27,27 @@ interface ShowcaseSlot {
 export function MentorDashboard() {
   const { user } = useAuth();
   const { data: eventsData, loading: eventsLoading } = useAllEvents();
-  const { data: submissionsData } = useEventWebsitesForReview();
+  // `refetch` lets us refresh the pending-review list after an approve/reject
+  // without doing a full-page window.location.reload (which blows away SPA
+  // state and causes the whole dashboard to buffer).
+  const { data: submissionsData, refetch: refetchSubmissions } = useEventWebsitesForReview();
   const events = eventsData ?? [];
   const allSubmissions = submissionsData ?? [];
   const [showcaseSlots, setShowcaseSlots] = useState<ShowcaseSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
+  // Track which rows have an in-flight approve/reject request so we can
+  // disable their buttons (no double-click, no duplicate Supabase writes).
+  const [pendingSubmissionIds, setPendingSubmissionIds] = useState<Set<string>>(() => new Set());
+  const [pendingSlotIds, setPendingSlotIds] = useState<Set<string>>(() => new Set());
   const isAuthorized = user && (user.role === 'mentor' || user.role === 'admin');
 
-  // Fetch showcase slots
+  // Fetch showcase slots. StrictMode-safe: we guard against setState on an
+  // unmounted component using a `cancelled` flag captured by the cleanup.
   useEffect(() => {
+    let cancelled = false;
     const fetchShowcaseSlots = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('showcase_slot')
           .select(
             'id, status, event_id, user_id, topic, project:project!project_id(id, title), app_user:app_user!user_id(name), event:event!event_id(title)'
@@ -45,17 +55,25 @@ export function MentorDashboard() {
           .eq('status', 'pending')
           .order('created_at', { ascending: false });
 
+        if (cancelled) return;
+        if (error) throw error;
         if (data) {
           setShowcaseSlots(data as unknown as ShowcaseSlot[]);
         }
       } catch (error) {
-        console.error('Error fetching showcase slots:', error);
+        if (!cancelled) {
+          console.error('Error fetching showcase slots:', error);
+          toast.error('Could not load showcase slot requests.');
+        }
       } finally {
-        setSlotsLoading(false);
+        if (!cancelled) setSlotsLoading(false);
       }
     };
 
     fetchShowcaseSlots();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Filter events for this mentor (admins see all, mentors see their own)
@@ -74,36 +92,89 @@ export function MentorDashboard() {
   const formatEventType = (t: string) =>
     t === 'build_challenge' ? 'Build Challenge' : t === 'tech_tuesday' ? 'Tech Tuesday' : 'Maker Meetup';
 
-  // Helper function to approve/reject submissions
-  const handleSubmissionAction = async (
-    submissionId: string,
-    action: 'approved' | 'rejected'
-  ) => {
-    try {
-      await supabase
-        .from('event_website')
-        .update({ status: action, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
-        .eq('id', submissionId);
-      window.location.reload();
-    } catch (error) {
-      console.error('Error updating submission:', error);
-    }
-  };
+  // Helper function to approve/reject submissions. Uses a per-row pending
+  // set so both buttons on the same row disable while the update is in
+  // flight, and refetches via the hook instead of a full page reload.
+  const handleSubmissionAction = useCallback(
+    async (submissionId: string, action: 'approved' | 'rejected') => {
+      setPendingSubmissionIds((prev) => {
+        if (prev.has(submissionId)) return prev;
+        const next = new Set(prev);
+        next.add(submissionId);
+        return next;
+      });
+      try {
+        const { error } = await supabase
+          .from('event_website')
+          .update({
+            status: action,
+            reviewed_by: user?.id,
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
+        if (error) throw error;
+        toast.success(`Submission ${action}.`);
+        await refetchSubmissions();
+      } catch (error) {
+        console.error('Error updating submission:', error);
+        toast.error(
+          error instanceof Error
+            ? `Could not ${action === 'approved' ? 'approve' : 'reject'} submission: ${error.message}`
+            : `Could not ${action === 'approved' ? 'approve' : 'reject'} submission.`,
+        );
+      } finally {
+        setPendingSubmissionIds((prev) => {
+          if (!prev.has(submissionId)) return prev;
+          const next = new Set(prev);
+          next.delete(submissionId);
+          return next;
+        });
+      }
+    },
+    [user?.id, refetchSubmissions],
+  );
 
-  // Helper function to approve/reject showcase slots
-  const handleSlotAction = async (slotId: string, action: 'approved' | 'rejected') => {
-    try {
-      await supabase.from('showcase_slot').update({ status: action }).eq('id', slotId);
-      setShowcaseSlots(showcaseSlots.filter((s) => s.id !== slotId));
-    } catch (error) {
-      console.error('Error updating showcase slot:', error);
-    }
-  };
+  // Helper function to approve/reject showcase slots. Uses functional state
+  // updates so rapid sequential clicks can't race each other.
+  const handleSlotAction = useCallback(
+    async (slotId: string, action: 'approved' | 'rejected') => {
+      setPendingSlotIds((prev) => {
+        if (prev.has(slotId)) return prev;
+        const next = new Set(prev);
+        next.add(slotId);
+        return next;
+      });
+      try {
+        const { error } = await supabase
+          .from('showcase_slot')
+          .update({ status: action })
+          .eq('id', slotId);
+        if (error) throw error;
+        toast.success(`Showcase slot ${action}.`);
+        setShowcaseSlots((prev) => prev.filter((s) => s.id !== slotId));
+      } catch (error) {
+        console.error('Error updating showcase slot:', error);
+        toast.error(
+          error instanceof Error
+            ? `Could not update slot: ${error.message}`
+            : 'Could not update showcase slot.',
+        );
+      } finally {
+        setPendingSlotIds((prev) => {
+          if (!prev.has(slotId)) return prev;
+          const next = new Set(prev);
+          next.delete(slotId);
+          return next;
+        });
+      }
+    },
+    [],
+  );
 
   // Access control — after all hooks
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen bg-brutal-bg pt-32 px-8">
+      <div className="min-h-screen bg-brutal-bg pt-24 md:pt-32 px-5 sm:px-6 md:px-8">
         <div className="max-w-4xl mx-auto border-4 border-brutal-dark bg-brutal-paper p-8">
           <div className="flex items-center gap-3 mb-4">
             <AlertCircle className="w-8 h-8 text-brutal-red" />
@@ -120,7 +191,7 @@ export function MentorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-brutal-bg pt-32 px-8">
+    <div className="min-h-screen bg-brutal-bg pt-24 md:pt-32 px-5 sm:px-6 md:px-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-12">
@@ -320,20 +391,26 @@ export function MentorDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                       <button
+                        type="button"
                         onClick={() => handleSubmissionAction(submission.id, 'approved')}
-                        className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-paper bg-brutal-dark border-2 border-brutal-dark px-4 py-2 hover:shadow-[4px_4px_0px_#111] transition"
+                        disabled={pendingSubmissionIds.has(submission.id)}
+                        aria-busy={pendingSubmissionIds.has(submission.id) || undefined}
+                        className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-paper bg-brutal-dark border-2 border-brutal-dark px-4 py-2 hover:shadow-[4px_4px_0px_#111] transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
                       >
                         <CheckCircle className="w-4 h-4" />
-                        Approve
+                        {pendingSubmissionIds.has(submission.id) ? 'Working…' : 'Approve'}
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleSubmissionAction(submission.id, 'rejected')}
-                        className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-dark border-2 border-brutal-dark bg-brutal-paper px-4 py-2 hover:bg-brutal-dark hover:text-brutal-paper transition"
+                        disabled={pendingSubmissionIds.has(submission.id)}
+                        aria-busy={pendingSubmissionIds.has(submission.id) || undefined}
+                        className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-dark border-2 border-brutal-dark bg-brutal-paper px-4 py-2 hover:bg-brutal-dark hover:text-brutal-paper transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
                       >
                         <XCircle className="w-4 h-4" />
-                        Reject
+                        {pendingSubmissionIds.has(submission.id) ? 'Working…' : 'Reject'}
                       </button>
                     </div>
                   </div>
@@ -383,20 +460,26 @@ export function MentorDashboard() {
 
                     <div className="md:col-span-2 flex flex-col justify-between">
                       <div></div>
-                      <div className="flex gap-3">
+                      <div className="flex flex-wrap gap-3">
                         <button
+                          type="button"
                           onClick={() => handleSlotAction(slot.id, 'approved')}
-                          className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-paper bg-brutal-dark border-2 border-brutal-dark px-4 py-2 hover:shadow-[4px_4px_0px_#111] transition"
+                          disabled={pendingSlotIds.has(slot.id)}
+                          aria-busy={pendingSlotIds.has(slot.id) || undefined}
+                          className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-paper bg-brutal-dark border-2 border-brutal-dark px-4 py-2 hover:shadow-[4px_4px_0px_#111] transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
                         >
                           <CheckCircle className="w-4 h-4" />
-                          Approve
+                          {pendingSlotIds.has(slot.id) ? 'Working…' : 'Approve'}
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleSlotAction(slot.id, 'rejected')}
-                          className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-dark border-2 border-brutal-dark bg-brutal-paper px-4 py-2 hover:bg-brutal-dark hover:text-brutal-paper transition"
+                          disabled={pendingSlotIds.has(slot.id)}
+                          aria-busy={pendingSlotIds.has(slot.id) || undefined}
+                          className="flex items-center gap-2 font-data text-sm uppercase tracking-wider text-brutal-dark border-2 border-brutal-dark bg-brutal-paper px-4 py-2 hover:bg-brutal-dark hover:text-brutal-paper transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
                         >
                           <XCircle className="w-4 h-4" />
-                          Reject
+                          {pendingSlotIds.has(slot.id) ? 'Working…' : 'Reject'}
                         </button>
                       </div>
                     </div>

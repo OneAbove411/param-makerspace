@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export function Footer() {
     return (
-        <footer className="bg-brutal-dark text-brutal-bg rounded-t-[4rem] px-8 pt-20 pb-12 mt-32 relative overflow-hidden">
+        <footer className="bg-brutal-dark text-brutal-bg px-8 pt-16 pb-8 relative overflow-hidden">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 relative z-10">
                 <div className="col-span-1 md:col-span-2">
                     <h2 className="font-heading font-bold text-4xl mb-4">PARAM.</h2>

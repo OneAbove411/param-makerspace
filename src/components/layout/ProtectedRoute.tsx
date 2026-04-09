@@ -1,14 +1,22 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type Role } from '../../lib/auth';
 
 export function ProtectedRoute({ allowedRoles }: { allowedRoles: Role[] }) {
     const { user, role, isLoading } = useAuth();
+    const location = useLocation();
 
-    if (isLoading) return <div className="p-20 font-data w-full flex justify-center mt-20">Loading...</div>;
+    // Don't block the whole page behind a text placeholder while auth
+    // rehydrates. Render nothing for the brief window; the previous page
+    // stays painted and transitions feel instant.
+    if (isLoading) return null;
 
     if (!user) {
-        return <Navigate to="/login" replace />;
+        // §1.5 F-105: round-trip the deep-link the user originally wanted.
+        const target = `${location.pathname}${location.search}${location.hash}`;
+        const safeTarget = target.startsWith('/') && !target.startsWith('//') ? target : '/dashboard';
+        const next = `/login?redirect=${encodeURIComponent(safeTarget)}`;
+        return <Navigate to={next} replace />;
     }
 
     if (!allowedRoles.includes(role)) {

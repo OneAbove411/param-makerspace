@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useInventory, useInventoryMutations } from '../../lib/hooks';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -140,7 +140,7 @@ export function ManageInventory() {
                 )}
 
                 {isEditing ? (
-                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(20,20,20,0.08)] scroll-mt-32">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
                                 {isEditing === 'new' ? 'Add Inventory Item' : 'Edit Item'}
@@ -184,7 +184,7 @@ export function ManageInventory() {
                             <div>
                                 <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Notes / Description</label>
                                 <textarea 
-                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px]" 
+                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px]" 
                                     value={form.description || ''} 
                                     onChange={e => setForm({...form, description: e.target.value})} 
                                 />
@@ -258,7 +258,7 @@ export function ManageInventory() {
                                                 <div className="flex gap-2 justify-end">
                                                     <button 
                                                         onClick={() => startEdit(item)}
-                                                        className="p-2 border-2 border-brutal-dark/20 rounded hover:bg-brutal-dark hover:text-white transition-colors"
+                                                        className="p-2 border-2 border-brutal-dark rounded hover:bg-brutal-dark hover:text-white transition-colors"
                                                         title="Edit"
                                                         disabled={actionLoading}
                                                     >

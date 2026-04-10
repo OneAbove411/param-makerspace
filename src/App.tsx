@@ -1,9 +1,10 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { RootLayout } from './components/layout/RootLayout';
 import { ScrollToTop } from './components/layout/ScrollToTop';
 import { AuthProvider } from './lib/auth';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
 /**
  * Route-level code splitting.
@@ -61,6 +62,13 @@ const ReviewEventSubmissions = lazyNamed(() => import('./pages/admin/ReviewEvent
 const ReviewWebsiteSubmissions = lazyNamed(() => import('./pages/admin/ReviewWebsiteSubmissions'), 'ReviewWebsiteSubmissions');
 const ManageProjects = lazyNamed(() => import('./pages/admin/ManageProjects'), 'ManageProjects');
 const MentorDashboard = lazyNamed(() => import('./pages/MentorDashboard'), 'MentorDashboard');
+const ExplorerHub = lazyNamed(() => import('./pages/ExplorerHub'), 'ExplorerHub');
+const BuildChallenges = lazyNamed(() => import('./pages/EventsByType'), 'BuildChallenges');
+const TechTuesdays = lazyNamed(() => import('./pages/EventsByType'), 'TechTuesdays');
+const MakerMeetups = lazyNamed(() => import('./pages/EventsByType'), 'MakerMeetups');
+const ManageTags = lazyNamed(() => import('./pages/admin/ManageTags'), 'ManageTags');
+const ManageMentors = lazyNamed(() => import('./pages/admin/ManageMentors'), 'ManageMentors');
+const ManageAnnouncements = lazyNamed(() => import('./pages/admin/ManageAnnouncements'), 'ManageAnnouncements');
 const PrivacyPolicy = lazyNamed(() => import('./pages/PrivacyPolicy'), 'PrivacyPolicy');
 const TermsOfService = lazyNamed(() => import('./pages/TermsOfService'), 'TermsOfService');
 const SafetyGuidelines = lazyNamed(() => import('./pages/SafetyGuidelines'), 'SafetyGuidelines');
@@ -88,6 +96,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
+        <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route element={<RootLayout />}>
@@ -99,7 +108,11 @@ function App() {
               <Route path="/projects/:id/merge-requests/:mrId" element={<MergeRequestPage />} />
               <Route path="/challenges" element={<Challenges />} />
               <Route path="/challenges/:id" element={<ChallengeDetails />} />
+              <Route path="/explorer-hub" element={<ExplorerHub />} />
               <Route path="/events" element={<Events />} />
+              <Route path="/events/build-challenges" element={<BuildChallenges />} />
+              <Route path="/events/tech-tuesdays" element={<TechTuesdays />} />
+              <Route path="/events/meetups" element={<MakerMeetups />} />
               <Route path="/events/:id" element={<EventDetails />} />
               <Route path="/makers" element={<Makers />} />
               <Route path="/makers/:id" element={<MakerDetails />} />
@@ -147,12 +160,16 @@ function App() {
                 <Route path="/admin/badges" element={<ManageBadges />} />
                 <Route path="/admin/store" element={<ManageStore />} />
                 <Route path="/admin/equipment" element={<ManageEquipment />} />
+                <Route path="/admin/tags" element={<ManageTags />} />
+                <Route path="/admin/mentors" element={<ManageMentors />} />
+                <Route path="/admin/announcements" element={<ManageAnnouncements />} />
               </Route>
 
               <Route path="*" element={<div className="p-20 font-data text-2xl">404 - Not Found</div>} />
             </Route>
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

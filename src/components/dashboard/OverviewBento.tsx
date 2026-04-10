@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import {
     Zap,
     Calendar,
@@ -9,6 +9,7 @@ import {
     AlertTriangle,
     Sparkles,
     ArrowRight,
+    Award,
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Skeleton } from '../ui/Skeleton';
@@ -17,6 +18,7 @@ import { RANK_STYLES } from '../ui/RankBadge';
 import { RANK_ORDER, RANK_THRESHOLDS, getProgressToNextRank, getNextRank } from '../../lib/xpEngine';
 import { getBadgeIcon } from '../../lib/badgeIcons';
 import { cn } from '../../lib/utils';
+import { XP_REWARDS } from '../../lib/constants';
 
 /**
  * §7 Cockpit — Overview Bento (v3: red-richness pass + custom rank tower).
@@ -67,6 +69,12 @@ export interface OverviewBentoProps {
         onPropose: () => void;
     };
     attention: Array<{ id: string; status: string; title: string }>;
+    badges: {
+        earned: number;
+        total: number;
+        lastBadgeName: string | null;
+        loading: boolean;
+    };
 }
 
 export function OverviewBento({
@@ -76,6 +84,7 @@ export function OverviewBento({
     xpHistory,
     propose,
     attention,
+    badges,
 }: OverviewBentoProps) {
     const hasAttention = attention.length > 0;
     const topAttention = attention[0];
@@ -241,10 +250,21 @@ export function OverviewBento({
                 </Card>
             </div>
 
-            {/* ── C2: Attention top-of-queue (cols 9-12, row 3) ── */}
-            {hasAttention && topAttention && (
+            {/* ── C2: Badges summary or Attention (cols 9-12, row 3) ── */}
+            {hasAttention && topAttention ? (
                 <div className="lg:col-span-4 lg:row-start-3">
                     <AttentionCard item={topAttention} extraCount={attention.length - 1} />
+                </div>
+            ) : (
+                <div className="lg:col-span-4 lg:row-start-3">
+                    <BadgesSummaryCard {...badges} />
+                </div>
+            )}
+
+            {/* If there IS attention AND we still want badges visible, show badges in row 4 */}
+            {hasAttention && (
+                <div className="lg:col-span-4 lg:row-start-4">
+                    <BadgesSummaryCard {...badges} />
                 </div>
             )}
         </div>
@@ -333,6 +353,17 @@ function BentoStat({ to, icon: Icon, label, value, loading, dark }: BentoStatPro
     );
 }
 
+/* ── Rank milestone labels — what ACTION earns each rank ───────────────── */
+
+const RANK_MILESTONES: Record<string, string> = {
+    'Curious':   'Create your account',
+    'Tinkerer':  'Complete a Tier 1 challenge',
+    'Builder':   'Get a project approved',
+    'Maker':     'Complete a project',
+    'Innovator': 'Complete a Tier 3 challenge',
+    'Lab Pro':   'Mentor with 3+ active projects',
+};
+
 /* ── Internal: hand-built rank tower (sized for col-span-4 cell) ───────── */
 
 interface RankTowerProps {
@@ -418,6 +449,30 @@ function RankTower({ rank, xp }: RankTowerProps) {
                 )}
             </div>
 
+            {/* XP earning guide — concrete actions with amounts */}
+            <div className="mt-4 pt-3 border-t border-brutal-dark/10">
+                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/35 mb-2">
+                    How to earn XP
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {[
+                        { label: 'Tier 1 challenge', xp: XP_REWARDS.tier1_challenge },
+                        { label: 'Tier 2 challenge', xp: XP_REWARDS.tier2_challenge },
+                        { label: 'Tier 3 challenge', xp: XP_REWARDS.tier3_challenge },
+                        { label: 'Project approved', xp: XP_REWARDS.project_approved },
+                        { label: 'Project active', xp: XP_REWARDS.project_active },
+                        { label: 'Event registration', xp: XP_REWARDS.event_registered },
+                        { label: 'Event presenting', xp: XP_REWARDS.event_presented },
+                        { label: 'Profile completed', xp: XP_REWARDS.profile_completed },
+                    ].map(({ label, xp }) => (
+                        <div key={label} className="flex items-center justify-between">
+                            <span className="font-data text-[9px] text-brutal-dark/50 truncate">{label}</span>
+                            <span className="font-data text-[9px] font-bold text-brutal-red tabular-nums flex-shrink-0">+{xp}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             {/* Mini ladder — each dot expands into a pill on hover (XPHudPill pattern) */}
             <div className="mt-auto pt-5 border-t border-brutal-dark/10">
                 <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/35 mb-2">
@@ -427,11 +482,13 @@ function RankTower({ rank, xp }: RankTowerProps) {
                     {RANK_ORDER.map((r, i) => {
                         const reached = currentIndex >= i;
                         const isCurrent = r === rank;
+                        const milestone = RANK_MILESTONES[r] || r;
                         return (
                             <React.Fragment key={r}>
                                 <button
                                     type="button"
-                                    aria-label={`${r}${isCurrent ? ' (current rank)' : reached ? ' (reached)' : ' (locked)'}`}
+                                    aria-label={`${r}: ${milestone}${isCurrent ? ' (current rank)' : reached ? ' (reached)' : ' (locked)'}`}
+                                    title={`${r}: ${milestone}`}
                                     tabIndex={0}
                                     className={cn(
                                         'group/dot flex-shrink-0 inline-flex items-center gap-1.5 rounded-full',
@@ -492,6 +549,67 @@ function RankTower({ rank, xp }: RankTowerProps) {
                 </div>
             </div>
         </div>
+    );
+}
+
+/* ── Internal: compact badges summary card ─────────────────────────────── */
+
+interface BadgesSummaryCardProps {
+    earned: number;
+    total: number;
+    lastBadgeName: string | null;
+    loading: boolean;
+}
+
+function BadgesSummaryCard({ earned, total, lastBadgeName, loading }: BadgesSummaryCardProps) {
+    if (loading) {
+        return (
+            <div className="h-full">
+                <Skeleton variant="card" />
+            </div>
+        );
+    }
+
+    return (
+        <Link
+            to="/badges"
+            aria-label={`Badges: ${earned} of ${total} earned. View all badges.`}
+            className={cn(
+                'group block h-full rounded-2xl p-5 border-2 border-brutal-dark/20',
+                'bg-brutal-bg shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]',
+                'hover:translate-x-[-2px] hover:translate-y-[-2px]',
+                'hover:shadow-[8px_8px_0_0_rgba(196,41,30,0.28)] hover:border-brutal-red/40',
+                'transition-transform duration-150 ease-out',
+                'motion-reduce:hover:translate-x-0 motion-reduce:hover:translate-y-0 motion-reduce:transition-none',
+                'focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brutal-red',
+                'flex flex-col'
+            )}
+        >
+            <div className="flex items-center gap-2 font-data text-[10px] uppercase font-bold tracking-widest text-brutal-dark/60 mb-3">
+                <Award className="w-3.5 h-3.5 text-brutal-red" aria-hidden />
+                My Badges
+            </div>
+            <div className="flex items-baseline gap-1 mb-2">
+                <span className="text-3xl font-heading font-bold tabular-nums text-brutal-dark leading-none">
+                    {earned}
+                </span>
+                <span className="font-data text-sm text-brutal-dark/40 font-bold">
+                    /{total}
+                </span>
+                <span className="font-data text-[10px] text-brutal-dark/40 uppercase tracking-widest ml-1">
+                    earned
+                </span>
+            </div>
+            {lastBadgeName && (
+                <div className="font-data text-xs text-brutal-dark/60 mb-3">
+                    Last earned: <span className="font-bold text-brutal-dark">{lastBadgeName}</span>
+                </div>
+            )}
+            <div className="mt-auto flex items-center gap-1 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/40 group-hover:text-brutal-red">
+                View all badges
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" aria-hidden />
+            </div>
+        </Link>
     );
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { gsap } from 'gsap';
 import { useAuth } from '../lib/auth';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { useAllEvents, useEventMutations, useSupabaseQuery, useEventHosts, useEventHostMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useEvents } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { MapPin, Calendar, Users, ArrowRight, Wrench, Trophy, BookOpen, Clock, Flame, Sparkles } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';

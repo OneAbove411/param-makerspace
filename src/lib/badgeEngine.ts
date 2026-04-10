@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
-import { awardXP, XP_REWARDS } from './xpEngine'
+import { awardXP } from './xpEngine'
+import { XP_REWARDS } from './constants'
+import { toast } from './toast'
 
 // Check if user already has a badge by name — avoid duplicates
 async function hasBadge(userId: string, badgeName: string): Promise<boolean> {
@@ -32,6 +34,13 @@ export async function awardBadgeByName(userId: string, badgeName: string): Promi
     user_id: userId,
     badge_id: badge.id,
   })
+
+  // Fire a celebration toast so the user sees immediate feedback
+  try {
+    toast.badgeEarned(badgeName)
+  } catch {
+    // Silently ignore if toast isn't available (e.g., server-side context)
+  }
 }
 
 // --- Trigger functions called at specific app events ---

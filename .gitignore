@@ -26,3 +26,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build artifacts (temporary build variants — should not be tracked)
+dist-tmp
+dist-tmp2
+dist-verify
+
+# Credentials / secrets — never commit
+migrate-pass.txt
+*.secret
+*.key
+*.pem
+
+# Internal tooling scripts
+scripts/
+
+# Claude / Cowork session data
+.claude/

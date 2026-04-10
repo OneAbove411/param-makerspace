@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ArrowRight, Plus } from 'lucide-react';
@@ -7,7 +7,9 @@ import { ArrowRight, Plus } from 'lucide-react';
 import { useProjects, useRankAccess, useMyBookmarkedProjectIds, useToggleProjectBookmark } from '../lib/hooks';
 import type { ProjectListItem } from '../lib/hooks';
 import { canAccess } from '../lib/rankAccess';
+import { useAuth } from '../lib/auth';
 import { cn } from '../lib/utils';
+import { RankGate } from '../components/ui/RankGate';
 
 import { Card } from '../components/ui/Card';
 import { ProjectCard } from '../components/projects/ProjectCard';
@@ -217,6 +219,7 @@ export function Projects() {
     // stale-while-revalidate useSupabaseQuery.
     const { data: projects, loading } = useProjects(undefined, sort);
     const { data: bookmarkedIds, refetch: refetchBookmarks } = useMyBookmarkedProjectIds();
+    const { user } = useAuth();
     const { data: rankInfo } = useRankAccess();
     const canPropose = !!rankInfo?.rank && canAccess(rankInfo.rank, 'create_project');
 
@@ -593,7 +596,7 @@ export function Projects() {
                 </div>
 
                 {/* ─── Sticky mobile propose ─── */}
-                {canPropose && (
+                {canPropose ? (
                     <div className="md:hidden fixed bottom-0 inset-x-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 bg-gradient-to-t from-brutal-bg via-brutal-bg/95 to-transparent pointer-events-none">
                         <Link
                             to="/dashboard"
@@ -603,6 +606,12 @@ export function Projects() {
                             <Plus size={16} aria-hidden="true" />
                             Propose Project
                         </Link>
+                    </div>
+                ) : user && (
+                    <div className="md:hidden fixed bottom-0 inset-x-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 bg-gradient-to-t from-brutal-bg via-brutal-bg/95 to-transparent pointer-events-none">
+                        <div className="pointer-events-auto">
+                            <RankGate feature="create_project" compact />
+                        </div>
                     </div>
                 )}
             </div>

@@ -1,6 +1,26 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { validateEnv } from './lib/env'
+
+// ── Fail fast if required env vars are missing ──────────────────
+// This runs before React renders so developers get a clear error
+// instead of cryptic Supabase failures.
+try {
+    validateEnv();
+} catch (err) {
+    // In dev, render the error in the DOM so it's visible even if
+    // the console is closed. In production, log and let Supabase
+    // client fall through to its own error handling.
+    if (import.meta.env.DEV) {
+        const root = document.getElementById('root');
+        if (root) {
+            root.innerHTML = `<pre style="color:red;padding:2rem;font-family:monospace;white-space:pre-wrap">${(err as Error).message}</pre>`;
+        }
+        throw err;
+    }
+    console.error(err);
+}
 
 // ── Silence known-upstream Three.js deprecation warnings ──────────────
 // These messages are emitted from inside `three` / `@react-three/fiber`

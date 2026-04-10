@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense } fr
 import { gsap } from 'gsap';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import {
     useMyProjects,
     useMyStats,
@@ -10,6 +10,10 @@ import {
     useMyProfile,
     useRankAccess,
     useMyXPHistory,
+    useBadges,
+    useUserBadges,
+    useMyChallengeCompletionStatus,
+    useChallenges,
 } from '../lib/hooks';
 import { useRequireProfile } from '../lib/useRequireProfile';
 import { useUnsavedChanges } from '../lib/useUnsavedChanges';
@@ -17,6 +21,7 @@ import { canAccess, getRequiredRank } from '../lib/rankAccess';
 import { toast } from '../lib/toast';
 import { Card } from '../components/ui/Card';
 import { RankBadge } from '../components/ui/RankBadge';
+import { RankGate } from '../components/ui/RankGate';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { FieldError } from '../components/ui/FieldError';
@@ -41,6 +46,7 @@ import {
 } from '../components/dashboard/DashboardCommandPalette';
 import { OverviewBento } from '../components/dashboard/OverviewBento';
 import { MyWorkTab } from '../components/dashboard/MyWorkTab';
+import { MyBadgesTab } from '../components/dashboard/MyBadgesTab';
 import { isMacPlatform } from '../lib/platform';
 
 /**
@@ -103,6 +109,58 @@ export function Dashboard() {
     const { data: myProfile, loading: profileLoading } = useMyProfile();
     const { data: rankAccess, loading: rankLoading } = useRankAccess();
     const { data: xpHistory, loading: xpLoading } = useMyXPHistory();
+    const { data: allBadges, loading: badgesLoading } = useBadges();
+    const { data: userBadges, loading: userBadgesLoading } = useUserBadges(user?.id);
+    const { data: myChallengeStatus, loading: myChallengesLoading } = useMyChallengeCompletionStatus();
+    const { data: allChallenges, loading: allChallengesLoading } = useChallenges();
+
+    // Build challenge items for MyWorkTab
+    const myChallengeItems = useMemo(() => {
+        if (!myChallengeStatus || !allChallenges) return [];
+        const items: Array<{ challengeId: string; title: string; tier: string; status: string }> = [];
+        for (const [challengeId, status] of myChallengeStatus.entries()) {
+            const challenge = allChallenges.find((c: any) => c.id === challengeId);
+            if (challenge) {
+                items.push({
+                    challengeId,
+                    title: (challenge as any).title || 'Untitled',
+                    tier: (challenge as any).tier || 'Tier 1',
+                    status,
+                });
+            }
+        }
+        return items;
+    }, [myChallengeStatus, allChallenges]);
+
+    // Build event items for MyWorkTab (query user's event registrations)
+    const [myEventItems, setMyEventItems] = useState<Array<{ id: string; title: string; date: string; type: string }>>([]);
+    const [myEventsLoading, setMyEventsLoading] = useState(true);
+    useEffect(() => {
+        if (!user?.id) { setMyEventsLoading(false); return; }
+        (async () => {
+            const { data } = await supabase
+                .from('event_registration')
+                .select('event_id, event:event(id, title, date, event_type)')
+                .eq('user_id', user.id)
+                .order('registered_at', { ascending: false })
+                .limit(20);
+            if (data) {
+                setMyEventItems(
+                    (data as any[])
+                        .filter((r: any) => r.event)
+                        .map((r: any) => ({
+                            id: r.event.id,
+                            title: r.event.title,
+                            date: r.event.date
+                                ? new Date(r.event.date).toLocaleDateString()
+                                : '',
+                            type: r.event.event_type || 'Event',
+                        }))
+                );
+            }
+            setMyEventsLoading(false);
+        })();
+    }, [user?.id]);
 
     // ── Active tab + sidebar state (persisted in localStorage per user) ──
     const tabStorageKey = user?.id ? `db_tab_${user.id}` : null;
@@ -112,7 +170,7 @@ export function Dashboard() {
         if (typeof window === 'undefined' || !tabStorageKey) return 'overview';
         try {
             const stored = window.localStorage.getItem(tabStorageKey) as DashboardTabId | null;
-            if (stored && ['overview', 'my-work', 'mentor', 'admin'].includes(stored)) {
+            if (stored && ['overview', 'my-work', 'badges', 'mentor', 'admin'].includes(stored)) {
                 return stored;
             }
         } catch { /* ignore */ }
@@ -336,6 +394,13 @@ export function Dashboard() {
                 icon: 'work',
                 badge: attentionItems.length,
             },
+            {
+                id: 'badges',
+                label: 'My Badges',
+                description: 'Earned & upcoming badges',
+                icon: 'badges',
+                badge: userBadges?.length || 0,
+            },
         ];
         if (canViewMentorTools) {
             items.push({
@@ -354,7 +419,7 @@ export function Dashboard() {
             });
         }
         return items;
-    }, [attentionItems.length, canViewMentorTools, isAdmin]);
+    }, [attentionItems.length, userBadges?.length, canViewMentorTools, isAdmin]);
 
     // Guard: if a user's role no longer permits the persisted tab, fall back.
     useEffect(() => {
@@ -619,6 +684,14 @@ export function Dashboard() {
                                     status: p.status,
                                     title: p.title,
                                 }))}
+                                badges={{
+                                    earned: userBadges?.length || 0,
+                                    total: allBadges?.length || 0,
+                                    lastBadgeName: userBadges && userBadges.length > 0
+                                        ? (userBadges[userBadges.length - 1] as any)?.badge?.name || null
+                                        : null,
+                                    loading: badgesLoading || userBadgesLoading,
+                                }}
                             />
                         )}
 
@@ -641,6 +714,10 @@ export function Dashboard() {
                                     canCreateProject={canCreateProject}
                                     requiredRank={createProjectRequiredRank}
                                     onPropose={() => setShowNewProject(true)}
+                                    challenges={myChallengeItems}
+                                    challengesLoading={myChallengesLoading || allChallengesLoading}
+                                    events={myEventItems}
+                                    eventsLoading={myEventsLoading}
                                 />
 
                                 {/* Inline new-project form */}
@@ -660,6 +737,17 @@ export function Dashboard() {
                                             New Project Proposal
                                         </h3>
 
+                                        {!canCreateProject ? (
+                                            <div className="space-y-4">
+                                                <RankGate feature="create_project" />
+                                                <Link
+                                                    to="/challenges?tier=Tier+1"
+                                                    className="inline-flex items-center gap-2 rounded-xl bg-yellow-500 text-brutal-dark hover:bg-yellow-600 transition-colors px-4 py-2.5 font-data text-[10px] font-bold uppercase tracking-widest"
+                                                >
+                                                    Browse Tier 1 Challenges
+                                                </Link>
+                                            </div>
+                                        ) : (
                                         <form onSubmit={handleCreateProject} className="space-y-4">
                                             <Input
                                                 label="Project Title"
@@ -756,9 +844,36 @@ export function Dashboard() {
                                                 </Button>
                                             </div>
                                         </form>
+                                        )}
                                     </Card>
                                 )}
                             </div>
+                        )}
+
+                        {activeTab === 'badges' && (
+                            <MyBadgesTab
+                                earnedBadges={(userBadges || []).map((ub: any) => ({
+                                    id: ub.badge?.id || ub.badge_id,
+                                    name: ub.badge?.name || 'Unknown',
+                                    description: ub.badge?.description,
+                                    criteria: ub.badge?.criteria,
+                                    tier: ub.badge?.tier,
+                                    domain: ub.badge?.domain,
+                                    badge_type: ub.badge?.badge_type,
+                                    icon_url: ub.badge?.icon_url,
+                                }))}
+                                allBadges={(allBadges || []).map((b: any) => ({
+                                    id: b.id,
+                                    name: b.name,
+                                    description: b.description,
+                                    criteria: b.criteria,
+                                    tier: b.tier,
+                                    domain: b.domain,
+                                    badge_type: b.badge_type,
+                                    icon_url: b.icon_url,
+                                }))}
+                                loading={badgesLoading || userBadgesLoading}
+                            />
                         )}
 
                         {activeTab === 'mentor' && canViewMentorTools && (

@@ -1,27 +1,8 @@
 import { supabase } from './supabase'
+import { RANK_THRESHOLDS, RANK_ORDER, XP_REWARDS } from './constants'
 
-export const RANK_THRESHOLDS: Record<string, number> = {
-  'Curious':   0,
-  'Tinkerer':  60,
-  'Builder':   250,
-  'Maker':     600,
-  'Innovator': 1200,
-  'Lab Pro':   2500,
-}
-
-export const RANK_ORDER = ['Curious', 'Tinkerer', 'Builder', 'Maker', 'Innovator', 'Lab Pro']
-
-export const XP_REWARDS = {
-  tier1_challenge:    50,
-  tier2_challenge:    150,
-  tier3_challenge:    400,
-  project_approved:   100,
-  project_active:     200,
-  event_registered:   25,
-  event_presented:    75,
-  profile_completed:  50,
-  first_login:        10,
-}
+// Re-export so existing consumers of `import { X } from './xpEngine'` keep working.
+export { RANK_THRESHOLDS, RANK_ORDER, XP_REWARDS }
 
 export function getRankFromXP(xp: number, role: string): string {
   // Lab Pro requires mentor role
@@ -35,6 +16,7 @@ export function getRankFromXP(xp: number, role: string): string {
 
 export function getNextRank(currentRank: string): string | null {
   const idx = RANK_ORDER.indexOf(currentRank)
+  if (idx === -1) return null
   return idx < RANK_ORDER.length - 1 ? RANK_ORDER[idx + 1] : null
 }
 

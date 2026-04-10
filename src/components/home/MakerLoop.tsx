@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Target, Wrench, TrendingUp, GitBranch, Star, ExternalLink, Code2, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 gsap.registerPlugin(ScrollTrigger);
 

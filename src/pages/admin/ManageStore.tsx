@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useAllProducts, useProductMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -133,7 +133,7 @@ export function ManageStore() {
                 </div>
 
                 {isEditing ? (
-                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(20,20,20,0.08)] scroll-mt-32">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
                                 {isEditing === 'new' ? 'Create Product' : 'Edit Product'}
@@ -154,7 +154,7 @@ export function ManageStore() {
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Category</label>
                                     <select 
-                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.category || 'materials'}
                                         onChange={e => setForm({...form, category: e.target.value})}
                                     >
@@ -194,7 +194,7 @@ export function ManageStore() {
                                     <label className="font-data text-sm font-bold text-brutal-dark mb-1 block">Product Image</label>
                                     <div className="flex items-center gap-4">
                                         {form.image_url && !imageFile && (
-                                            <div className="w-20 h-20 border-2 border-brutal-dark/20 rounded object-cover overflow-hidden bg-white">
+                                            <div className="w-20 h-20 border-2 border-brutal-dark rounded object-cover overflow-hidden bg-white">
                                                 <img src={form.image_url} alt="Product" className="w-full h-full object-contain" />
                                             </div>
                                         )}
@@ -218,7 +218,7 @@ export function ManageStore() {
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Description</label>
                                     <textarea 
                                         required
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px]" 
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px]" 
                                         value={form.description || ''} 
                                         onChange={e => setForm({...form, description: e.target.value})} 
                                     />

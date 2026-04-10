@@ -3,7 +3,7 @@ import { useAuth } from '../../lib/auth';
 import { useSupabaseQuery, useBadgeMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -174,7 +174,7 @@ export function ManageBadges() {
                 </div>
 
                 {isEditing ? (
-                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark rounded-2xl shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] scroll-mt-32">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
                                 {isEditing === 'new' ? 'Mint New Badge' : 'Edit Badge'}
@@ -195,7 +195,7 @@ export function ManageBadges() {
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Type</label>
                                     <select 
-                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-12 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.badge_type || 'achievement'}
                                         onChange={e => setForm({...form, badge_type: e.target.value})}
                                     >

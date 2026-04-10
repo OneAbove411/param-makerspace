@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router';
 import { useMaker } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
 import { ArrowLeft } from 'lucide-react';
 import { BadgeIcon } from '../components/ui/BadgeIcon';
 import { RankBadge } from '../components/ui/RankBadge';
+import { computeDomainLevels } from '../lib/domainLevel';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -62,6 +63,9 @@ export function MakerDetails() {
     const earnedProgression = maker ? maker.badges.filter(b => progressionNames.includes(b.name)) : [];
     const earnedDomain = maker ? maker.badges.filter(b => domainNames.includes(b.domain) && !progressionNames.includes(b.name)) : [];
     const earnedOther = maker ? maker.badges.filter(b => !progressionNames.includes(b.name) && !domainNames.includes(b.domain)) : [];
+
+    // Compute per-domain level summary from earned domain badges
+    const domainLevels = maker ? computeDomainLevels(maker.badges, false) : [];
 
     // GSAP
     useEffect(() => {
@@ -360,6 +364,33 @@ export function MakerDetails() {
                                         </div>
                                         <div className="font-data text-[10px] text-brutal-dark/40 mt-2">
                                             Current level: <strong className="text-brutal-dark/60">{earnedProgression[earnedProgression.length - 1]?.name || 'Curious'}</strong>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {domainLevels.length > 0 && (
+                                    <div className="mb-6">
+                                        <span className="font-data text-[9px] font-bold uppercase text-brutal-dark/30 block mb-3 tracking-widest">Domain Levels</span>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {domainLevels.map(dl => (
+                                                <div
+                                                    key={dl.domain}
+                                                    className="flex items-center gap-2 px-3 py-2 border-2 border-brutal-dark/10 rounded-xl bg-brutal-bg"
+                                                >
+                                                    <div
+                                                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                                            dl.tierRank >= 3 ? 'bg-brutal-red' :
+                                                            dl.tierRank >= 2 ? 'bg-yellow-500' :
+                                                            dl.tierRank >= 1 ? 'bg-green-500' :
+                                                            'bg-brutal-dark/20'
+                                                        }`}
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <div className="font-data text-[10px] font-bold truncate">{dl.domain}</div>
+                                                        <div className="font-data text-[9px] text-brutal-dark/45">{dl.level}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}

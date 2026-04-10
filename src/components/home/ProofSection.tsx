@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ChevronDown, ArrowRight } from 'lucide-react';
 import { RANK_ORDER } from '../../lib/xpEngine';
 import { getBadgeIcon } from '../../lib/badgeIcons';

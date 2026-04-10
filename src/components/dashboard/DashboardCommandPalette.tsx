@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Search, ArrowRight, Command as CommandIcon, CornerDownLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMacPlatform } from '../../lib/platform';

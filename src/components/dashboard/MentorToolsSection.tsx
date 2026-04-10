@@ -1,7 +1,8 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { supabase } from '../../lib/supabase';
 import {
     ClipboardCheck,
     Trophy,
@@ -9,29 +10,62 @@ import {
     Calendar,
     Settings,
     Zap,
+    Loader2,
 } from 'lucide-react';
 
 /**
  * §7 F-313 — Mentor Tools split into two visually-weighted rows:
  *
- *   Row 1 (high attention): Review Queue
+ *   Row 1 (high attention): Review Queue — with LIVE pending counts
  *     Project Reviews / Challenge Verification / Event Submissions /
  *     Website Submissions
- *     Rendered with the yellow brutalist border and larger typography
- *     because these are the surfaces where mentors act on pending work.
+ *     Rendered with the yellow brutalist border, larger typography,
+ *     and a count badge showing how many items await action.
  *
  *   Row 2 (low frequency): Lab Admin
  *     Event Management / Lab Inventory / Challenges / Projects
  *     Rendered muted (dark/5 bg, thinner border, smaller title) because
  *     these are configuration surfaces, not queues.
  *
- * Principle: inverted pyramid + grouping by frequency of use (Cluster,
- * GoodData). Equal-weight cards hid the Project Reviews surface in a
- * grid of nine identical yellow tiles.
- *
- * §7 F-324 — This file is code-split via `React.lazy()` in Dashboard.tsx
- * so viewers and non-mentor makers never pay the bundle cost.
+ * §7 F-324 — Code-split via `React.lazy()` in Dashboard.tsx.
  */
+
+// ── Live queue counts hook ──────────────────────────────────────────────────
+function useQueueCounts() {
+    const [counts, setCounts] = useState({
+        projects: 0,
+        challenges: 0,
+        eventSubs: 0,
+        websites: 0,
+        loading: true,
+    });
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const [projects, challenges, eventSubs, websites] = await Promise.all([
+                supabase.from('project').select('id', { count: 'exact', head: true }).eq('status', 'pending_review'),
+                supabase.from('challenge_completion').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('event_submission').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'shortlisted']),
+                supabase.from('event_website').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+            ]);
+            if (!cancelled) {
+                setCounts({
+                    projects: projects.count || 0,
+                    challenges: challenges.count || 0,
+                    eventSubs: eventSubs.count || 0,
+                    websites: websites.count || 0,
+                    loading: false,
+                });
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    return counts;
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
 
 interface ReviewCardProps {
     title: string;
@@ -39,39 +73,72 @@ interface ReviewCardProps {
     to: string;
     cta: string;
     Icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+    count?: number;
+    countLoading?: boolean;
 }
 
-function ReviewCard({ title, blurb, to, cta, Icon }: ReviewCardProps) {
+function ReviewCard({ title, blurb, to, cta, Icon, count, countLoading }: ReviewCardProps) {
     return (
-        <Card className="p-5 border-2 border-yellow-500/50 bg-yellow-500/5 shadow-[6px_6px_0_0_rgba(234,179,8,0.18)] hover:shadow-[8px_8px_0_0_rgba(234,179,8,0.28)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 ease-out motion-reduce:transition-none motion-reduce:hover:translate-x-0 motion-reduce:hover:translate-y-0 flex flex-col">
-            <div className="flex items-center gap-2 mb-4">
-                <Icon className="w-5 h-5 text-yellow-700" aria-hidden />
-                <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading">{title}</h3>
-            </div>
-            <p className="font-data text-sm text-brutal-dark/60 mb-4 flex-1">{blurb}</p>
-            <Link to={to} className="mt-auto">
-                <Button variant="outline" size="sm" className="w-full">{cta}</Button>
-            </Link>
-        </Card>
+        <Link to={to} className="block group">
+            <Card className="p-5 border-2 border-yellow-500/50 bg-yellow-500/5 shadow-[6px_6px_0_0_rgba(234,179,8,0.18)] hover:shadow-[8px_8px_0_0_rgba(234,179,8,0.28)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 ease-out motion-reduce:transition-none motion-reduce:hover:translate-x-0 motion-reduce:hover:translate-y-0 flex flex-col h-full">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-yellow-700" aria-hidden />
+                    </div>
+                    <h3 className="font-heading font-bold text-base uppercase tracking-tight-heading flex-1">{title}</h3>
+                    {/* Live count badge */}
+                    {countLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 text-yellow-600/50 animate-spin" />
+                    ) : count !== undefined && count > 0 ? (
+                        <span className="bg-yellow-500 text-brutal-dark px-2 py-0.5 text-[10px] font-bold font-data rounded-full min-w-[24px] text-center">
+                            {count}
+                        </span>
+                    ) : (
+                        <span className="font-data text-[10px] text-brutal-dark/30 font-bold">0</span>
+                    )}
+                </div>
+                <p className="font-data text-xs text-brutal-dark/55 mb-4 flex-1 leading-relaxed">{blurb}</p>
+                <div className="mt-auto">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-yellow-500/40 bg-brutal-bg px-3 py-1.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/60 group-hover:bg-brutal-dark group-hover:text-brutal-bg group-hover:border-brutal-dark transition-all duration-150">
+                        {cta}
+                    </span>
+                </div>
+            </Card>
+        </Link>
     );
 }
 
-function AdminCard({ title, blurb, to, cta, Icon }: ReviewCardProps) {
+interface AdminCardProps {
+    title: string;
+    blurb: string;
+    to: string;
+    cta: string;
+    Icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+}
+
+function AdminCard({ title, blurb, to, cta, Icon }: AdminCardProps) {
     return (
-        <Card className="p-4 border-2 border-brutal-dark/10 bg-brutal-dark/5 flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-4 h-4 text-brutal-dark/50" aria-hidden />
-                <h3 className="font-data font-bold text-sm uppercase tracking-wider text-brutal-dark/80">{title}</h3>
-            </div>
-            <p className="font-data text-xs text-brutal-dark/50 mb-3 flex-1">{blurb}</p>
-            <Link to={to} className="mt-auto">
-                <Button variant="outline" size="sm" className="w-full text-xs">{cta}</Button>
-            </Link>
-        </Card>
+        <Link to={to} className="block group">
+            <Card className="p-4 border-2 border-brutal-dark/10 bg-brutal-dark/[0.03] flex flex-col h-full hover:border-brutal-dark/25 transition-colors duration-150">
+                <div className="flex items-center gap-2 mb-2">
+                    <Icon className="w-4 h-4 text-brutal-dark/40" aria-hidden />
+                    <h3 className="font-data font-bold text-sm uppercase tracking-wider text-brutal-dark/70">{title}</h3>
+                </div>
+                <p className="font-data text-[11px] text-brutal-dark/45 mb-3 flex-1">{blurb}</p>
+                <span className="inline-flex items-center rounded-full border border-brutal-dark/15 px-2.5 py-1 font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/50 group-hover:text-brutal-dark group-hover:border-brutal-dark/30 transition-colors duration-150 mt-auto self-start">
+                    {cta}
+                </span>
+            </Card>
+        </Link>
     );
 }
+
+// ── Main ────────────────────────────────────────────────────────────────────
 
 export default function MentorToolsSection({ eyebrowNumber }: { eyebrowNumber?: string }) {
+    const queue = useQueueCounts();
+    const totalPending = queue.projects + queue.challenges + queue.eventSubs + queue.websites;
+
     return (
         <section
             className="db-section"
@@ -84,7 +151,7 @@ export default function MentorToolsSection({ eyebrowNumber }: { eyebrowNumber?: 
             )}
             <div className="flex items-center gap-3 mb-8 border-b-2 border-brutal-dark/10 pb-4">
                 <span
-                    className="bg-yellow-500 text-brutal-dark px-3 py-1 text-xs font-bold font-data rounded uppercase"
+                    className="bg-yellow-500 text-brutal-dark px-3 py-1 text-[10px] font-bold font-data rounded-full uppercase tracking-widest"
                     aria-label="Mentor-only zone"
                 >
                     Mentor-only
@@ -95,9 +162,14 @@ export default function MentorToolsSection({ eyebrowNumber }: { eyebrowNumber?: 
                 >
                     Review Queue
                 </h2>
+                {!queue.loading && totalPending > 0 && (
+                    <span className="bg-yellow-500 text-brutal-dark px-2.5 py-1 text-xs font-bold font-data rounded-full ml-auto">
+                        {totalPending} pending
+                    </span>
+                )}
             </div>
 
-            {/* Row 1 — Review Queue (high attention) */}
+            {/* Row 1 — Review Queue (high attention) with live counts */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
                 <ReviewCard
                     title="Project Reviews"
@@ -105,6 +177,8 @@ export default function MentorToolsSection({ eyebrowNumber }: { eyebrowNumber?: 
                     to="/admin/review-projects"
                     cta="View Pending"
                     Icon={ClipboardCheck}
+                    count={queue.projects}
+                    countLoading={queue.loading}
                 />
                 <ReviewCard
                     title="Challenge Verification"
@@ -112,13 +186,17 @@ export default function MentorToolsSection({ eyebrowNumber }: { eyebrowNumber?: 
                     to="/admin/review-challenges"
                     cta="View Submissions"
                     Icon={Trophy}
+                    count={queue.challenges}
+                    countLoading={queue.loading}
                 />
                 <ReviewCard
                     title="Event Submissions"
-                    blurb="Review and shortlist Build Challenge submissions."
+                    blurb="Review and shortlist Build Challenge project submissions."
                     to="/admin/review-submissions"
                     cta="Review"
                     Icon={Trophy}
+                    count={queue.eventSubs}
+                    countLoading={queue.loading}
                 />
                 <ReviewCard
                     title="Website Submissions"
@@ -126,6 +204,8 @@ export default function MentorToolsSection({ eyebrowNumber }: { eyebrowNumber?: 
                     to="/admin/review-websites"
                     cta="Review"
                     Icon={Globe}
+                    count={queue.websites}
+                    countLoading={queue.loading}
                 />
             </div>
 

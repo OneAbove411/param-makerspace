@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { gsap } from 'gsap';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../lib/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';

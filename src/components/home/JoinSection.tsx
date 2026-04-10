@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { ChevronDown, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useReveal } from '../../hooks/useReveal';

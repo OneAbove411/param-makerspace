@@ -1,15 +1,18 @@
-import React, { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useAuth } from '../lib/auth';
+import { supabase } from '../lib/supabase';
 
 /**
- * §1.5 — OAuth landing page.
+ * §1.5 — OAuth / PKCE landing page.
  *
- * Supabase JS auto-detects the URL hash on import and exchanges it for a
- * session, so by the time this component mounts the AuthProvider's
- * onAuthStateChange handler is already running. Our job here is just to
- * (a) honor the `?next=` query param the OAuth start put on the callback URL,
- * (b) validate it (open-redirect guard), and (c) navigate once auth is ready.
+ * With PKCE flow, Supabase redirects back with a `?code=` query param
+ * instead of a hash fragment. We call `exchangeCodeForSession` to convert
+ * the auth code into a session. The AuthProvider's onAuthStateChange
+ * listener then picks up the SIGNED_IN event.
+ *
+ * We also honor the `?next=` query param for post-auth redirect, validate
+ * it (open-redirect guard), and navigate once auth is ready.
  */
 function safeNext(raw: string | null): string {
     if (!raw) return '/dashboard';
@@ -22,8 +25,19 @@ export function AuthCallback() {
     const [params] = useSearchParams();
     const navigate = useNavigate();
     const { user, isLoading } = useAuth();
+    const exchanged = useRef(false);
 
     const next = safeNext(params.get('next'));
+    const code = params.get('code');
+
+    // PKCE: exchange the auth code for a session (once)
+    useEffect(() => {
+        if (!code || exchanged.current) return;
+        exchanged.current = true;
+        supabase.auth.exchangeCodeForSession(code).catch((err) => {
+            console.error('[param] PKCE code exchange failed:', err);
+        });
+    }, [code]);
 
     useEffect(() => {
         if (isLoading) return;

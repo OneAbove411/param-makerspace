@@ -4,10 +4,11 @@ import React, {
     useState,
     useEffect,
     useCallback,
+    useMemo,
     useRef,
 } from 'react';
 import { supabase, clearAppAuth, handleAuthError } from './supabase';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import type { Role } from './database.types';
 import { onUserJoined } from './badgeEngine';
 
@@ -156,21 +157,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isRecoveryRef = useRef(false);
     const initDone = useRef(false);
     const eventCounter = useRef(0); // Tracks latest event to discard stale async results
+    const bufferedEvents = useRef<{ event: AuthChangeEvent; session: Session | null }[]>([]);
 
     useEffect(() => {
         let mounted = true;
 
-        // Detect recovery flow from URL hash BEFORE any async work.
-        // Supabase implicit flow puts tokens in the hash fragment:
-        // /update-password#access_token=...&type=recovery
-        // We must detect this synchronously so init() doesn't treat
-        // the recovery session as a full login.
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const isRecoveryUrl = hashParams.get('type') === 'recovery';
-        if (isRecoveryUrl) {
-            isRecoveryRef.current = true;
-            setIsRecovery(true);
-        }
+        // With PKCE flow, recovery is detected via the PASSWORD_RECOVERY
+        // event from onAuthStateChange (handled below). No hash-fragment
+        // parsing needed — PKCE uses query params, not URL hash.
 
         async function init() {
             // 1. Try to get the session from storage
@@ -234,6 +228,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
             initDone.current = true;
+
+            // Replay any auth events that arrived while init was running.
+            // This ensures TOKEN_REFRESHED events aren't silently dropped.
+            if (bufferedEvents.current.length > 0) {
+                const events = bufferedEvents.current.splice(0);
+                // Only the latest TOKEN_REFRESHED matters — apply its session
+                const lastRefresh = [...events].reverse().find(e => e.event === 'TOKEN_REFRESHED');
+                if (lastRefresh?.session && mounted) {
+                    setSession(lastRefresh.session);
+                }
+            }
         }
 
         init();
@@ -244,8 +249,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = supabase.auth.onAuthStateChange(async (event, s) => {
             if (!mounted) return;
 
-            // Skip events during init to avoid double-loading
-            if (!initDone.current && event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') return;
+            // TOKEN_REFRESHED fires on every tab-return (Supabase's built-in
+            // autoRefreshToken handler).  The user hasn't changed — only the
+            // access_token rotated — so re-fetching the app_user is wasteful
+            // and causes a visible loading flash / stale-data flicker.
+            // Just update the session object silently.
+            if (event === 'TOKEN_REFRESHED') {
+                setSession(s);
+                return;
+            }
+
+            // Buffer non-critical events during init to avoid double-loading,
+            // but don't drop them — they'll be replayed after init completes.
+            if (!initDone.current && event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
+                bufferedEvents.current.push({ event, session: s });
+                return;
+            }
 
             // Handle password recovery flow — set flag and skip normal user loading
             if (event === 'PASSWORD_RECOVERY') {
@@ -427,22 +446,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    const value = useMemo(
+        () => ({
+            user,
+            session,
+            role: user?.role || 'viewer',
+            isLoading,
+            isRecovery,
+            signUp,
+            signIn,
+            signInWithGoogle,
+            signOut,
+            resetPassword,
+            refreshUser,
+        }),
+        [user, session, isLoading, isRecovery, signUp, signIn, signInWithGoogle, signOut, resetPassword, refreshUser]
+    );
+
     return (
-        <AuthContext.Provider
-            value={{
-                user,
-                session,
-                role: user?.role || 'viewer',
-                isLoading,
-                isRecovery,
-                signUp,
-                signIn,
-                signInWithGoogle,
-                signOut,
-                resetPassword,
-                refreshUser,
-            }}
-        >
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

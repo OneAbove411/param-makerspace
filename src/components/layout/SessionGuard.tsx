@@ -1,28 +1,70 @@
+import { useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { refetchAllActiveQueries } from '../../lib/hooks';
+
+// Only kick a refetch cascade if the tab was hidden for at least this
+// long.  Brief alt-tabs don't need to invalidate every query.
+const MIN_HIDDEN_FOR_REFETCH_MS = 30_000;
+
 /**
- * SessionGuard — intentionally a no-op as of the post-demo pass.
+ * SessionGuard — lightweight visibility-aware recovery.
  *
- * The previous implementation ran a `setInterval` every 5 minutes AND a
- * `visibilitychange` handler that called `supabase.auth.refreshSession()`
- * whenever the tab came back to the foreground, even though Supabase's JS
- * client already does `autoRefreshToken: true` on its own. This caused two
- * very visible bugs:
+ * Supabase JS (with `autoRefreshToken: true`) already installs its own
+ * `visibilitychange` listener that calls `startAutoRefresh()` when the
+ * tab becomes visible and `stopAutoRefresh()` when it's hidden.  That
+ * internal handler takes care of token refresh and session management.
  *
- *   1. The "Session Expired" popup could appear while the user was still
- *      actively using the tab (any network blip during the pre-expire
- *      refresh flipped `setShowPopup(true)`).
- *   2. Every tab re-focus kicked off a refetch cascade because the auth
- *      state listener treated the TOKEN_REFRESHED event as a fresh
- *      sign-in and re-loaded the app user.
+ * **This component must NOT call `stopAutoRefresh`, `startAutoRefresh`,
+ * `refreshSession`, or `getSession` inside a visibilitychange handler.**
+ * Doing so fights the built-in handler, introduces blocking awaits that
+ * stall data queries, and causes the "0 results until hard refresh" bug.
  *
- * The ground truth is now simply: Supabase refreshes the token silently,
- * and `handleAuthError(401)` in src/lib/supabase.ts redirects to /login
- * the moment a request actually comes back with a dead session. There is
- * no need for a second, client-side watchdog on top of that.
+ * What this component does:
+ *   1. After a long absence (≥ 30s), update the realtime socket's JWT
+ *      so channels don't silently fail RLS checks.
+ *   2. After a long absence, kick `refetchAllActiveQueries()` so stale
+ *      useSupabaseQuery hooks re-fetch.
  *
- * The component is kept (rather than deleted outright) so that existing
- * imports in RootLayout continue to compile, and so that a future
- * session-health heuristic can be added here without re-plumbing.
+ * That's it.  Everything else is Supabase's job.
  */
 export function SessionGuard() {
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        let hiddenAt: number | null = null;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                hiddenAt = Date.now();
+                return;
+            }
+
+            // Tab became visible
+            const hiddenDurationMs = hiddenAt != null ? Date.now() - hiddenAt : 0;
+            hiddenAt = null;
+
+            // Brief switch — do nothing.  Token is still valid,
+            // websocket is still alive, auto-refresh timer is fine.
+            if (hiddenDurationMs < MIN_HIDDEN_FOR_REFETCH_MS) return;
+
+            // Extended absence — update realtime auth and refetch data.
+            // We read the token from localStorage (where Supabase's own
+            // auto-refresh already wrote the latest JWT) instead of
+            // making a blocking network call.
+            try {
+                const raw = localStorage.getItem('param-makerspace-auth');
+                if (raw) {
+                    const token = JSON.parse(raw)?.access_token;
+                    if (token) supabase.realtime.setAuth(token);
+                }
+            } catch { /* ignore */ }
+
+            try { refetchAllActiveQueries(); } catch { /* ignore */ }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, []);
+
     return null;
 }

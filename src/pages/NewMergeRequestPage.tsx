@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
 import { useProject, useMergeRequestMutations } from '../lib/hooks';
 import { supabase } from '../lib/supabase';

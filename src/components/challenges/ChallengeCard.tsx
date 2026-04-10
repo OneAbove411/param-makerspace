@@ -1,8 +1,10 @@
 import React, { memo, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowRight, Bookmark, Clock, CheckCircle2, Loader2 } from 'lucide-react';
 import { Card } from '../ui/Card';
+import { XpRewardBadge } from '../ui/XpRewardBadge';
 import { cn } from '../../lib/utils';
+import { XP_REWARDS } from '../../lib/constants';
 import type { Challenge } from '../../lib/database.types';
 
 // ─────────────────────────────────────────────────────────────
@@ -260,6 +262,12 @@ function ChallengeCardImpl({
         );
     }
 
+    // ── XP reward for this tier ─────────────────────────────
+    const xpAmount = tier === 'Tier 3' ? XP_REWARDS.tier3_challenge
+        : tier === 'Tier 2' ? XP_REWARDS.tier2_challenge
+        : tier === 'Tier 1' ? XP_REWARDS.tier1_challenge
+        : null;
+
     // ── IMAGE VARIANTS (medium + spotlight) ───────────────
     const isSpotlight = variant === 'spotlight';
     const imgHeight = isSpotlight ? 'h-[340px] md:h-[380px]' : 'h-48';
@@ -397,11 +405,13 @@ function ChallengeCardImpl({
                         <span className="font-data text-[10px] font-bold text-brutal-red uppercase tracking-wider flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
                             View Blueprint <ArrowRight size={12} />
                         </span>
-                        {isSpotlight && (
+                        {xpAmount ? (
+                            <XpRewardBadge amount={xpAmount} />
+                        ) : isSpotlight ? (
                             <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/30">
                                 Spotlight
                             </span>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </Card>

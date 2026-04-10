@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, AlertTriangle, Lock } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
+import { Plus, AlertTriangle, Lock, Trophy, Calendar } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
@@ -24,6 +24,20 @@ export interface MyWorkProject {
     status: string;
 }
 
+export interface MyChallengeItem {
+    challengeId: string;
+    title: string;
+    tier: string;
+    status: string; // 'verified' | 'pending_review' | 'rejected'
+}
+
+export interface MyEventItem {
+    id: string;
+    title: string;
+    date: string;
+    type: string;
+}
+
 interface MyWorkTabProps {
     projects: MyWorkProject[];
     projectsLoading: boolean;
@@ -31,6 +45,10 @@ interface MyWorkTabProps {
     canCreateProject: boolean;
     requiredRank: string;
     onPropose: () => void;
+    challenges: MyChallengeItem[];
+    challengesLoading: boolean;
+    events: MyEventItem[];
+    eventsLoading: boolean;
 }
 
 export function MyWorkTab({
@@ -40,6 +58,10 @@ export function MyWorkTab({
     canCreateProject,
     requiredRank,
     onPropose,
+    challenges,
+    challengesLoading,
+    events,
+    eventsLoading,
 }: MyWorkTabProps) {
     const navigate = useNavigate();
 
@@ -70,13 +92,14 @@ export function MyWorkTab({
                             <Plus className="w-4 h-4 mr-1" aria-hidden /> Propose Project
                         </Button>
                     ) : (
-                        <span
-                            aria-label={`Propose Project locked. Unlocks at ${requiredRank}.`}
-                            className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/40 border-2 border-dashed border-brutal-dark/20 px-3 py-2 rounded"
+                        <Link
+                            to="/challenges?tier=Tier+1"
+                            aria-label={`Propose Project locked. Complete a Tier 1 challenge to unlock.`}
+                            className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 border-2 border-dashed border-yellow-400/60 bg-yellow-50 px-3 py-2 rounded hover:border-yellow-500 hover:bg-yellow-100 transition-colors"
                         >
                             <Lock className="w-3.5 h-3.5" aria-hidden />
-                            Need {requiredRank}
-                        </span>
+                            Complete a Tier 1 challenge to unlock
+                        </Link>
                     )}
                 </div>
             </div>
@@ -138,8 +161,15 @@ export function MyWorkTab({
                         <Skeleton variant="card" />
                     </div>
                 ) : projects.length === 0 ? (
-                    <div className="py-12 text-center font-data text-brutal-dark/50 border-2 border-dashed border-brutal-dark/20 rounded-2xl">
-                        No projects yet. {canCreateProject && 'Click Propose Project to start your first one.'}
+                    <div className="py-12 text-center font-data text-brutal-dark/50 border-2 border-dashed border-brutal-dark/20 rounded-2xl space-y-2">
+                        <p>No projects yet.</p>
+                        {canCreateProject ? (
+                            <p>Click <strong>Propose Project</strong> to start your first one.</p>
+                        ) : (
+                            <p>
+                                Complete a <Link to="/challenges?tier=Tier+1" className="text-brutal-red underline hover:text-brutal-dark transition-colors">Tier 1 challenge</Link> to unlock project proposals.
+                            </p>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -189,6 +219,121 @@ export function MyWorkTab({
                                             View Public
                                         </Button>
                                     )}
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Challenges history */}
+            <div>
+                <div className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/30 mb-3 flex items-center gap-2">
+                    <Trophy className="w-3.5 h-3.5 text-brutal-red" aria-hidden />
+                    My Challenges
+                </div>
+                {challengesLoading && challenges.length === 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <Skeleton variant="card" />
+                        <Skeleton variant="card" />
+                    </div>
+                ) : challenges.length === 0 ? (
+                    <div className="py-8 text-center font-data text-brutal-dark/50 border-2 border-dashed border-brutal-dark/20 rounded-2xl">
+                        No challenges attempted yet.{' '}
+                        <Link to="/challenges" className="text-brutal-red underline">Browse challenges</Link>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {challenges.map((c) => (
+                            <Card
+                                key={c.challengeId}
+                                className={cn(
+                                    'flex flex-col p-5 border-2 border-brutal-dark/15',
+                                    'shadow-[6px_6px_0_0_rgba(20,20,20,0.06)]',
+                                    'hover:border-brutal-dark hover:shadow-[8px_8px_0_0_rgba(20,20,20,0.1)]',
+                                    'transition-all duration-150 ease-out motion-reduce:transition-none'
+                                )}
+                            >
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span
+                                        className={cn(
+                                            'px-2 py-0.5 text-[10px] font-bold font-data uppercase rounded tracking-widest',
+                                            c.status === 'verified'
+                                                ? 'bg-green-100 text-green-700'
+                                                : c.status === 'pending_review'
+                                                ? 'bg-yellow-100 text-yellow-700'
+                                                : 'bg-brutal-red/10 text-brutal-red'
+                                        )}
+                                    >
+                                        {c.status.replace('_', ' ')}
+                                    </span>
+                                    <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/40">
+                                        {c.tier}
+                                    </span>
+                                </div>
+                                <h4 className="font-heading font-bold text-lg mb-1 tracking-tight-heading line-clamp-2">
+                                    {c.title}
+                                </h4>
+                                <div className="mt-auto pt-3">
+                                    <Link
+                                        to={`/challenges/${c.challengeId}`}
+                                        className="font-data text-xs font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-red underline"
+                                    >
+                                        View challenge →
+                                    </Link>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Events history */}
+            <div>
+                <div className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/30 mb-3 flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5 text-brutal-red" aria-hidden />
+                    My Events
+                </div>
+                {eventsLoading && events.length === 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <Skeleton variant="card" />
+                        <Skeleton variant="card" />
+                    </div>
+                ) : events.length === 0 ? (
+                    <div className="py-8 text-center font-data text-brutal-dark/50 border-2 border-dashed border-brutal-dark/20 rounded-2xl">
+                        No events registered yet.{' '}
+                        <Link to="/events" className="text-brutal-red underline">Browse events</Link>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {events.map((ev) => (
+                            <Card
+                                key={ev.id}
+                                className={cn(
+                                    'flex flex-col p-5 border-2 border-brutal-dark/15',
+                                    'shadow-[6px_6px_0_0_rgba(20,20,20,0.06)]',
+                                    'hover:border-brutal-dark hover:shadow-[8px_8px_0_0_rgba(20,20,20,0.1)]',
+                                    'transition-all duration-150 ease-out motion-reduce:transition-none'
+                                )}
+                            >
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="px-2 py-0.5 text-[10px] font-bold font-data uppercase rounded tracking-widest bg-brutal-dark/10 text-brutal-dark/60">
+                                        {ev.type}
+                                    </span>
+                                </div>
+                                <h4 className="font-heading font-bold text-lg mb-1 tracking-tight-heading line-clamp-2">
+                                    {ev.title}
+                                </h4>
+                                <div className="font-data text-xs text-brutal-dark/40 mt-1">
+                                    {ev.date}
+                                </div>
+                                <div className="mt-auto pt-3">
+                                    <Link
+                                        to={`/events/${ev.id}`}
+                                        className="font-data text-xs font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-red underline"
+                                    >
+                                        View event →
+                                    </Link>
                                 </div>
                             </Card>
                         ))}

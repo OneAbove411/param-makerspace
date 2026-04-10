@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth, type Role } from '../../lib/auth';
 import { useSupabaseQuery } from '../../lib/hooks';
 import { supabase } from '../../lib/supabase';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Users, Shield, UserX, UserCheck, Edit3, X } from 'lucide-react';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { Users, Shield, UserX, UserCheck, Edit3, X, Search, ArrowLeft } from 'lucide-react';
 import type { AppUser, MakerProfile } from '../../lib/database.types';
 
 // ─── Isolated data fetching — does NOT rely on useAllUsers from hooks.ts ───
@@ -88,6 +89,21 @@ export function ManageUsers() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<any>(null);
     const [xpForm, setXpForm] = useState({ xp: 0, rank: 'Curious', rankOverride: false });
+    const [searchQuery, setSearchQuery] = useState('');
+    const [roleFilter, setRoleFilter] = useState<string>('all');
+
+    // Filtered + searched user list
+    const filteredUsers = useMemo(() => {
+        if (!users) return [];
+        return users.filter((u: any) => {
+            const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+            const q = searchQuery.toLowerCase().trim();
+            const matchesSearch = !q
+                || (u.name || '').toLowerCase().includes(q)
+                || (u.email || '').toLowerCase().includes(q);
+            return matchesRole && matchesSearch;
+        });
+    }, [users, roleFilter, searchQuery]);
 
     if (role !== 'admin') {
         return (
@@ -170,8 +186,13 @@ export function ManageUsers() {
 
     if (loading) {
         return (
-            <div className="p-24 flex justify-center font-data">
-                Loading users...
+            <div className="flex-1 w-full bg-brutal-bg pt-28 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
+                <div className="max-w-6xl mx-auto space-y-6">
+                    <Skeleton variant="line" className="h-6 w-48" />
+                    <Skeleton variant="banner" className="h-14 w-80" />
+                    <Skeleton variant="line" className="h-10 w-full" />
+                    <Skeleton variant="card" className="h-96" />
+                </div>
             </div>
         );
     }
@@ -209,28 +230,64 @@ export function ManageUsers() {
     }
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
-            <div className="max-w-6xl mx-auto space-y-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <span className="bg-brutal-red text-white px-2 py-1 text-xs font-bold font-data rounded uppercase">
-                        Admin Panel
-                    </span>
+        <div className="flex-1 w-full bg-brutal-bg pt-28 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
+            <div className="max-w-6xl mx-auto space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-3 flex-wrap">
                     <Link
                         to="/dashboard"
-                        className="text-brutal-dark/60 hover:text-brutal-dark font-data text-sm font-bold ml-auto underline"
+                        className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-dark transition-colors"
                     >
-                        Back to Dashboard
+                        <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
                     </Link>
+                    <span className="bg-brutal-red text-brutal-bg px-2.5 py-1 text-[10px] font-bold font-data rounded-full uppercase tracking-widest">
+                        Admin
+                    </span>
                 </div>
 
-                <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading flex items-center gap-4">
-                    <Users className="w-10 h-10 text-brutal-red" />
-                    User Management
-                </h1>
-                <p className="font-data text-lg text-brutal-dark/60 border-l-4 border-brutal-red pl-4 mb-8">
-                    Manage all user accounts, update roles (Maker, Mentor, Admin), and
-                    toggle account active status.
-                </p>
+                <div className="border-b-2 border-brutal-dark/10 pb-5">
+                    <h1 className="font-heading font-bold text-3xl md:text-4xl uppercase tracking-tight-heading flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-brutal-red/10 border-2 border-brutal-red/30 flex items-center justify-center">
+                            <Users className="w-5 h-5 text-brutal-red" />
+                        </div>
+                        User Management
+                    </h1>
+                    <p className="font-data text-sm text-brutal-dark/55 mt-2 max-w-2xl">
+                        Manage accounts, update roles, toggle active status, and adjust XP/rank.
+                    </p>
+                </div>
+
+                {/* Search + Filter bar */}
+                <div className="flex flex-wrap gap-3 items-center">
+                    <div className="relative flex-1 min-w-[200px] max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brutal-dark/30 pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="Search by name or email..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full bg-brutal-bg border-2 border-brutal-dark/15 pl-9 pr-4 py-2 rounded-xl font-data text-xs font-bold focus:outline-none focus:border-brutal-dark/30 transition-colors"
+                        />
+                    </div>
+                    <div className="flex gap-0.5 bg-brutal-dark/5 rounded-xl p-1">
+                        {['all', 'viewer', 'maker', 'mentor', 'admin'].map(r => (
+                            <button
+                                key={r}
+                                onClick={() => setRoleFilter(r)}
+                                className={`px-3 py-1.5 rounded-lg font-data text-[10px] font-bold uppercase tracking-widest transition-all ${
+                                    roleFilter === r
+                                        ? 'bg-brutal-dark text-brutal-bg shadow-[2px_2px_0_0_rgba(196,41,30,0.3)]'
+                                        : 'text-brutal-dark/50 hover:text-brutal-dark hover:bg-brutal-dark/10'
+                                }`}
+                            >
+                                {r}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/40 ml-auto">
+                        {filteredUsers.length} / {users?.length || 0} users
+                    </span>
+                </div>
 
                 {/* Zero-state — table loaded but empty */}
                 {users && users.length === 0 && (
@@ -259,31 +316,47 @@ export function ManageUsers() {
                     </div>
                 )}
 
-                {users && users.length > 0 && (
-                    <Card className="overflow-hidden border-2 border-brutal-dark/10">
+                {/* No search results */}
+                {users && users.length > 0 && filteredUsers.length === 0 && (
+                    <div className="rounded-2xl border-2 border-dashed border-brutal-dark/15 bg-brutal-bg p-10 text-center">
+                        <Search className="w-6 h-6 text-brutal-dark/25 mx-auto mb-3" />
+                        <p className="font-data text-sm text-brutal-dark/50">
+                            No users match "{searchQuery}" {roleFilter !== 'all' ? `with role "${roleFilter}"` : ''}
+                        </p>
+                        <button
+                            onClick={() => { setSearchQuery(''); setRoleFilter('all'); }}
+                            className="mt-3 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red hover:text-brutal-dark transition-colors"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
+                )}
+
+                {filteredUsers.length > 0 && (
+                    <Card className="overflow-hidden border-2 border-brutal-dark rounded-2xl shadow-[6px_6px_0_0_rgba(20,20,20,0.08)]">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse font-data">
                                 <thead>
-                                    <tr className="bg-brutal-dark/5 border-b-2 border-brutal-dark/10">
-                                        <th className="p-4 font-bold text-sm uppercase text-brutal-dark/60 tracking-wider">
+                                    <tr className="bg-brutal-dark text-brutal-bg border-b-2 border-brutal-dark">
+                                        <th className="p-4 font-bold text-[10px] uppercase tracking-widest">
                                             User
                                         </th>
-                                        <th className="p-4 font-bold text-sm uppercase text-brutal-dark/60 tracking-wider">
+                                        <th className="p-4 font-bold text-[10px] uppercase tracking-widest">
                                             Role
                                         </th>
-                                        <th className="p-4 font-bold text-sm uppercase text-brutal-dark/60 tracking-wider">
+                                        <th className="p-4 font-bold text-[10px] uppercase tracking-widest">
                                             Status
                                         </th>
-                                        <th className="p-4 font-bold text-sm uppercase text-brutal-dark/60 tracking-wider">
+                                        <th className="p-4 font-bold text-[10px] uppercase tracking-widest">
                                             Rank / XP
                                         </th>
-                                        <th className="p-4 font-bold text-sm uppercase text-brutal-dark/60 tracking-wider text-right">
+                                        <th className="p-4 font-bold text-[10px] uppercase tracking-widest text-right">
                                             Actions
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-brutal-dark/5">
-                                    {users.map((u: any) => (
+                                <tbody className="divide-y divide-brutal-dark/10">
+                                    {filteredUsers.map((u: any) => (
                                         <tr
                                             key={u.id}
                                             className="hover:bg-brutal-dark/5 transition-colors"
@@ -314,7 +387,7 @@ export function ManageUsers() {
 
                                             <td className="p-4">
                                                 <select
-                                                    className="bg-transparent border border-brutal-dark/20 rounded px-2 py-1 text-sm font-bold disabled:opacity-50 focus:outline-none focus:border-brutal-red"
+                                                    className="bg-transparent border-2 border-brutal-dark/30 rounded px-2 py-1 text-sm font-bold disabled:opacity-50 focus:outline-none focus:border-brutal-red"
                                                     value={u.role}
                                                     onChange={(e) =>
                                                         handleRoleChange(u.id, e.target.value as Role)

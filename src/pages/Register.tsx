@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { gsap } from 'gsap';
 import { useAuth } from '../lib/auth';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';

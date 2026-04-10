@@ -1,5 +1,5 @@
 import React, { memo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowRight, Heart, Bookmark, Video, Users, Flame, Eye, GitFork } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { MagneticCard } from '../ui/MagneticCard';

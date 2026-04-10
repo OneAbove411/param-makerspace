@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState, lazy, Suspense } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { gsap } from 'gsap';
 import {
     ChevronDown, ArrowRight, Sparkles,
@@ -603,15 +603,12 @@ export function WelcomeHero() {
                     intentional yellow headlight beams. */}
             </div>
 
-            {/* ── Mobile robot (Option A) ──
-                Inline SVG stylized robot above the headline on <md so the
-                visual hierarchy stays robot → headline → tagline → chips → CTA.
-                No new deps, ~3KB inline. Decorative for AT. */}
-            {!user && (
-                <div className="md:hidden absolute top-6 right-6 z-[3] pointer-events-none" aria-hidden="true">
-                    <MobileRobot />
-                </div>
-            )}
+            {/* ── Mobile robot ──
+                Previously rendered a 96x96 SVG robot floating in the top-right
+                corner on <md. It was ruled out for visual clutter — on phones
+                the hierarchy now goes straight from headline → tagline → CTA
+                without a decorative robot. Component kept in-file for reference
+                below but intentionally not rendered. */}
 
             {/* Content — text sits above the robot canvas */}
             <div className="relative z-10 w-full max-w-7xl mx-auto pointer-events-none">

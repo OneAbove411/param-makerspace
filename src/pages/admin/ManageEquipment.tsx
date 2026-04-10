@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useEquipment, useEquipmentMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -125,7 +125,7 @@ export function ManageEquipment() {
                 </div>
 
                 {isEditing ? (
-                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32">
+                    <Card ref={formRef} className="p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(20,20,20,0.08)] scroll-mt-32">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
                                 {isEditing === 'new' ? 'Register New Machine' : 'Edit Equipment'}
@@ -167,7 +167,7 @@ export function ManageEquipment() {
                                     <label className="font-data text-sm font-bold text-brutal-dark mb-1 block">Machine Photo</label>
                                     <div className="flex items-center gap-4">
                                         {form.image_url && !imageFile && (
-                                            <div className="w-20 h-20 border-2 border-brutal-dark/20 rounded object-cover overflow-hidden bg-white">
+                                            <div className="w-20 h-20 border-2 border-brutal-dark rounded object-cover overflow-hidden bg-white">
                                                 <img src={form.image_url} alt="Equipment" className="w-full h-full object-cover" />
                                             </div>
                                         )}
@@ -189,7 +189,7 @@ export function ManageEquipment() {
                                 <div>
                                     <label className="font-data text-sm font-bold text-brutal-dark block mb-1">Description & Specs</label>
                                     <textarea 
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[120px]" 
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[120px]" 
                                         value={form.description || ''} 
                                         placeholder="What is this machine used for? Key specifications?"
                                         onChange={e => setForm({...form, description: e.target.value})} 
@@ -236,7 +236,7 @@ export function ManageEquipment() {
                                 <div className="flex flex-col gap-2 pl-4 border-l-2 border-brutal-dark/10">
                                     <button 
                                         onClick={() => startEdit(equip)}
-                                        className="p-2 border-2 border-brutal-dark/20 rounded hover:bg-brutal-dark hover:text-white transition-colors"
+                                        className="p-2 border-2 border-brutal-dark rounded hover:bg-brutal-dark hover:text-white transition-colors"
                                         title="Edit"
                                         disabled={actionLoading}
                                     >

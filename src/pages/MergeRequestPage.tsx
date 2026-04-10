@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
 import { useProject, useMergeRequestMutations } from '../lib/hooks';
 import { supabase } from '../lib/supabase';
@@ -24,7 +24,7 @@ export function MergeRequestPage() {
             try {
                 const { data: mrData, error: mrError } = await supabase
                     .from('project_merge_request')
-                    .select('*')
+                    .select('id, source_project_id, target_project_id, submitter_id, title, body, status, diff_snapshot, created_at, resolved_at')
                     .eq('id', mrId)
                     .single();
 
@@ -37,13 +37,13 @@ export function MergeRequestPage() {
 
                 const { data: sourceData } = await supabase
                     .from('project')
-                    .select('*')
+                    .select('id, owner_id, title, summary, description, domain, tier, github_url, duration, remixed_from_id, is_hardware, status, visibility, created_at, updated_at')
                     .eq('id', mrData.source_project_id)
                     .single();
 
                 const { data: targetData } = await supabase
                     .from('project')
-                    .select('*')
+                    .select('id, owner_id, title, summary, description, domain, tier, github_url, duration, remixed_from_id, is_hardware, status, visibility, created_at, updated_at')
                     .eq('id', mrData.target_project_id)
                     .single();
 

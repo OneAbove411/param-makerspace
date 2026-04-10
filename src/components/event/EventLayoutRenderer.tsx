@@ -19,7 +19,7 @@ import {
     Type, AlignLeft, Image as ImageIcon, Video, Clock, Users,
     ArrowUp, ArrowDown, Trash2, Pencil, Plus, Check, X, ArrowRight,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type {
     AnyBlock, EventLayout, BlockType, ScheduleItem, HeadingBlock,
     RichTextBlock, ImageBlock, VideoBlock, RegistrationBlock, ScheduleBlock,

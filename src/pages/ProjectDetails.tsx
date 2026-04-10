@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, memo, useMemo } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router';
 import { useProject, useReaction, useComments } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
 import { toast } from '../lib/toast';
@@ -26,6 +26,8 @@ import { ProjectBomTab } from '../components/project/ProjectBomTab';
 import { ProjectFilesTab } from '../components/project/ProjectFilesTab';
 import { ProjectMakesTab } from '../components/project/ProjectMakesTab';
 import { cn } from '../lib/utils';
+import { XpRewardBadge } from '../components/ui/XpRewardBadge';
+import { XP_REWARDS } from '../lib/constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // §9 Project Cockpit — single-screen bento redesign.
@@ -242,17 +244,17 @@ export function ProjectDetails() {
                             >
                                 <ArrowLeft size={12} /> Back
                             </button>
-                            <span className="font-data text-[10px] text-brutal-dark/30">/</span>
+                            <span className="hidden sm:inline font-data text-[10px] text-brutal-dark/30">/</span>
                             <Link
                                 to="/projects"
-                                className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-red transition-colors"
+                                className="hidden sm:inline-flex font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-red transition-colors"
                             >
                                 Projects
                             </Link>
                             {project.domain && (
                                 <>
-                                    <span className="font-data text-[10px] text-brutal-dark/30">/</span>
-                                    <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 truncate">
+                                    <span className="hidden md:inline font-data text-[10px] text-brutal-dark/30">/</span>
+                                    <span className="hidden md:inline font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 truncate">
                                         {project.domain}
                                     </span>
                                 </>
@@ -373,6 +375,21 @@ export function ProjectDetails() {
                                 <Stat icon={<ImageIcon size={11} />} label="Photos" value={project.images?.length || 0} />
                                 <Stat icon={<VideoIcon size={11} />} label="Videos" value={videos.length} />
                                 <Stat icon={<CheckCircle2 size={11} />} label="Done" value={`${milestonesDone}/${milestones.length || 0}`} />
+                            </div>
+
+                            {/* XP Rewards */}
+                            <div className="rounded-2xl border-2 border-brutal-red/15 bg-brutal-red/[0.04] p-4 space-y-2">
+                                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 mb-1">
+                                    Project XP
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="font-data text-[10px] text-brutal-dark/60">Approved</span>
+                                    <XpRewardBadge amount={XP_REWARDS.project_approved} />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="font-data text-[10px] text-brutal-dark/60">Active (published)</span>
+                                    <XpRewardBadge amount={XP_REWARDS.project_active} />
+                                </div>
                             </div>
 
                             {/* Milestone progress (if any) */}

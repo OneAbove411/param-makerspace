@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Loader, X } from 'lucide-react';
 import { useRemixProject } from '../../lib/hooks';
 import { toast } from '../../lib/toast';

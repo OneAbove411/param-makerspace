@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { X, ArrowRight, Heart, Bookmark, Video, Users, Target } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { ProjectListItem } from '../../lib/hooks';

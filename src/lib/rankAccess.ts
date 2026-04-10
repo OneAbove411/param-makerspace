@@ -1,4 +1,4 @@
-import { RANK_ORDER } from './xpEngine'
+import { RANK_ORDER } from './constants'
 
 export type Feature =
   | 'create_project'

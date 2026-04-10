@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useMakers } from '../lib/hooks';
 import { Card } from '../components/ui/Card';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Search, ArrowRight, Star, ChevronDown, Users, Award } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';

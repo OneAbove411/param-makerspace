@@ -7,7 +7,8 @@ import { getBadgeIcon, getBadgeColors } from '../lib/badgeIcons';
 import { RANK_ORDER } from '../lib/xpEngine';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
+import { getBadgeCriteria } from '../lib/badgeCriteria';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -162,7 +163,7 @@ export function Badges() {
                                 </span>
                                 {badge && (
                                     <span className="font-data text-[8px] md:text-[9px] text-brutal-dark/30 mt-1 max-w-[100px] line-clamp-2 leading-tight hidden md:block">
-                                        {badge.criteria}
+                                        {getBadgeCriteria(badge)}
                                     </span>
                                 )}
                             </div>
@@ -292,7 +293,7 @@ export function Badges() {
                                             {badge.name}
                                         </h3>
                                         <p className={`font-data text-xs leading-relaxed mb-4 ${earned ? 'text-brutal-bg/50' : 'text-brutal-dark/40'}`}>
-                                            {badge.description || badge.criteria}
+                                            {badge.description || getBadgeCriteria(badge)}
                                         </p>
                                     </div>
 

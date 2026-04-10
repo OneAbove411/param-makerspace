@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth, type Role } from '../../lib/auth';
 
 export function ProtectedRoute({ allowedRoles }: { allowedRoles: Role[] }) {

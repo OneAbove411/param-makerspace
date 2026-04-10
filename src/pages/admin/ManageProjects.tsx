@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useAllProjectsAdmin, useAdminProjectMutations } from '../../lib/hooks';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Zap, Trash2, Eye, Edit2, ExternalLink, Play } from 'lucide-react';
@@ -142,7 +142,7 @@ export function ManageProjects() {
                     <div className="space-y-4">
                         {filtered.map(project => (
                             <React.Fragment key={project.id}>
-                                <Card className="p-5 border-2 border-brutal-dark/10 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                <Card className="p-5 border-2 border-brutal-dark flex flex-col md:flex-row gap-4 items-start md:items-center">
                                     {/* Info */}
                                     <div className="flex-1 min-w-0 space-y-1">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -191,7 +191,7 @@ export function ManageProjects() {
                                             value={project.status}
                                             onChange={(e) => handleStatusChange(project.id, e.target.value)}
                                             disabled={actionLoading === project.id}
-                                            className="px-2 py-1.5 font-data text-xs font-bold border-2 border-brutal-dark/20 rounded-lg bg-white focus:outline-none focus:border-brutal-dark cursor-pointer"
+                                            className="px-2 py-1.5 font-data text-xs font-bold border-2 border-brutal-dark rounded-lg bg-white focus:outline-none focus:border-brutal-dark cursor-pointer"
                                         >
                                             <option value="draft">Draft</option>
                                             <option value="pending_review">Pending Review</option>
@@ -214,7 +214,7 @@ export function ManageProjects() {
 
                                 {/* Inline Video Preview Panel */}
                                 {previewProjectId === project.id && (
-                                    <Card ref={videoModalRef} className="p-6 border-2 border-brutal-dark/10 bg-brutal-dark/5 scroll-mt-32 -mt-2 ml-4 mr-4">
+                                    <Card ref={videoModalRef} className="p-6 border-2 border-brutal-dark/10 bg-brutal-dark/5 scroll-mt-32 -mt-2 ml-4 mr-4 shadow-[6px_6px_0_0_rgba(20,20,20,0.08)]">
                                         <h4 className="font-heading font-bold text-lg uppercase mb-4 flex items-center gap-2">
                                             <Play className="w-4 h-4 text-brutal-red" /> Videos for "{project.title}"
                                         </h4>

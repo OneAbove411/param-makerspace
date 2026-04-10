@@ -72,6 +72,8 @@ export const toast = {
     error: (message: string, duration?: number) => toastStore.add('error', message, duration),
     loading: (message: string) => toastStore.add('loading', message, Infinity),
     info: (message: string, duration?: number) => toastStore.add('info', message, duration),
+    badgeEarned: (badgeName: string) =>
+        toastStore.add('success', `🏅 Badge earned: ${badgeName}`, 5000),
     dismiss: (id: number) => toastStore.dismiss(id),
     promise: <T,>(
         promise: Promise<T>,

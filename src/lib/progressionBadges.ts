@@ -5,7 +5,7 @@ export const PROGRESSION_BADGES = [
     tier: 'Tier 1',
     domain: 'General',
     badge_type: 'achievement',
-    criteria: 'Create a Param Makerspace account.',
+    criteria: 'Create a Param Makerspace account. Earns +10 XP for first login.',
   },
   {
     name: 'Tinkerer',
@@ -13,7 +13,7 @@ export const PROGRESSION_BADGES = [
     tier: 'Tier 1',
     domain: 'General',
     badge_type: 'achievement',
-    criteria: 'Complete and verify one Tier 1 challenge.',
+    criteria: 'Complete and verify one Tier 1 challenge. Earns +50 XP.',
   },
   {
     name: 'Builder',
@@ -21,7 +21,7 @@ export const PROGRESSION_BADGES = [
     tier: 'Tier 2',
     domain: 'General',
     badge_type: 'achievement',
-    criteria: 'Have a project proposal approved by a mentor.',
+    criteria: 'Have a project proposal approved by a mentor. Earns +100 XP.',
   },
   {
     name: 'Maker',
@@ -29,7 +29,7 @@ export const PROGRESSION_BADGES = [
     tier: 'Tier 2',
     domain: 'General',
     badge_type: 'achievement',
-    criteria: 'Complete a project and have it marked active.',
+    criteria: 'Complete a project and have it marked active. Earns +200 XP.',
   },
   {
     name: 'Innovator',
@@ -37,7 +37,7 @@ export const PROGRESSION_BADGES = [
     tier: 'Tier 3',
     domain: 'General',
     badge_type: 'achievement',
-    criteria: 'Complete a Tier 3 challenge or T3 Architect project.',
+    criteria: 'Complete a Tier 3 challenge or T3 Architect project. Earns +400 XP.',
   },
   {
     name: 'Lab Pro',
@@ -45,15 +45,17 @@ export const PROGRESSION_BADGES = [
     tier: 'Tier 3',
     domain: 'General',
     badge_type: 'role',
-    criteria: 'Achieve Mentor role and complete at least 3 projects.',
+    criteria: 'Achieve Mentor role and have at least 3 active projects.',
   },
 ] as const
 
-const DOMAINS = ['Electronics', 'Robotics', 'AI', 'Design', 'Fabrication', 'Bio', 'Interdisciplinary']
+import { BADGE_DOMAINS } from './constants'
+
+const DOMAINS = [...BADGE_DOMAINS]
 const DOMAIN_TIERS = [
-  { suffix: 'T1', tier: 'Tier 1', description: 'Completed a Tier 1 challenge in this domain.' },
-  { suffix: 'T2', tier: 'Tier 2', description: 'Completed a Tier 2 challenge in this domain.' },
-  { suffix: 'T3', tier: 'Tier 3', description: 'Completed a Tier 3 challenge in this domain.' },
+  { suffix: 'T1', tier: 'Tier 1', description: 'Completed a Tier 1 challenge in this domain. Earns +50 XP.' },
+  { suffix: 'T2', tier: 'Tier 2', description: 'Completed a Tier 2 challenge in this domain. Earns +150 XP.' },
+  { suffix: 'T3', tier: 'Tier 3', description: 'Completed a Tier 3 challenge in this domain. Earns +400 XP.' },
 ]
 
 export const DOMAIN_BADGES = DOMAINS.flatMap(domain =>
@@ -63,6 +65,6 @@ export const DOMAIN_BADGES = DOMAINS.flatMap(domain =>
     tier,
     domain,
     badge_type: 'skill',
-    criteria: `Complete and verify a ${tier} challenge in ${domain}.`,
+    criteria: `Complete and verify a ${tier} challenge in ${domain}. Earns +${tier === 'Tier 1' ? 50 : tier === 'Tier 2' ? 150 : 400} XP.`,
   }))
 )

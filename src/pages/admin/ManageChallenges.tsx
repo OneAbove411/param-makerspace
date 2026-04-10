@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useAllChallenges, useChallengeMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -54,21 +54,21 @@ export function ManageChallenges() {
         const [stepsRes, matsRes, vocabRes, skillsRes] = await Promise.all([
             supabase
                 .from('challenge_step')
-                .select('*')
+                .select('id, challenge_id, step_text, display_order')
                 .eq('challenge_id', challengeId)
                 .order('display_order'),
             supabase
                 .from('challenge_material')
-                .select('*')
+                .select('id, challenge_id, name, display_order')
                 .eq('challenge_id', challengeId)
                 .order('display_order'),
             supabase
                 .from('challenge_vocabulary')
-                .select('*')
+                .select('id, challenge_id, term, definition')
                 .eq('challenge_id', challengeId),
             supabase
                 .from('challenge_skill')
-                .select('*')
+                .select('id, challenge_id, skill_name')
                 .eq('challenge_id', challengeId),
         ]);
 
@@ -210,7 +210,7 @@ export function ManageChallenges() {
                 {isEditing && (
                     <Card
                         ref={formRef}
-                        className="p-8 border-2 border-brutal-dark/20 border-t-8 border-t-brutal-red shadow-xl scroll-mt-32"
+                        className="p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(20,20,20,0.08)] scroll-mt-32"
                     >
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="font-heading font-bold text-3xl uppercase">
@@ -245,7 +245,7 @@ export function ManageChallenges() {
                                         </span>
                                     </label>
                                     <select
-                                        className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.status || 'draft'}
                                         onChange={(e) =>
                                             setForm({ ...form, status: e.target.value as any })
@@ -261,7 +261,7 @@ export function ManageChallenges() {
                                         Domain
                                     </label>
                                     <select
-                                        className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.domain || ''}
                                         onChange={(e) =>
                                             setForm({ ...form, domain: e.target.value })
@@ -283,7 +283,7 @@ export function ManageChallenges() {
                                         Tier
                                     </label>
                                     <select
-                                        className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark/20 px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
+                                        className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
                                         value={form.tier || ''}
                                         onChange={(e) =>
                                             setForm({ ...form, tier: e.target.value })
@@ -312,7 +312,7 @@ export function ManageChallenges() {
                                         Mystery (Hook)
                                     </label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
                                         value={form.mystery || ''}
                                         onChange={(e) =>
                                             setForm({ ...form, mystery: e.target.value })
@@ -324,7 +324,7 @@ export function ManageChallenges() {
                                         Core Idea
                                     </label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
                                         value={form.core_idea || ''}
                                         onChange={(e) =>
                                             setForm({ ...form, core_idea: e.target.value })
@@ -336,7 +336,7 @@ export function ManageChallenges() {
                                         Mission (Brief)
                                     </label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
                                         value={form.mission || ''}
                                         onChange={(e) =>
                                             setForm({ ...form, mission: e.target.value })
@@ -348,7 +348,7 @@ export function ManageChallenges() {
                                         Success Criteria
                                     </label>
                                     <textarea
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark/20 p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
+                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
                                         value={form.success_criteria || ''}
                                         onChange={(e) =>
                                             setForm({ ...form, success_criteria: e.target.value })
@@ -380,7 +380,7 @@ export function ManageChallenges() {
                                 </h3>
 
                                 {/* Materials */}
-                                <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
+                                <div className="bg-brutal-bg border-2 border-brutal-dark rounded-2xl p-6">
                                     <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
                                         Materials{' '}
                                         <span className="text-brutal-dark/50 text-sm">
@@ -435,7 +435,7 @@ export function ManageChallenges() {
                                 </div>
 
                                 {/* Steps */}
-                                <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
+                                <div className="bg-brutal-bg border-2 border-brutal-dark rounded-2xl p-6">
                                     <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
                                         Steps{' '}
                                         <span className="text-brutal-dark/50 text-sm">
@@ -494,7 +494,7 @@ export function ManageChallenges() {
                                 </div>
 
                                 {/* Skills */}
-                                <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
+                                <div className="bg-brutal-bg border-2 border-brutal-dark rounded-2xl p-6">
                                     <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
                                         Skills{' '}
                                         <span className="text-brutal-dark/50 text-sm">
@@ -549,7 +549,7 @@ export function ManageChallenges() {
                                 </div>
 
                                 {/* Vocabulary */}
-                                <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
+                                <div className="bg-brutal-bg border-2 border-brutal-dark rounded-2xl p-6">
                                     <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
                                         Vocabulary{' '}
                                         <span className="text-brutal-dark/50 text-sm">
@@ -624,7 +624,7 @@ export function ManageChallenges() {
                     {challenges?.map((challenge) => (
                         <Card
                             key={challenge.id}
-                            className="p-4 border-2 flex items-center justify-between group hover:border-brutal-red/50 transition-colors"
+                            className="p-4 border-2 border-brutal-dark flex items-center justify-between group hover:border-brutal-red/50 transition-colors"
                         >
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-16 rounded overflow-hidden border-2 border-brutal-dark flex-shrink-0 bg-brutal-dark/10">

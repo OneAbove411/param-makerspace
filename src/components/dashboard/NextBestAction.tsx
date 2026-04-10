@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowRight, Zap, UserCheck, RefreshCcw, Calendar, FileEdit, Compass } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { canAccess } from '../../lib/rankAccess';
+import { XP_REWARDS } from '../../lib/constants';
 
 /**
  * §7 F-307 — "Next Best Action" strip.
@@ -95,7 +96,7 @@ function pickAction(input: NextBestActionInput): Action {
         return {
             eyebrow: 'Your unlock path',
             headline: 'Beat a Tier 1 challenge.',
-            sub: 'One clean Tier 1 earns you Tinkerer and the Propose Project key.',
+            sub: `One clean Tier 1 earns you +${XP_REWARDS.tier1_challenge} XP, Tinkerer rank, and the Propose Project key.`,
             ctaLabel: 'Browse Tier 1',
             to: '/challenges?tier=Tier+1',
             Icon: Zap,
@@ -106,7 +107,7 @@ function pickAction(input: NextBestActionInput): Action {
         return {
             eyebrow: 'The lab is open',
             headline: 'RSVP to something live.',
-            sub: 'Events are where drafts become projects.',
+            sub: `Events are where drafts become projects. +${XP_REWARDS.event_registered} XP on registration, +${XP_REWARDS.event_presented} XP if you present.`,
             ctaLabel: 'See events',
             to: '/events',
             Icon: Calendar,
@@ -116,7 +117,7 @@ function pickAction(input: NextBestActionInput): Action {
     return {
         eyebrow: 'Keep moving',
         headline: 'Find your next challenge.',
-        sub: 'Higher tiers, harder builds, bigger XP drops.',
+        sub: `Tier 1 → +${XP_REWARDS.tier1_challenge} XP · Tier 2 → +${XP_REWARDS.tier2_challenge} XP · Tier 3 → +${XP_REWARDS.tier3_challenge} XP`,
         ctaLabel: 'Browse challenges',
         to: '/challenges',
         Icon: Compass,

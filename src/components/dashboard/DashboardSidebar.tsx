@@ -4,6 +4,7 @@ import {
     Briefcase,
     ClipboardCheck,
     ShieldCheck,
+    Award,
     ChevronsLeft,
     ChevronsRight,
     Command,
@@ -41,6 +42,7 @@ import { isMacPlatform } from '../../lib/platform';
 export type DashboardTabId =
     | 'overview'
     | 'my-work'
+    | 'badges'
     | 'mentor'
     | 'admin';
 
@@ -48,13 +50,14 @@ export interface DashboardSidebarItem {
     id: DashboardTabId;
     label: string;
     description: string;
-    icon: 'overview' | 'work' | 'mentor' | 'admin';
+    icon: 'overview' | 'work' | 'badges' | 'mentor' | 'admin';
     badge?: number; // optional small count chip (e.g. attention items)
 }
 
 const ICONS = {
     overview: LayoutGrid,
     work:     Briefcase,
+    badges:   Award,
     mentor:   ClipboardCheck,
     admin:    ShieldCheck,
 } as const;

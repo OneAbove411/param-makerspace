@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 import { useAuth } from '../lib/auth';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useMyProfile, useProfileMutation, useSupabaseQuery } from '../lib/hooks';
 import { supabase } from '../lib/supabase';
 import { uploadFile } from '../lib/storage';
@@ -327,7 +327,7 @@ export function ProfileSetup() {
                 }
             );
         });
-        return () => { ScrollTrigger.getAll().forEach((trigger) => trigger.kill()); };
+        return () => { ScrollTrigger.getAll().forEach((trigger: { kill: () => void }) => trigger.kill()); };
     }, []);
 
     // ─── Section-dirty marker + debounced autosave ──────────────────

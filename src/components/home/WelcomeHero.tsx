@@ -197,8 +197,10 @@ export function WelcomeHero() {
         return () => window.clearTimeout(id);
     }, [user, isLoading, shouldMountCanvas]);
 
-    // First name for personalized HUD greeting
-    const firstName = user?.name?.split(' ')[0]?.toUpperCase() || 'MAKER';
+    // First name for personalized HUD greeting — capped at 12 chars to prevent
+    // layout overflow on the hero heading (e.g., "VENKATESHWARAN" → "VENKATESHWA…")
+    const rawFirst = user?.name?.split(' ')[0]?.toUpperCase() || 'MAKER';
+    const firstName = rawFirst.length > 12 ? rawFirst.slice(0, 11) + '…' : rawFirst;
 
     // ── Fetch active maker count — now sourced from the shared useHomeLive
     // hook so the hero and LivePulse share a single network call (see
@@ -838,7 +840,7 @@ export function WelcomeHero() {
 
                             <h1 className="hud-headline font-heading font-bold uppercase tracking-tight-heading
                                            text-brutal-bg leading-[0.95]
-                                           text-4xl sm:text-6xl md:text-7xl lg:text-[6rem]">
+                                           text-3xl sm:text-5xl md:text-6xl lg:text-[5rem]">
                                 Build something
                                 <br />
                                 <span className="text-brutal-red">today, {firstName}.</span>

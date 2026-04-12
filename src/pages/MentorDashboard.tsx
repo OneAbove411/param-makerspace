@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router';
 import {
     Shield,
@@ -93,6 +93,7 @@ export function MentorDashboard() {
     const [pendingSubmissionIds, setPendingSubmissionIds] = useState<Set<string>>(() => new Set());
     const [pendingSlotIds, setPendingSlotIds] = useState<Set<string>>(() => new Set());
     const [activeTab, setActiveTab] = useState<MentorTab>('events');
+    const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
 
     const isAuthorized = user && (user.role === 'mentor' || user.role === 'admin');
 
@@ -164,6 +165,9 @@ export function MentorDashboard() {
                     .eq('id', submissionId);
                 if (error) throw error;
                 toast.success(`Submission ${action}.`);
+                setRemovingIds((prev) => new Set(prev).add(submissionId));
+                await new Promise(r => setTimeout(r, 250));
+                setRemovingIds((prev) => { const n = new Set(prev); n.delete(submissionId); return n; });
                 await refetchSubmissions();
             } catch (error) {
                 console.error('Error updating submission:', error);
@@ -199,7 +203,11 @@ export function MentorDashboard() {
                     .eq('id', slotId);
                 if (error) throw error;
                 toast.success(`Showcase slot ${action}.`);
-                setShowcaseSlots((prev) => prev.filter((s) => s.id !== slotId));
+                setRemovingIds((prev) => new Set(prev).add(slotId));
+                setTimeout(() => {
+                    setShowcaseSlots((prev) => prev.filter((s) => s.id !== slotId));
+                    setRemovingIds((prev) => { const n = new Set(prev); n.delete(slotId); return n; });
+                }, 250);
             } catch (error) {
                 console.error('Error updating showcase slot:', error);
                 toast.error(
@@ -279,7 +287,7 @@ export function MentorDashboard() {
                             {approvalDomains.map((d) => (
                                 <span
                                     key={d}
-                                    className="font-data text-[10px] font-bold uppercase tracking-widest bg-yellow-500/15 text-yellow-800 border border-yellow-500/30 rounded-full px-2.5 py-0.5"
+                                    className="font-data text-[10px] font-bold uppercase tracking-widest bg-yellow-500/10 text-yellow-800 border border-yellow-500/30 rounded-full px-2.5 py-0.5"
                                 >
                                     {d}
                                 </span>
@@ -364,6 +372,7 @@ export function MentorDashboard() {
 
                 {/* ── Tab bodies ────────────────────────────────────────── */}
                 <div role="tabpanel" aria-label={tabs.find((t) => t.k === activeTab)?.label}>
+                <div key={activeTab} style={{ animation: 'mentorFadeIn 200ms ease-out' }}>
 
                     {/* ── EVENTS ── */}
                     {activeTab === 'events' && (
@@ -474,7 +483,10 @@ export function MentorDashboard() {
                                         return (
                                             <article
                                                 key={submission.id}
-                                                className="rounded-2xl border-2 border-yellow-500/40 bg-yellow-500/[0.04] p-5 shadow-[6px_6px_0_0_rgba(234,179,8,0.18)]"
+                                                className={cn(
+                                                    "rounded-2xl border-2 border-yellow-500/40 bg-yellow-500/[0.04] p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] transition-all duration-250",
+                                                    removingIds.has(submission.id) && "opacity-0 translate-x-2.5"
+                                                )}
                                             >
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                                     <div className="md:col-span-1">
@@ -557,7 +569,10 @@ export function MentorDashboard() {
                                         return (
                                             <article
                                                 key={slot.id}
-                                                className="rounded-2xl border-2 border-yellow-500/40 bg-yellow-500/[0.04] p-5 shadow-[6px_6px_0_0_rgba(234,179,8,0.18)]"
+                                                className={cn(
+                                                    "rounded-2xl border-2 border-yellow-500/40 bg-yellow-500/[0.04] p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] transition-all duration-250",
+                                                    removingIds.has(slot.id) && "opacity-0 translate-x-2.5"
+                                                )}
                                             >
                                                 <h3 className="font-heading font-bold text-brutal-dark text-base leading-tight mb-3">
                                                     {slot.project?.title || 'Untitled Project'}
@@ -599,7 +614,9 @@ export function MentorDashboard() {
                         </section>
                     )}
                 </div>
+                </div>
             </div>
+            <style>{`@keyframes mentorFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
         </div>
     );
 }
@@ -622,14 +639,14 @@ function StatCard({
             className={cn(
                 'rounded-xl border-2 p-3 md:p-4 flex items-center gap-3',
                 tone === 'yellow'
-                    ? 'border-yellow-500/40 bg-yellow-500/[0.06] shadow-[4px_4px_0_0_rgba(234,179,8,0.18)]'
+                    ? 'border-yellow-500/40 bg-yellow-500/10 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]'
                     : 'border-brutal-dark/10 bg-brutal-bg',
             )}
         >
             <div
                 className={cn(
                     'w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center flex-shrink-0',
-                    tone === 'yellow' ? 'bg-yellow-500/15 text-yellow-700' : 'bg-brutal-dark/5 text-brutal-dark/50',
+                    tone === 'yellow' ? 'bg-yellow-500/10 text-yellow-700' : 'bg-brutal-dark/5 text-brutal-dark/50',
                 )}
             >
                 <Icon className="w-4 h-4" />

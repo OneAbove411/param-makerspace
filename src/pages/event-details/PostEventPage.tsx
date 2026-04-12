@@ -1,6 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router';
-import { ArrowLeft, Calendar, Users, Star, Trophy, Image as ImageIcon, BookOpen, Award } from 'lucide-react';
+import { Calendar, Users, Star, Trophy, Image as ImageIcon, BookOpen, Award } from 'lucide-react';
 import { formatEventType } from '../Events';
 import HostedBySection from './HostedBySection';
 import GalleryGrid from './GalleryGrid';
@@ -9,6 +8,7 @@ import { DiscussionSection } from './DiscussionSection';
 import { SectionAnchor } from './SectionAnchor';
 import { RecapToC } from './RecapToC';
 import { BuildChallengePostHighlights, MakerMeetupPostHighlights, TechTuesdayPostHighlights } from './EventPostHighlights';
+import { PostEventProjectBridge } from '../../components/event/PostEventProjectBridge';
 
 const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProps }: any) => {
     const [aboutText, recapText] = event.description?.includes('---RECAP---')
@@ -44,12 +44,7 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-brutal-bg via-brutal-bg/90 to-brutal-dark/60" />
 
-                <Link
-                    to="/events"
-                    className="absolute top-24 md:top-26 left-6 md:left-12 lg:left-24 z-20 inline-flex items-center gap-2 font-data text-[10px] font-bold uppercase text-brutal-bg/70 hover:text-brutal-bg transition-colors bg-brutal-bg/10 backdrop-blur-sm px-2.5 py-1.5 rounded-full border border-brutal-bg/10"
-                >
-                    <ArrowLeft className="w-3 h-3" /> Back
-                </Link>
+                {/* Back button removed — navbar back pill handles navigation globally */}
 
                 <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-8 md:pb-10 pt-32 md:pt-36 max-w-7xl mx-auto">
                     <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -144,6 +139,9 @@ const PostEventPage = ({ event, hosts, id, user, registrationProps, commentsProp
                                 <GalleryGrid urls={event.gallery_urls} />
                             </section>
                         )}
+
+                        {/* "Did you build something?" — Maker Flywheel bridge */}
+                        <PostEventProjectBridge eventId={id} eventTitle={event.title} />
 
                         {/* Learnings */}
                         {event.learnings && (

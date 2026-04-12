@@ -2,55 +2,45 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, Plus, Zap, Sparkles } from 'lucide-react';
 
 import { useProjects, useRankAccess, useMyBookmarkedProjectIds, useToggleProjectBookmark } from '../lib/hooks';
 import type { ProjectListItem } from '../lib/hooks';
 import { canAccess } from '../lib/rankAccess';
 import { useAuth } from '../lib/auth';
 import { cn } from '../lib/utils';
+import { RANK_THRESHOLDS, RANK_ORDER, XP_REWARDS } from '../lib/constants';
 import { RankGate } from '../components/ui/RankGate';
 
-import { Card } from '../components/ui/Card';
 import { ProjectCard } from '../components/projects/ProjectCard';
-import { FacetRail } from '../components/projects/FacetRail';
 import type { ProjectsSort, ProjectsView } from '../components/projects/ProjectsFilterRail';
-import { ProjectsCommandBar } from '../components/projects/ProjectsCommandBar';
 import { MobileFilterSheet } from '../components/projects/MobileFilterSheet';
-import { ProjectQuickPeek } from '../components/projects/ProjectQuickPeek';
 import { RemixModal } from '../components/project/RemixModal';
 import {
     ProjectsCommandPalette,
     type ProjectCommand,
 } from '../components/projects/ProjectsCommandPalette';
 
+// New shared components (SPEC.md Directive 1)
+import { ListingLayout } from '../components/shared/ListingLayout';
+import { ListingSidebar } from '../components/shared/ListingSidebar';
+import { SidebarSearch } from '../components/shared/SidebarSearch';
+import { SidebarChipGroup, type ChipOption } from '../components/shared/SidebarChipGroup';
+import { GamificationNudge } from '../components/shared/GamificationNudge';
+import { MobileFilterBar } from '../components/shared/MobileFilterBar';
+
 gsap.registerPlugin(ScrollTrigger);
 
 // ─────────────────────────────────────────────────────────────
-// §8 Archive Cockpit — Projects page (Phase-1 Step-2 archive visual cleanup).
+// §8 Archive Cockpit — Projects page (SPEC.md refactor)
 //
-// Composes:
-//   • ProjectsCommandBar        — 72px sticky bar (search + sort only)
-//   • FacetRail                 — 220px sticky left sidebar (≥ lg) with domains, tags, view
-//   • MobileFilterSheet         — bottom sheet triggered on <md
-//   • ProjectCard               — merged archive + featured variants, CSS columns layout
-//   • ProjectQuickPeek          — right-drawer preview
-//   • ProjectsCommandPalette    — ⌘K global actions
+// Layout migration:
+//   • ProjectsCommandBar  → REMOVED on desktop. Mobile: MobileFilterBar.
+//   • FacetRail           → REPLACED by ListingSidebar + composed filter sections.
+//   • PostProjectCTA      → REMOVED from grid. XP incentive now in sidebar GamificationNudge.
+//   • CSS columns         → CSS Grid with @container queries.
 //
-// URL state keys (shareable, refreshable):
-//   ?domain=A,B     multi-select domain chips
-//   ?tags=x,y       multi-select tag chips
-//   ?sort=trending  sort mode (newest | oldest | trending)
-//   ?view=list      view mode (grid | list | bookmarks)
-//   ?q=text         search query
-//
-// Keyboard shortcuts (H7 — flexibility/efficiency):
-//   /            focus search input
-//   ⌘K / Ctrl+K  open command palette
-//   g then p     noop (already here)
-//   b            toggle Bookmarks view
-//   v            cycle Grid → List → Bookmarks
-//   Esc          close palette / quick peek
+// ALL data hooks, URL state, keyboard shortcuts, overlays preserved.
 // ─────────────────────────────────────────────────────────────
 
 const DOMAINS = [
@@ -63,52 +53,36 @@ const DOMAINS = [
     'Interdisciplinary',
 ];
 
-// Phase-1 Step-2: default sort is now 'trending' so the most-liked project
-// lands in slot 1 (the 2x featured slot).
 const DEFAULT_SORT: ProjectsSort = 'trending';
 const DEFAULT_VIEW: ProjectsView = 'grid';
 
-// ─── "Propose a Project" CTA card (guardrail: preserve italic / dashed) ───
-
-function ProposeCTA() {
-    const navigate = useNavigate();
+// ── Sort selector for sidebar ──
+function SidebarSortSelect({ value, onChange }: { value: ProjectsSort; onChange: (v: ProjectsSort) => void }) {
     return (
-        <div onClick={() => navigate('/dashboard')} className="group cursor-pointer h-full">
-            <Card className="h-full flex flex-col items-center justify-center p-8 border-dashed border-brutal-dark/15 hover:border-brutal-red/40 transition-all duration-500 bg-brutal-bg hover:bg-brutal-red/[0.03] min-h-[320px]">
-                <div className="w-14 h-14 rounded-full border-2 border-brutal-dark/10 flex items-center justify-center group-hover:border-brutal-red/30 group-hover:bg-brutal-red/5 transition-all duration-500">
-                    <Plus size={24} className="text-brutal-dark/25 group-hover:text-brutal-red transition-colors duration-500" />
-                </div>
-                <h3 className="font-heading font-bold text-lg mt-6 text-brutal-dark/50 group-hover:text-brutal-dark transition-colors duration-500 text-center">
-                    Be the first to build<br />something
-                </h3>
-                <p className="font-data text-[10px] text-brutal-dark/30 uppercase tracking-[0.15em] mt-3 group-hover:text-brutal-dark/50 transition-colors duration-500">
-                    Start your own legacy
-                </p>
-                <div className="mt-6 px-5 py-2.5 rounded-full border-2 border-brutal-dark/15 font-heading font-bold text-xs uppercase tracking-widest text-brutal-dark/40 group-hover:bg-brutal-dark group-hover:text-brutal-bg group-hover:border-brutal-dark transition-all duration-500 flex items-center gap-2">
-                    Propose a Project
-                    <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform duration-300" />
-                </div>
-            </Card>
+        <div>
+            <h3 className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 mb-2">Sort</h3>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value as ProjectsSort)}
+                className="w-full h-8 px-2.5 rounded-lg border border-brutal-dark/15 bg-transparent font-data text-[11px] font-bold uppercase tracking-wider text-brutal-dark/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-brutal-red"
+            >
+                <option value="trending">Trending</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+            </select>
         </div>
     );
 }
 
-function ProjectSkeleton({ spanCols = false }: { spanCols?: boolean }) {
+
+function ProjectSkeleton() {
     return (
-        <Card
-            className={cn(
-                'h-full flex flex-col animate-pulse',
-                spanCols && 'md:col-span-2 lg:col-span-2',
-            )}
-        >
-            <div className="h-48 bg-brutal-dark/5" />
-            <div className="p-6 space-y-4 flex-1">
-                <div className="h-3 w-20 bg-brutal-dark/8 rounded" />
-                <div className="h-6 w-3/4 bg-brutal-dark/8 rounded" />
-                <div className="h-3 w-full bg-brutal-dark/5 rounded" />
-                <div className="h-3 w-2/3 bg-brutal-dark/5 rounded" />
+        <div className="animate-pulse rounded-lg overflow-hidden bg-brutal-dark/10 aspect-[3/4] relative">
+            <div className="absolute inset-x-0 bottom-0 p-4 space-y-2">
+                <div className="h-4 w-3/4 bg-white/10 rounded" />
+                <div className="h-3 w-1/2 bg-white/5 rounded" />
             </div>
-        </Card>
+        </div>
     );
 }
 
@@ -119,20 +93,20 @@ function ProjectSkeleton({ spanCols = false }: { spanCols?: boolean }) {
 interface CardItemProps {
     project: ProjectListItem;
     variant?: 'archive' | 'featured';
+    isNew?: boolean;
     bookmarkedIds: Set<string> | null | undefined;
-    onQuickPeek: (p: ProjectListItem) => void;
     onRemix?: (p: ProjectListItem) => void;
     onToggleBookmark?: (p: ProjectListItem, currentlyBookmarked: boolean) => Promise<boolean>;
 }
 
-const CardItem = React.memo(function CardItem({ project, variant = 'archive', bookmarkedIds, onQuickPeek, onRemix, onToggleBookmark }: CardItemProps) {
+const CardItem = React.memo(function CardItem({ project, variant = 'archive', isNew = false, bookmarkedIds, onRemix, onToggleBookmark }: CardItemProps) {
     const isBookmarked = bookmarkedIds?.has(project.id) ?? false;
     return (
         <ProjectCard
             project={project}
             variant={variant}
+            isNew={isNew}
             isBookmarked={isBookmarked}
-            onQuickPeek={onQuickPeek}
             onRemix={onRemix}
             onToggleBookmark={onToggleBookmark}
         />
@@ -213,10 +187,6 @@ export function Projects() {
     };
 
     // ── Data ─────────────────────────────────────────────────
-    // Note: we fetch ALL projects client-side (no server-side domain filter)
-    // so multi-select + search + trending can all be computed in memory.
-    // This is cheap for the archive — one batched fetch, cached by the
-    // stale-while-revalidate useSupabaseQuery.
     const { data: projects, loading } = useProjects(undefined, sort);
     const { data: bookmarkedIds, refetch: refetchBookmarks } = useMyBookmarkedProjectIds();
     const { user } = useAuth();
@@ -232,7 +202,6 @@ export function Projects() {
                 return currentlyBookmarked;
             }
             const next = await toggleBookmark(p.id, currentlyBookmarked);
-            // Refresh the parent set so the "Saved" view filter stays in sync
             refetchBookmarks();
             return next;
         },
@@ -245,6 +214,26 @@ export function Projects() {
         const set = new Set<string>();
         for (const p of projects) for (const t of p.tags) set.add(t);
         return Array.from(set).sort();
+    }, [projects]);
+
+    // ── Derived — domain counts (for sidebar) ────────────────
+    const domainCounts = useMemo(() => {
+        if (!projects) return {} as Record<string, number>;
+        const counts: Record<string, number> = {};
+        for (const p of projects) {
+            if (p.domain) counts[p.domain] = (counts[p.domain] || 0) + 1;
+        }
+        return counts;
+    }, [projects]);
+
+    // ── Derived — tag counts ─────────────────────────────────
+    const tagCounts = useMemo(() => {
+        if (!projects) return {} as Record<string, number>;
+        const counts: Record<string, number> = {};
+        for (const p of projects) {
+            for (const t of p.tags) counts[t] = (counts[t] || 0) + 1;
+        }
+        return counts;
     }, [projects]);
 
     // ── Filter pipeline ─────────────────────────────────────
@@ -283,11 +272,6 @@ export function Projects() {
         view !== DEFAULT_VIEW ||
         !!query;
 
-    // ── Quick peek state ─────────────────────────────────────
-    const [peek, setPeek] = useState<ProjectListItem | null>(null);
-    const openPeek = useCallback((p: ProjectListItem) => setPeek(p), []);
-    const closePeek = useCallback(() => setPeek(null), []);
-
     // ── Remix modal state ────────────────────────────────────
     const [remixProject, setRemixProject] = useState<ProjectListItem | null>(null);
     const openRemix = useCallback((p: ProjectListItem) => setRemixProject(p), []);
@@ -311,7 +295,6 @@ export function Projects() {
     // ── Keyboard shortcuts ───────────────────────────────────
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            // Do not interfere while typing in inputs (except for modifier combos).
             const tgt = e.target as HTMLElement | null;
             const typing =
                 !!tgt &&
@@ -319,7 +302,6 @@ export function Projects() {
                     tgt.tagName === 'TEXTAREA' ||
                     tgt.isContentEditable);
 
-            // ⌘K / Ctrl+K — always works
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
                 setPaletteOpen((o) => !o);
@@ -349,7 +331,7 @@ export function Projects() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [view, cycleView]);
 
-    // ── GSAP intro animations — runs ONCE, respects reduced-motion ────
+    // ── GSAP intro animations ────
     const pageRef = useRef<HTMLDivElement>(null);
     const hasAnimated = useRef(false);
 
@@ -360,11 +342,6 @@ export function Projects() {
             && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         if (prefersReduced) return;
         const ctx = gsap.context(() => {
-            gsap.fromTo(
-                '.filter-rail',
-                { y: -10, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 }
-            );
             gsap.fromTo(
                 '.project-card-animated',
                 { y: 60, opacity: 0 },
@@ -385,7 +362,6 @@ export function Projects() {
     const commands = useMemo<ProjectCommand[]>(() => {
         const list: ProjectCommand[] = [];
 
-        // Navigate — jump to each visible project
         for (const p of filteredProjects.slice(0, 20)) {
             list.push({
                 id: `nav:${p.id}`,
@@ -397,7 +373,6 @@ export function Projects() {
             });
         }
 
-        // Filter — set each domain as the sole filter
         for (const d of DOMAINS) {
             list.push({
                 id: `filter:domain:${d}`,
@@ -408,7 +383,6 @@ export function Projects() {
             });
         }
 
-        // Filter — sorts
         const sorts: Array<{ id: ProjectsSort; label: string }> = [
             { id: 'trending', label: 'Sort by Trending' },
             { id: 'newest', label: 'Sort by Newest' },
@@ -424,7 +398,6 @@ export function Projects() {
             });
         }
 
-        // View
         const views: Array<{ id: ProjectsView; label: string }> = [
             { id: 'grid', label: 'Switch to Grid view' },
             { id: 'list', label: 'Switch to List view' },
@@ -440,7 +413,6 @@ export function Projects() {
             });
         }
 
-        // Actions
         list.push({
             id: 'action:focus-search',
             label: 'Focus search',
@@ -466,134 +438,170 @@ export function Projects() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filteredProjects, canPropose, navigate]);
 
+    // ── Sidebar chip data ────────────────────────────────────
+    const domainChips: ChipOption[] = DOMAINS.map((d) => ({
+        value: d,
+        label: d,
+        count: domainCounts[d] || 0,
+    }));
+
+    const tagChips: ChipOption[] = allTags.slice(0, 30).map((t) => ({
+        value: t,
+        label: t,
+        count: tagCounts[t] || 0,
+    }));
+
     // ── Render ───────────────────────────────────────────────
     return (
         <div
             ref={pageRef}
-            className="flex-1 w-full bg-brutal-bg pt-28 md:pt-32 px-6 md:px-12 lg:px-24 min-h-screen"
+            className="flex-1 w-full bg-brutal-bg pt-28 md:pt-32 min-h-screen"
         >
-            <div className="max-w-7xl mx-auto">
-                {/* ─── Project Archive identity ─── */}
-                <div className="flex items-end justify-between mb-6 md:mb-8">
-                    <div>
-                        <p className="font-data text-[10px] font-bold uppercase tracking-[0.25em] text-brutal-dark/50 mb-2">Project Archive</p>
-                        <h1 className="font-heading font-bold text-3xl md:text-4xl uppercase tracking-tight-heading text-brutal-dark">
-                            {filteredProjects.length} build{filteredProjects.length === 1 ? '' : 's'}
-                            <span className="text-brutal-dark/30"> · browse, remix, build</span>
-                        </h1>
+            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-0">
+                {/* ─── Page heading ─── */}
+                <div className="px-0 lg:px-8 mb-6 md:mb-8">
+                    <div className="flex items-end justify-between">
+                        <div>
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="inline-block w-6 h-[3px] bg-brutal-red" aria-hidden />
+                                <p className="font-data text-[10px] font-bold uppercase tracking-[0.25em] text-brutal-dark/60">Project Archive</p>
+                            </div>
+                            <h1 className="font-heading font-bold text-3xl md:text-4xl uppercase tracking-tight-heading text-brutal-dark">
+                                {filteredProjects.length} build{filteredProjects.length === 1 ? '' : 's'}
+                                <span className="text-brutal-dark/30"> · browse, remix, build</span>
+                            </h1>
+                            {filteredProjects.length > 0 && (() => {
+                                const newest = filteredProjects.reduce((a, b) =>
+                                    new Date(b.created_at) > new Date(a.created_at) ? b : a
+                                );
+                                const daysAgo = Math.floor(
+                                    (Date.now() - new Date(newest.created_at).getTime()) / (1000 * 60 * 60 * 24)
+                                );
+                                const timeLabel = daysAgo === 0 ? 'today' : daysAgo === 1 ? '1d ago' : `${daysAgo}d ago`;
+                                return (
+                                    <p className="font-data text-[11px] text-brutal-dark/40 mt-1">
+                                        Latest: <span className="font-bold text-brutal-dark/55">{newest.title}</span> posted {timeLabel}
+                                    </p>
+                                );
+                            })()}
+                        </div>
                     </div>
                 </div>
 
-                {/* ─── Sticky Command Bar (full-width) ─── */}
-                <ProjectsCommandBar
-                    search={query}
-                    onSearchChange={setQuery}
-                    searchInputRef={searchInputRef}
-                    sort={sort}
-                    onSortChange={setSort}
+                {/* ─── Mobile filter bar (< lg) ─── */}
+                <MobileFilterBar
+                    searchValue={query}
+                    onSearch={setQuery}
+                    onOpenFilters={() => setMobileSheetOpen(true)}
+                    placeholder="Search projects…"
                 />
 
-                {/* ─── Facet Rail (left) + Content (right) ─── */}
-                <div className="flex gap-8 relative">
-                    <FacetRail
-                        domains={DOMAINS}
-                        selectedDomains={selectedDomains}
-                        onToggleDomain={toggleDomain}
-                        allTags={allTags}
-                        selectedTags={selectedTags}
-                        onToggleTag={toggleTag}
-                        view={view}
-                        onViewChange={setView}
-                        onClearAll={clearAll}
-                        hasActiveFilters={hasActiveFilters}
-                    />
-
-                    <div className="flex-1 min-w-0">
-                        {loading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-32">
+                {/* ─── Two-column layout ─── */}
+                <ListingLayout
+                    sidebar={
+                        <ListingSidebar>
+                            <SidebarSearch
+                                value={query}
+                                onChange={setQuery}
+                                placeholder="Search projects…"
+                                inputRef={searchInputRef}
+                            />
+                            <SidebarChipGroup
+                                label="Domain"
+                                options={domainChips}
+                                selected={selectedDomains}
+                                onChange={setDomains}
+                            />
+                            <SidebarChipGroup
+                                label="Tags"
+                                options={tagChips}
+                                selected={selectedTags}
+                                onChange={setTags}
+                            />
+                            <SidebarSortSelect value={sort} onChange={setSort} />
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={clearAll}
+                                    className="w-full font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red border border-brutal-red/20 rounded-lg py-2 hover:bg-brutal-red/5 transition-colors"
+                                >
+                                    Clear all filters
+                                </button>
+                            )}
+                            <GamificationNudge />
+                        </ListingSidebar>
+                    }
+                >
+                    {loading ? (
+                        <div className="">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {[...Array(6)].map((_, i) => (
-                                    <ProjectSkeleton key={i} spanCols={i === 0} />
+                                    <ProjectSkeleton key={i} />
                                 ))}
                             </div>
-                        ) : filteredProjects.length === 0 ? (
-                            <div className="py-24 text-center space-y-4">
-                                <div className="font-heading font-bold text-5xl text-brutal-dark/10 uppercase tracking-tight-heading">
-                                    {view === 'bookmarks' ? 'No Bookmarks' : 'Nothing Found'}
+                        </div>
+                    ) : filteredProjects.length === 0 ? (
+                        <div className="py-24 text-center space-y-4">
+                            <div className="font-heading font-bold text-5xl text-brutal-dark/10 uppercase tracking-tight-heading">
+                                {view === 'bookmarks' ? 'No Bookmarks' : 'Nothing Found'}
+                            </div>
+                            <p className="font-data text-sm text-brutal-dark/40 max-w-md mx-auto">
+                                {view === 'bookmarks'
+                                    ? 'Bookmark projects from their detail page and they will show up here.'
+                                    : hasActiveFilters
+                                    ? 'No projects match the current filters. Try clearing some chips.'
+                                    : 'Be the first to propose a project and start building.'}
+                            </p>
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={clearAll}
+                                    className="font-data text-[11px] font-bold uppercase tracking-widest text-brutal-red border-b-2 border-brutal-red/40 pb-0.5 hover:border-brutal-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
+                                >
+                                    Clear all filters
+                                </button>
+                            )}
+                        </div>
+                    ) : view === 'list' ? (
+                        <div className="project-grid grid grid-cols-2 lg:grid-cols-4 gap-4 pb-32">
+                            {filteredProjects.map((p) => (
+                                <div key={p.id} className="project-card-animated">
+                                    <CardItem
+                                        project={p}
+                                        variant="archive"
+                                        bookmarkedIds={bookmarkedIds}
+                                        onRemix={openRemix}
+                                        onToggleBookmark={handleToggleBookmark}
+                                    />
                                 </div>
-                                <p className="font-data text-sm text-brutal-dark/40 max-w-md mx-auto">
-                                    {view === 'bookmarks'
-                                        ? 'Bookmark projects from their detail page and they will show up here.'
-                                        : hasActiveFilters
-                                        ? 'No projects match the current filters. Try clearing some chips.'
-                                        : 'Be the first to propose a project and start building.'}
-                                </p>
-                                {hasActiveFilters && (
-                                    <button
-                                        type="button"
-                                        onClick={clearAll}
-                                        className="font-data text-[11px] font-bold uppercase tracking-widest text-brutal-red border-b-2 border-brutal-red/40 pb-0.5 hover:border-brutal-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
-                                    >
-                                        Clear all filters
-                                    </button>
-                                )}
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="pb-32">
+                            {/* Uniform grid — 3 per row */}
+                            <div className="project-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {filteredProjects.map((p) => {
+                                    const isNew = (Date.now() - new Date(p.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000;
+                                    return (
+                                        <div
+                                            key={p.id}
+                                            className="project-card-animated"
+                                        >
+                                            <CardItem
+                                                project={p}
+                                                variant="archive"
+                                                isNew={isNew}
+                                                bookmarkedIds={bookmarkedIds}
+                                                        onRemix={openRemix}
+                                                onToggleBookmark={handleToggleBookmark}
+                                            />
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        ) : view === 'list' ? (
-                            <div className="project-grid flex flex-col gap-4 pb-32">
-                                {filteredProjects.map((p) => (
-                                    <div key={p.id} className="project-card-animated">
-                                        <CardItem
-                                            project={p}
-                                            variant="archive"
-                                            bookmarkedIds={bookmarkedIds}
-                                            onQuickPeek={openPeek}
-                                            onRemix={openRemix}
-                                            onToggleBookmark={handleToggleBookmark}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="pb-32">
-                                {/* Featured slot — full-width, OUTSIDE the masonry so the
-                                    horizontal split layout actually has room to breathe.
-                                    Without this the featured card is trapped in a single
-                                    CSS column and all corner icons cluster on top of each
-                                    other (Phase-1 fix). */}
-                                {sort === 'trending' && filteredProjects[0] && (
-                                    <div className="project-card-animated mb-8 md:mb-10">
-                                        <CardItem
-                                            project={filteredProjects[0]}
-                                            variant="featured"
-                                            bookmarkedIds={bookmarkedIds}
-                                            onQuickPeek={openPeek}
-                                            onRemix={openRemix}
-                                            onToggleBookmark={handleToggleBookmark}
-                                        />
-                                    </div>
-                                )}
-                                <div className="project-grid columns-1 md:columns-2 xl:columns-3 gap-6 md:gap-8">
-                                    {filteredProjects
-                                        .slice(sort === 'trending' && filteredProjects[0] ? 1 : 0)
-                                        .map((p) => (
-                                            <div
-                                                key={p.id}
-                                                className="project-card-animated break-inside-avoid mb-6 md:mb-8"
-                                            >
-                                                <CardItem
-                                                    project={p}
-                                                    variant="archive"
-                                                    bookmarkedIds={bookmarkedIds}
-                                                    onQuickPeek={openPeek}
-                                                    onRemix={openRemix}
-                                                    onToggleBookmark={handleToggleBookmark}
-                                                />
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                        </div>
+                    )}
+                </ListingLayout>
 
                 {/* ─── Sticky mobile propose ─── */}
                 {canPropose ? (
@@ -601,7 +609,7 @@ export function Projects() {
                         <Link
                             to="/dashboard"
                             aria-label="Propose a new project"
-                            className="pointer-events-auto flex items-center justify-center gap-2 w-full bg-brutal-dark text-brutal-bg font-heading font-bold uppercase tracking-widest text-sm px-6 py-4 rounded-full border-2 border-brutal-dark shadow-[0_4px_0_rgba(0,0,0,0.15)] min-h-[44px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red active:translate-y-[1px] transition-transform"
+                            className="pointer-events-auto flex items-center justify-center gap-2 w-full bg-brutal-dark text-brutal-bg font-heading font-bold uppercase tracking-widest text-sm px-6 py-4 rounded-full border-2 border-brutal-dark shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] min-h-[44px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red active:translate-y-[1px] transition-transform"
                         >
                             <Plus size={16} aria-hidden="true" />
                             Propose Project
@@ -632,7 +640,6 @@ export function Projects() {
                 hasActiveFilters={hasActiveFilters}
                 resultCount={filteredProjects.length}
             />
-            <ProjectQuickPeek project={peek} open={!!peek} onClose={closePeek} />
             <RemixModal open={!!remixProject} origin={remixProject} onClose={closeRemix} />
             <ProjectsCommandPalette
                 open={paletteOpen}

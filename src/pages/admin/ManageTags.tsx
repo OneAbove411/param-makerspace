@@ -7,6 +7,12 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Tags, Plus, Pencil, Trash2, X, Search } from 'lucide-react';
+import { AdminPageShell } from '../../components/admin/AdminPageShell';
+import { BrutalTabBar } from '../../components/admin/BrutalTabBar';
+import type { TabOption } from '../../components/admin/BrutalTabBar';
+import { BrutalTable } from '../../components/admin/BrutalTable';
+import type { BrutalColumn } from '../../components/admin/BrutalTable';
+import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
 
 interface TagWithUsage {
     id: string;
@@ -84,15 +90,20 @@ function useTagsData() {
     );
 }
 
+type CategoryFilter = typeof CATEGORIES[number];
+
 export function ManageTags() {
     const { role } = useAuth();
     const { data: tags, loading, error, refetch } = useTagsData();
-    const [activeCategory, setActiveCategory] = useState('All');
+    const [activeCategory, setActiveCategory] = useState<CategoryFilter>('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingTag, setEditingTag] = useState<TagWithUsage | null>(null);
     const [formData, setFormData] = useState({ name: '', category: '' });
+
+    // Delete confirmation state
+    const [deleteTarget, setDeleteTarget] = useState<TagWithUsage | null>(null);
 
     if (role !== 'admin') {
         return (
@@ -110,6 +121,26 @@ export function ManageTags() {
             tag.category === CATEGORY_VALUES[activeCategory as keyof typeof CATEGORY_VALUES];
         const matchesSearch = tag.name.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesCategory && matchesSearch;
+    });
+
+    // Compute counts per category for tab badges
+    const categoryCounts = (tags || []).reduce<Record<string, number>>((acc, t) => {
+        const cat = t.category || 'uncategorized';
+        acc[cat] = (acc[cat] || 0) + 1;
+        return acc;
+    }, {});
+
+    const categoryTabs: TabOption<CategoryFilter>[] = CATEGORIES.map((cat) => {
+        let count: number;
+        if (cat === 'All') {
+            count = (tags || []).length;
+        } else if (cat === 'Uncategorized') {
+            count = categoryCounts['uncategorized'] || 0;
+        } else {
+            const val = CATEGORY_VALUES[cat as keyof typeof CATEGORY_VALUES];
+            count = val ? (categoryCounts[val] || 0) : 0;
+        }
+        return { value: cat, label: cat, count };
     });
 
     const handleAddTag = async (e: React.FormEvent) => {
@@ -164,14 +195,6 @@ export function ManageTags() {
     };
 
     const handleDeleteTag = async (tag: TagWithUsage) => {
-        if (
-            !window.confirm(
-                `Delete tag "${tag.name}"?${tag.usage_count > 0 ? ` (Currently used ${tag.usage_count} time${tag.usage_count !== 1 ? 's' : ''})` : ''}`
-            )
-        ) {
-            return;
-        }
-
         setActionLoading(tag.id);
 
         // Delete entity_tag references first, then the tag
@@ -199,6 +222,7 @@ export function ManageTags() {
             await refetch();
         }
         setActionLoading(null);
+        setDeleteTarget(null);
     };
 
     const handleOpenEdit = (tag: TagWithUsage) => {
@@ -219,309 +243,294 @@ export function ManageTags() {
 
     if (error) {
         return (
-            <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen">
-                <div className="max-w-2xl mx-auto">
-                    <div className="p-8 bg-brutal-red/10 border-2 border-brutal-red/30 rounded-2xl">
-                        <h2 className="font-heading font-bold text-2xl text-brutal-red mb-4 uppercase">
-                            Failed to Load Tags
-                        </h2>
-                        <p className="font-data text-sm text-brutal-dark/80 mb-6">
-                            Error: <code className="bg-brutal-dark/10 px-2 py-1 rounded">{error}</code>
-                        </p>
-                        <Button onClick={() => refetch()} className="mt-6">
-                            Retry
-                        </Button>
-                    </div>
+            <AdminPageShell
+                role={role}
+                title="Tag Management"
+                subtitle="Organize and manage all system tags by category."
+                icon={Tags}
+            >
+                <div className="p-8 border-2 border-brutal-red/30 bg-brutal-red/5 shadow-[6px_6px_0_0_rgba(17,17,17,1)]">
+                    <h2 className="font-heading font-bold text-2xl text-brutal-red mb-4 uppercase">
+                        Failed to Load Tags
+                    </h2>
+                    <p className="font-data text-sm text-brutal-dark/80 mb-6">
+                        Error: <code className="bg-brutal-dark/10 px-2 py-1">{error}</code>
+                    </p>
+                    <Button onClick={() => refetch()}>
+                        Retry
+                    </Button>
                 </div>
-            </div>
+            </AdminPageShell>
         );
     }
 
-    return (
-        <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 lg:px-24 min-h-screen pb-32">
-            <div className="max-w-6xl mx-auto space-y-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <span className="bg-brutal-red text-white px-2 py-1 text-xs font-bold font-data rounded uppercase">
-                        Admin Panel
+    // ── Table column definitions ──────────────────────────────────
+    const columns: BrutalColumn<TagWithUsage>[] = [
+        {
+            key: 'name',
+            header: 'Name',
+            render: (tag) => (
+                <span className="font-bold text-brutal-dark">{tag.name}</span>
+            ),
+        },
+        {
+            key: 'category',
+            header: 'Category',
+            render: (tag) =>
+                tag.category ? (
+                    <span className="inline-block bg-brutal-dark/10 text-brutal-dark px-3 py-1 text-sm font-bold font-data capitalize border border-brutal-dark/20">
+                        {tag.category.replace('_', ' ')}
                     </span>
-                    <Link
-                        to="/dashboard"
-                        className="text-brutal-dark/60 hover:text-brutal-dark font-data text-sm font-bold ml-auto underline"
+                ) : (
+                    <span className="text-brutal-dark/40 font-data text-sm italic">Uncategorized</span>
+                ),
+        },
+        {
+            key: 'usage',
+            header: 'Usage',
+            render: (tag) => (
+                <span className="text-sm font-bold font-data text-brutal-dark/70">
+                    {tag.usage_count}{' '}
+                    <span className="text-brutal-dark/50">
+                        ref{tag.usage_count !== 1 ? 's' : ''}
+                    </span>
+                </span>
+            ),
+        },
+        {
+            key: 'actions',
+            header: 'Actions',
+            headerAlign: 'right' as const,
+            cellClassName: 'text-right',
+            render: (tag) => (
+                <div className="flex items-center justify-end gap-2">
+                    <button
+                        onClick={() => handleOpenEdit(tag)}
+                        className="p-2 border-2 border-brutal-dark hover:bg-brutal-dark hover:text-white transition-colors"
+                        title="Edit tag"
                     >
-                        Back to Dashboard
-                    </Link>
+                        <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => setDeleteTarget(tag)}
+                        disabled={actionLoading === tag.id}
+                        className="p-2 border-2 border-brutal-red/20 text-brutal-red hover:bg-brutal-red hover:text-white transition-colors disabled:opacity-50"
+                        title="Delete tag"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
                 </div>
+            ),
+        },
+    ];
 
-                <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading flex items-center gap-4">
-                    <Tags className="w-10 h-10 text-brutal-red" />
-                    Tag Management
-                </h1>
-                <p className="font-data text-lg text-brutal-dark/60 border-l-4 border-brutal-red pl-4 mb-8">
-                    Organize and manage all system tags by category. Add, edit, delete, and
-                    track usage across domains, levels, skills, and project states.
-                </p>
+    return (
+        <AdminPageShell
+            role={role}
+            title="Tag Management"
+            subtitle="Organize and manage all system tags by category. Add, edit, delete, and track usage across domains, levels, skills, and project states."
+            icon={Tags}
+            headerAction={
+                !showAddForm ? (
+                    <Button
+                        onClick={() => {
+                            setShowAddForm(true);
+                            setEditingTag(null);
+                            setFormData({ name: '', category: '' });
+                        }}
+                    >
+                        <Plus className="w-5 h-5 mr-2" /> Add New Tag
+                    </Button>
+                ) : undefined
+            }
+        >
+            {/* ── Add Tag Form ───────────────────────────────────── */}
+            {showAddForm && (
+                <Card className="p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(17,17,17,1)]">
+                    <h3 className="font-heading font-bold text-2xl uppercase mb-4">
+                        Add New Tag
+                    </h3>
+                    <form onSubmit={handleAddTag} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Input
+                                label="Tag Name"
+                                placeholder="e.g., Arduino, Python, Welding"
+                                value={formData.name}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, name: e.target.value })
+                                }
+                                required
+                            />
+                            <div>
+                                <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
+                                    Category
+                                </label>
+                                <select
+                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 text-brutal-dark font-data focus:outline-none focus:border-brutal-red transition-colors"
+                                    value={formData.category}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, category: e.target.value })
+                                    }
+                                >
+                                    <option value="">None (Uncategorized)</option>
+                                    <option value="domain">Domain</option>
+                                    <option value="level">Level</option>
+                                    <option value="skill">Skill</option>
+                                    <option value="project_status">Project Status</option>
+                                    <option value="event_type">Event Type</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-4 border-t-2 border-brutal-dark/10">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => {
+                                    setShowAddForm(false);
+                                    setFormData({ name: '', category: '' });
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={!!actionLoading}>
+                                {actionLoading === 'add' ? 'Adding...' : 'Add Tag'}
+                            </Button>
+                        </div>
+                    </form>
+                </Card>
+            )}
 
-                {/* Add Tag Form */}
-                {!showAddForm && (
-                    <div>
-                        <Button
+            {/* ── Category filter tabs ───────────────────────────── */}
+            <div className="flex items-center gap-4 flex-wrap">
+                <BrutalTabBar<CategoryFilter>
+                    tabs={categoryTabs}
+                    activeTab={activeCategory}
+                    onTabChange={setActiveCategory}
+                />
+                <span className="ml-auto font-data text-sm text-brutal-dark/50 font-bold">
+                    {filteredTags.length} tag{filteredTags.length !== 1 ? 's' : ''}
+                </span>
+            </div>
+
+            {/* ── Search Bar ─────────────────────────────────────── */}
+            <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brutal-dark/40" />
+                <Input
+                    placeholder="Search tags by name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                />
+            </div>
+
+            {/* ── Delete confirmation ─────────────────────────────── */}
+            {deleteTarget && (
+                <ConfirmDeleteCard
+                    entityName={deleteTarget.name}
+                    message={`Delete tag "${deleteTarget.name}"?${deleteTarget.usage_count > 0 ? ` Currently used ${deleteTarget.usage_count} time${deleteTarget.usage_count !== 1 ? 's' : ''} — all references will also be removed.` : ''}`}
+                    cascadeItems={
+                        deleteTarget.usage_count > 0
+                            ? [{ label: 'entity references', count: deleteTarget.usage_count }]
+                            : []
+                    }
+                    onConfirm={() => handleDeleteTag(deleteTarget)}
+                    onCancel={() => setDeleteTarget(null)}
+                    loading={actionLoading === deleteTarget.id}
+                />
+            )}
+
+            {/* ── Tags Table ─────────────────────────────────────── */}
+            {filteredTags.length === 0 ? (
+                <div className="p-12 text-center border-2 border-dashed border-brutal-dark/20 shadow-[6px_6px_0_0_rgba(17,17,17,1)]">
+                    <Tags className="w-12 h-12 text-brutal-dark/20 mx-auto mb-4" />
+                    <h3 className="font-heading font-bold text-2xl text-brutal-dark/50">
+                        No Tags Found
+                    </h3>
+                    <p className="font-data text-brutal-dark/40 mt-2">
+                        {tags && tags.length === 0
+                            ? 'Start by adding your first tag.'
+                            : 'No tags match your current filters.'}
+                    </p>
+                </div>
+            ) : (
+                <BrutalTable<TagWithUsage>
+                    columns={columns}
+                    data={filteredTags}
+                    rowKey={(tag) => tag.id}
+                />
+            )}
+
+            {/* ── Edit Tag Modal ──────────────────────────────────── */}
+            {editingTag && (
+                <div className="fixed inset-0 bg-brutal-dark/60 z-50 flex items-center justify-center p-4">
+                    <Card className="w-full max-w-md p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(17,17,17,1)] relative">
+                        <button
                             onClick={() => {
-                                setShowAddForm(true);
                                 setEditingTag(null);
                                 setFormData({ name: '', category: '' });
                             }}
-                            className="flex items-center gap-2"
+                            className="absolute top-4 right-4 p-2 hover:bg-brutal-dark/10 transition-colors"
                         >
-                            <Plus className="w-4 h-4" />
-                            Add New Tag
-                        </Button>
-                    </div>
-                )}
+                            <X className="w-5 h-5" />
+                        </button>
 
-                {showAddForm && (
-                    <Card className="p-6 border-2 border-brutal-dark">
-                        <h3 className="font-heading font-bold text-lg uppercase tracking-tight-heading mb-4">
-                            Add New Tag
-                        </h3>
-                        <form onSubmit={handleAddTag} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Input
-                                    label="Tag Name"
-                                    placeholder="e.g., Arduino, Python, Welding"
-                                    value={formData.name}
+                        <h2 className="font-heading font-bold text-2xl uppercase mb-2">
+                            Edit Tag
+                        </h2>
+                        <p className="font-data text-sm mb-6 text-brutal-dark/70">
+                            Editing{' '}
+                            <strong className="text-brutal-dark">"{editingTag.name}"</strong>
+                        </p>
+
+                        <form onSubmit={handleUpdateTag} className="space-y-4">
+                            <Input
+                                label="Tag Name"
+                                value={formData.name}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, name: e.target.value })
+                                }
+                                required
+                            />
+
+                            <div>
+                                <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
+                                    Category
+                                </label>
+                                <select
+                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 text-brutal-dark font-data focus:outline-none focus:border-brutal-red transition-colors"
+                                    value={formData.category}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, name: e.target.value })
+                                        setFormData({ ...formData, category: e.target.value })
                                     }
-                                    required
-                                />
-                                <div>
-                                    <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
-                                        Category
-                                    </label>
-                                    <select
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded-xl text-brutal-dark font-data focus:outline-none focus:border-brutal-red transition-colors"
-                                        value={formData.category}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, category: e.target.value })
-                                        }
-                                    >
-                                        <option value="">None (Uncategorized)</option>
-                                        <option value="domain">Domain</option>
-                                        <option value="level">Level</option>
-                                        <option value="skill">Skill</option>
-                                        <option value="project_status">Project Status</option>
-                                        <option value="event_type">Event Type</option>
-                                    </select>
-                                </div>
+                                >
+                                    <option value="">None (Uncategorized)</option>
+                                    <option value="domain">Domain</option>
+                                    <option value="level">Level</option>
+                                    <option value="skill">Skill</option>
+                                    <option value="project_status">Project Status</option>
+                                    <option value="event_type">Event Type</option>
+                                </select>
                             </div>
-                            <div className="flex justify-end gap-3">
+
+                            <div className="pt-4 flex justify-end gap-3 border-t-2 border-brutal-dark/10">
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant="ghost"
                                     onClick={() => {
-                                        setShowAddForm(false);
+                                        setEditingTag(null);
                                         setFormData({ name: '', category: '' });
                                     }}
                                 >
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={!!actionLoading}>
-                                    {actionLoading === 'add' ? 'Adding...' : 'Add Tag'}
+                                    {actionLoading === editingTag.id ? 'Saving...' : 'Save Changes'}
                                 </Button>
                             </div>
                         </form>
                     </Card>
-                )}
-
-                {/* Category Tabs */}
-                <div className="flex flex-wrap gap-2 border-b-2 border-brutal-dark/10 pb-4">
-                    {CATEGORIES.map((cat) => (
-                        <button
-                            key={cat}
-                            onClick={() => setActiveCategory(cat)}
-                            className={`px-4 py-2 text-sm font-bold font-data rounded transition-colors ${
-                                activeCategory === cat
-                                    ? 'bg-brutal-red text-white'
-                                    : 'bg-brutal-dark/5 text-brutal-dark hover:bg-brutal-dark/10'
-                            }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
                 </div>
-
-                {/* Search Bar */}
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brutal-dark/40" />
-                    <Input
-                        placeholder="Search tags by name..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-
-                {/* Tags Table */}
-                {filteredTags && filteredTags.length === 0 && (
-                    <div className="p-12 bg-yellow-50 border-2 border-yellow-400/50 rounded-2xl text-center">
-                        <h3 className="font-heading font-bold text-2xl text-yellow-800 uppercase mb-3">
-                            No Tags Found
-                        </h3>
-                        <p className="font-data text-sm text-yellow-800/70">
-                            {tags && tags.length === 0
-                                ? 'Start by adding your first tag.'
-                                : 'No tags match your current filters.'}
-                        </p>
-                    </div>
-                )}
-
-                {filteredTags && filteredTags.length > 0 && (
-                    <Card className="overflow-hidden border-2 border-brutal-dark">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse font-data">
-                                <thead>
-                                    <tr className="bg-brutal-dark text-brutal-bg border-b-2 border-brutal-dark/10">
-                                        <th className="p-4 font-bold text-[10px] uppercase text-brutal-bg tracking-widest">
-                                            Name
-                                        </th>
-                                        <th className="p-4 font-bold text-[10px] uppercase text-brutal-bg tracking-widest">
-                                            Category
-                                        </th>
-                                        <th className="p-4 font-bold text-[10px] uppercase text-brutal-bg tracking-widest">
-                                            Usage
-                                        </th>
-                                        <th className="p-4 font-bold text-[10px] uppercase text-brutal-bg tracking-widest text-right">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-brutal-dark/10">
-                                    {filteredTags.map((tag) => (
-                                        <tr
-                                            key={tag.id}
-                                            className="hover:bg-brutal-dark/5 transition-colors"
-                                        >
-                                            <td className="p-4">
-                                                <span className="font-bold text-brutal-dark">
-                                                    {tag.name}
-                                                </span>
-                                            </td>
-                                            <td className="p-4">
-                                                {tag.category ? (
-                                                    <span className="inline-block bg-brutal-dark/10 text-brutal-dark px-3 py-1 rounded text-sm font-bold capitalize">
-                                                        {tag.category.replace('_', ' ')}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-brutal-dark/50 italic">Uncategorized</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <span className="text-sm font-bold text-brutal-dark/70">
-                                                    {tag.usage_count}{' '}
-                                                    <span className="text-brutal-dark/50">
-                                                        reference{tag.usage_count !== 1 ? 's' : ''}
-                                                    </span>
-                                                </span>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenEdit(tag)}
-                                                        className="p-2 text-brutal-dark/50 hover:text-brutal-dark hover:bg-brutal-dark/5 rounded transition-colors"
-                                                        title="Edit tag"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteTag(tag)}
-                                                        disabled={actionLoading === tag.id}
-                                                        className="p-2 text-brutal-red/60 hover:text-brutal-red hover:bg-brutal-red/10 rounded transition-colors disabled:opacity-50"
-                                                        title="Delete tag"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                )}
-
-                {/* Edit Tag Modal */}
-                {editingTag && (
-                    <div className="fixed inset-0 bg-brutal-bg/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <Card className="w-full max-w-md p-6 border-2 border-brutal-dark shadow-[6px_6px_0_0_rgba(20,20,20,0.08)] relative">
-                            <button
-                                onClick={() => {
-                                    setEditingTag(null);
-                                    setFormData({ name: '', category: '' });
-                                }}
-                                className="absolute top-4 right-4 text-brutal-dark/50 hover:text-brutal-dark"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-
-                            <h2 className="font-heading font-bold text-2xl uppercase tracking-tight-heading mb-6">
-                                Edit Tag
-                            </h2>
-                            <p className="font-data text-sm mb-6 text-brutal-dark/70">
-                                Editing{' '}
-                                <strong className="text-brutal-dark">"{editingTag.name}"</strong>
-                            </p>
-
-                            <form onSubmit={handleUpdateTag} className="space-y-4">
-                                <Input
-                                    label="Tag Name"
-                                    value={formData.name}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, name: e.target.value })
-                                    }
-                                    required
-                                />
-
-                                <div>
-                                    <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
-                                        Category
-                                    </label>
-                                    <select
-                                        className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded-xl text-brutal-dark font-data focus:outline-none focus:border-brutal-red transition-colors"
-                                        value={formData.category}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, category: e.target.value })
-                                        }
-                                    >
-                                        <option value="">None (Uncategorized)</option>
-                                        <option value="domain">Domain</option>
-                                        <option value="level">Level</option>
-                                        <option value="skill">Skill</option>
-                                        <option value="project_status">Project Status</option>
-                                        <option value="event_type">Event Type</option>
-                                    </select>
-                                </div>
-
-                                <div className="pt-4 flex justify-end gap-3 border-t-2 border-brutal-dark/10">
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        onClick={() => {
-                                            setEditingTag(null);
-                                            setFormData({ name: '', category: '' });
-                                        }}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit" disabled={!!actionLoading}>
-                                        {actionLoading === editingTag.id ? 'Saving...' : 'Save Changes'}
-                                    </Button>
-                                </div>
-                            </form>
-                        </Card>
-                    </div>
-                )}
-            </div>
-        </div>
+            )}
+        </AdminPageShell>
     );
 }

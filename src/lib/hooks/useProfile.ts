@@ -301,7 +301,7 @@ export function useRankAccess() {
                 )
                 .subscribe((status, err) => {
                     if (status === 'CHANNEL_ERROR') {
-                        console.error('[realtime] app_user_rank subscription error:', err);
+                        console.warn('[realtime] app_user_rank subscription error:', err ?? 'unknown reason — ensure Realtime is enabled for the app_user table and RLS permits access');
                     }
                 });
             entry = { channel, listeners: new Set(), refCount: 0 };
@@ -363,7 +363,7 @@ export function useMyXPHistory() {
                 )
                 .subscribe((status, err) => {
                     if (status === 'CHANNEL_ERROR') {
-                        console.error('[realtime] xp_event subscription error:', err);
+                        console.warn('[realtime] xp_event subscription error:', err ?? 'unknown reason — ensure Realtime is enabled for the xp_event table and RLS permits access');
                     }
                 });
             entry = { channel, listeners: new Set(), refCount: 0 };

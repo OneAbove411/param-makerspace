@@ -114,7 +114,7 @@ export async function deleteProject(id: string) {
 export async function fetchProjectBom(projectId: string, signal?: AbortSignal) {
     let q = supabase
         .from('project_bom_line')
-        .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, display_order, created_at')
+        .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, image_url, display_order, created_at')
         .eq('project_id', projectId)
         .order('display_order', { ascending: true });
     if (signal) q = q.abortSignal(signal);
@@ -122,11 +122,11 @@ export async function fetchProjectBom(projectId: string, signal?: AbortSignal) {
 }
 
 export async function insertBomLine(line: Omit<ProjectBomLine, 'id' | 'created_at'>) {
-    return supabase.from('project_bom_line').insert([line]).select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, display_order, created_at').single();
+    return supabase.from('project_bom_line').insert([line]).select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, image_url, display_order, created_at').single();
 }
 
 export async function updateBomLine(id: string, updates: Partial<ProjectBomLine>) {
-    return supabase.from('project_bom_line').update(updates).eq('id', id).select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, display_order, created_at').single();
+    return supabase.from('project_bom_line').update(updates).eq('id', id).select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, image_url, display_order, created_at').single();
 }
 
 export async function deleteBomLine(id: string) {

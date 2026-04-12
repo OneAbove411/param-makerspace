@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router';
-import { useProject, useReaction, useComments } from '../lib/hooks';
+import { useProject, useReaction, useComments, useProjectMakes } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
 import { toast } from '../lib/toast';
 import { RemixModal } from '../components/project/RemixModal';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
     ArrowLeft,
     Play,
@@ -16,10 +18,20 @@ import {
     Image as ImageIcon,
     Video as VideoIcon,
     Users,
-    Calendar,
     CheckCircle2,
-    Circle,
     ExternalLink,
+    Zap,
+    Sparkles,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    Package,
+    Target,
+    FileText,
+    MoreHorizontal,
+    Pencil,
+    Trash2,
 } from 'lucide-react';
 import { getEmbedUrl, getYoutubeThumbnail } from '../lib/videoUtils';
 import { ProjectBomTab } from '../components/project/ProjectBomTab';
@@ -27,45 +39,39 @@ import { ProjectFilesTab } from '../components/project/ProjectFilesTab';
 import { ProjectMakesTab } from '../components/project/ProjectMakesTab';
 import { cn } from '../lib/utils';
 import { XpRewardBadge } from '../components/ui/XpRewardBadge';
-import { XP_REWARDS } from '../lib/constants';
+import { XP_REWARDS, RANK_THRESHOLDS, RANK_ORDER } from '../lib/constants';
+import { XPProgressStrip } from '../components/shared/XPProgressStrip';
+import { WhatsNextClosure } from '../components/shared/WhatsNextClosure';
+import { zeroCTA } from '../lib/zeroCTA';
+
+gsap.registerPlugin(ScrollTrigger);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §9 Project Cockpit — single-screen bento redesign.
+// §9 Project Cockpit — "Scrolling Story" redesign v2
 //
-// Replaces the prior 3-column long-scroll layout that produced:
-//   • duplicate cover images
-//   • oversized headings
-//   • "broken" timeline (only ever 1 entry: Overview)
-//   • BOM/Files/Makes that lived in a tab strip the user couldn't reach
-//   • non-snappy scroll because every section was a giant block
-//
-// New layout (≥ lg):
-//
-//   ┌─────────── 12 col grid ─────────────────────────────────┐
-//   │ IDENTITY (3) │ HERO COVER + OVERVIEW (6) │ SIDE (3)     │
-//   │              │                            │ BOM/FILES/   │
-//   │              │                            │ MAKES tabs   │
-//   └──────────────────────────────────────────────────────────┘
-//
-// Everything fits in one viewport on a 1440×900 screen.
-// Content panes scroll internally — the page itself does not.
+// Inspired by reference UI: full-width hero with accent-color title,
+// tabbed content area (Visual BOM / Build Steps / Overview & Files),
+// bottom section with Project Stats (contribution meter) + Community Remixes
+// carousel. Scroll-triggered animations throughout.
 // ─────────────────────────────────────────────────────────────────────────────
+
+type ContentTab = 'bom' | 'milestones' | 'overview';
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 
 function DetailsSkeleton() {
     return (
-        <div className="flex-1 w-full bg-brutal-bg min-h-screen pt-24 px-6 md:px-10">
-            <div className="max-w-[1480px] mx-auto grid grid-cols-12 gap-6 animate-pulse">
-                <div className="col-span-3 h-[520px] rounded-2xl bg-brutal-dark/5" />
-                <div className="col-span-6 h-[520px] rounded-2xl bg-brutal-dark/5" />
-                <div className="col-span-3 h-[520px] rounded-2xl bg-brutal-dark/5" />
+        <div className="flex-1 w-full bg-brutal-bg min-h-screen">
+            <div className="h-[55vh] bg-brutal-dark/5 animate-pulse" />
+            <div className="max-w-6xl mx-auto px-6 md:px-10 py-10">
+                <div className="h-12 w-64 bg-brutal-dark/5 rounded animate-pulse mb-6" />
+                <div className="h-[400px] bg-brutal-dark/5 rounded-2xl animate-pulse" />
             </div>
         </div>
     );
 }
 
-// ─── LazyVideo (kept compact) ──────────────────────────────────────────────
+// ─── LazyVideo ────────────────────────────────────────────────────────────
 
 const LazyVideo = memo(function LazyVideo({
     vid,
@@ -116,14 +122,145 @@ const LazyVideo = memo(function LazyVideo({
                 />
             )}
             <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-brutal-red flex items-center justify-center
-                                shadow-[0_0_24px_rgba(196,41,30,0.4)] group-hover:scale-110 transition-transform">
-                    <Play size={20} className="text-brutal-bg fill-brutal-bg ml-0.5" />
+                <div className="w-14 h-14 rounded-full bg-brutal-red flex items-center justify-center
+                                shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] group-hover:scale-110 transition-transform">
+                    <Play size={22} className="text-brutal-bg fill-brutal-bg ml-0.5" />
                 </div>
             </div>
         </button>
     );
 });
+
+// ─── Section wrapper — scroll-triggered reveal ──────────────────────────
+
+function StorySection({
+    children,
+    className,
+    id,
+}: {
+    children: React.ReactNode;
+    className?: string;
+    id?: string;
+}) {
+    return (
+        <section id={id} className={cn('story-section', className)}>
+            {children}
+        </section>
+    );
+}
+
+// ─── Community Remixes Carousel ─────────────────────────────────────────
+
+function RemixesCarousel({ projectId }: { projectId: string }) {
+    const { data: makes, loading } = useProjectMakes(projectId);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    const updateScrollButtons = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setCanScrollLeft(el.scrollLeft > 4);
+        setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    };
+
+    useEffect(() => {
+        updateScrollButtons();
+        const el = scrollRef.current;
+        if (el) el.addEventListener('scroll', updateScrollButtons, { passive: true });
+        return () => { el?.removeEventListener('scroll', updateScrollButtons); };
+    }, [makes]);
+
+    const scroll = (dir: 'left' | 'right') => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const amount = el.clientWidth * 0.7;
+        el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
+    };
+
+    if (loading) return <div className="py-8 text-center text-brutal-dark/30 font-data text-sm">Loading remixes...</div>;
+    if (!makes || makes.length === 0) return null;
+
+    return (
+        <div className="relative">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-heading font-bold text-sm uppercase tracking-widest text-brutal-dark/70">
+                    Community Remixes
+                </h3>
+                <div className="flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => scroll('left')}
+                        disabled={!canScrollLeft}
+                        className={cn(
+                            'w-8 h-8 rounded-full border-2 border-brutal-dark/10 flex items-center justify-center transition-all',
+                            canScrollLeft ? 'hover:border-brutal-red hover:text-brutal-red text-brutal-dark/40' : 'opacity-30 cursor-default',
+                        )}
+                    >
+                        <ChevronLeft size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => scroll('right')}
+                        disabled={!canScrollRight}
+                        className={cn(
+                            'w-8 h-8 rounded-full border-2 border-brutal-dark/10 flex items-center justify-center transition-all',
+                            canScrollRight ? 'hover:border-brutal-red hover:text-brutal-red text-brutal-dark/40' : 'opacity-30 cursor-default',
+                        )}
+                    >
+                        <ChevronRight size={14} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Scrollable row */}
+            <div
+                ref={scrollRef}
+                className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+                {makes.map((make) => (
+                    <div
+                        key={make.id}
+                        className="flex-shrink-0 w-[180px] snap-start rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg overflow-hidden
+                                   hover:border-brutal-red/30 hover:shadow-[8px_8px_0_0_rgba(196,41,30,0.24)] transition-all group"
+                    >
+                        {make.image_url ? (
+                            <img
+                                src={make.image_url}
+                                alt={make.caption}
+                                loading="lazy"
+                                className="w-full h-[130px] object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                        ) : (
+                            <div className="w-full h-[130px] bg-brutal-dark/5 flex items-center justify-center">
+                                <Package size={24} className="text-brutal-dark/15" />
+                            </div>
+                        )}
+                        <div className="p-2.5">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                {make.user_avatar_url ? (
+                                    <img src={make.user_avatar_url} alt={make.user_name} className="w-5 h-5 rounded-full" />
+                                ) : (
+                                    <div className="w-5 h-5 rounded-full bg-brutal-dark text-brutal-bg font-data text-[8px] font-bold flex items-center justify-center">
+                                        {make.user_name?.charAt(0) || '?'}
+                                    </div>
+                                )}
+                                <span className="font-data text-[10px] font-bold text-brutal-dark truncate">
+                                    {make.user_name}
+                                </span>
+                            </div>
+                            <p className="font-data text-[10px] text-brutal-dark/50 line-clamp-2 leading-relaxed">
+                                {make.caption || 'Built this project'}
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
@@ -132,21 +269,22 @@ export function ProjectDetails() {
     const { data: project, loading } = useProject(id);
     const { user } = useAuth();
     const { counts, myReactions, toggle } = useReaction('project', id);
-    const { comments, addComment, deleteComment } = useComments('project', id);
+    const { comments, addComment, deleteComment, editComment } = useComments('project', id);
     const navigate = useNavigate();
     const location = useLocation();
     const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
     const [remixModalOpen, setRemixModalOpen] = useState(false);
-    const [centerTab, setCenterTab] = useState<'overview' | 'milestones' | 'media'>('overview');
-    const [sideTab, setSideTab] = useState<'bom' | 'files' | 'makes'>('bom');
     const [commentText, setCommentText] = useState('');
     const [submittingComment, setSubmittingComment] = useState(false);
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+    const [editCommentText, setEditCommentText] = useState('');
+    const [commentMenuOpenId, setCommentMenuOpenId] = useState<string | null>(null);
+    const commentMenuRef = useRef<HTMLDivElement>(null);
+    const [activeTab, setActiveTab] = useState<ContentTab>('bom');
     const MAX_COMMENT = 500;
 
-    // Default the side tab to whatever section actually has content
-    useEffect(() => {
-        if (project?.github_url && !project?.files?.length) setSideTab('files');
-    }, [project?.id]);
+    const pageRef = useRef<HTMLDivElement>(null);
+    const heroImageRef = useRef<HTMLImageElement>(null);
 
     const goBack = () => {
         const from = (location.state as any)?.from;
@@ -200,6 +338,92 @@ export function ProjectDetails() {
     const galleryImages = (project?.images || []).slice(1);
     const videos = project?.videos || [];
 
+    const isLiked = myReactions.includes('like');
+    const isBookmarked = myReactions.includes('bookmark');
+
+    // ── XP contribution meter calculation ────────────────────────
+    const xpEarned = useMemo(() => {
+        if (!project) return 0;
+        let xp = 0;
+        if (project.status === 'active') xp += XP_REWARDS.project_active;
+        else if (project.status !== 'draft') xp += XP_REWARDS.project_approved;
+        return xp;
+    }, [project]);
+
+    const xpPotential = XP_REWARDS.project_active; // max possible for a project
+
+    // Close comment action menu on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (commentMenuRef.current && !commentMenuRef.current.contains(e.target as Node)) {
+                setCommentMenuOpenId(null);
+            }
+        };
+        if (commentMenuOpenId) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [commentMenuOpenId]);
+
+    // ── GSAP ScrollTrigger animations ────────────────────────────
+    useEffect(() => {
+        if (loading || !project) return;
+
+        const prefersReduced = typeof window !== 'undefined'
+            && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReduced) return;
+
+        const ctx = gsap.context(() => {
+            // Hero parallax — image moves slower than scroll
+            if (heroImageRef.current) {
+                gsap.to(heroImageRef.current, {
+                    yPercent: 20,
+                    ease: 'none',
+                    scrollTrigger: {
+                        trigger: '.project-hero',
+                        start: 'top top',
+                        end: 'bottom top',
+                        scrub: true,
+                    },
+                });
+            }
+
+            // Scroll indicator bounce
+            gsap.to('.scroll-indicator', {
+                y: 8,
+                duration: 1.2,
+                repeat: -1,
+                yoyo: true,
+                ease: 'power1.inOut',
+            });
+
+            // Fade-in + slide-up for each story section
+            gsap.utils.toArray<HTMLElement>('.story-section').forEach((_section) => {
+                gsap.fromTo(
+                    _section,
+                    { y: 40, opacity: 0 },
+                    {
+                        y: 0,
+                        opacity: 1,
+                        duration: 0.8,
+                        ease: 'power3.out',
+                        scrollTrigger: {
+                            trigger: _section,
+                            start: 'top 85%',
+                            toggleActions: 'play none none none',
+                        },
+                    },
+                );
+            });
+
+            // Tab content card entrance
+            gsap.fromTo('.tab-content-area', { opacity: 0, y: 20 }, {
+                opacity: 1, y: 0, duration: 0.5, ease: 'power2.out',
+                scrollTrigger: { trigger: '.tab-content-area', start: 'top 90%' },
+            });
+        }, pageRef);
+
+        return () => ctx.revert();
+    }, [loading, project]);
+
     if (loading) return <DetailsSkeleton />;
 
     if (!project) {
@@ -226,501 +450,737 @@ export function ProjectDetails() {
         );
     }
 
-    const isLiked = myReactions.includes('like');
-    const isBookmarked = myReactions.includes('bookmark');
+    const isOwner = user?.id === project.owner_id;
+
+    // ─── Tab definitions ─────────────────────────────────────────
+    const tabs: { key: ContentTab; label: string; icon: React.ReactNode }[] = [
+        { key: 'bom', label: 'Visual BOM', icon: <Package size={14} /> },
+        { key: 'milestones', label: 'Build Steps', icon: <Target size={14} /> },
+        { key: 'overview', label: 'Overview & Files', icon: <FileText size={14} /> },
+    ];
 
     return (
-        <div className="flex-1 w-full bg-brutal-bg min-h-screen">
-            <div className="pt-24 md:pt-24 pb-10 px-4 md:px-8 lg:px-10">
-                <div className="max-w-[1480px] mx-auto">
-                    {/* Compact breadcrumb + actions strip */}
-                    <div className="flex items-center justify-between mb-4 gap-4">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <button
-                                type="button"
-                                onClick={goBack}
-                                className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest
-                                           text-brutal-dark/50 hover:text-brutal-red transition-colors"
-                            >
-                                <ArrowLeft size={12} /> Back
-                            </button>
-                            <span className="hidden sm:inline font-data text-[10px] text-brutal-dark/30">/</span>
-                            <Link
-                                to="/projects"
-                                className="hidden sm:inline-flex font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-red transition-colors"
-                            >
-                                Projects
-                            </Link>
-                            {project.domain && (
-                                <>
-                                    <span className="hidden md:inline font-data text-[10px] text-brutal-dark/30">/</span>
-                                    <span className="hidden md:inline font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 truncate">
-                                        {project.domain}
-                                    </span>
-                                </>
+        <div ref={pageRef} className="flex-1 w-full bg-brutal-bg min-h-screen">
+
+            {/* ═══════════════════════════════════════════════════════
+                HERO — Full-width cover with overlaid identity
+            ═══════════════════════════════════════════════════════ */}
+            <div className="project-hero relative w-full h-[40vh] md:h-[45vh] overflow-hidden bg-brutal-dark">
+                {/* Parallax cover image */}
+                {coverImage ? (
+                    <img
+                        ref={heroImageRef}
+                        src={coverImage}
+                        alt={`${project.title} cover`}
+                        className="absolute inset-0 w-full h-[120%] object-cover opacity-60"
+                    />
+                ) : (
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.06) 1px, transparent 1px)',
+                            backgroundSize: '28px 28px',
+                        }}
+                    />
+                )}
+
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark via-brutal-dark/50 to-transparent" />
+
+
+                {/* Hero content (bottom) */}
+                <div className="absolute bottom-0 inset-x-0 px-6 md:px-10 lg:px-16 pb-10 z-10">
+                    <div className="max-w-6xl mx-auto">
+                        {/* Title — clean uppercase, matches projects listing */}
+                        <h1 className="font-heading font-bold text-3xl md:text-4xl lg:text-5xl uppercase tracking-tight leading-[1.05] text-brutal-bg max-w-3xl">
+                            {project.title}
+                        </h1>
+
+                        {/* Owner + status row */}
+                        <div className="flex flex-wrap items-center gap-3 mt-4">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-brutal-bg text-brutal-dark font-heading font-bold flex items-center justify-center text-sm border-2 border-brutal-bg/30">
+                                    {project.ownerName?.charAt(0) || '?'}
+                                </div>
+                                <span className="font-data text-[12px] font-bold text-brutal-bg">
+                                    {project.ownerName}
+                                </span>
+                            </div>
+                            {project.status && (
+                                <span className={cn(
+                                    'inline-flex px-2.5 py-1 font-data text-[10px] font-bold uppercase tracking-widest rounded-full',
+                                    project.status === 'active' ? 'bg-green-500/20 text-green-300' :
+                                        project.status === 'pending_review' ? 'bg-yellow-500/20 text-yellow-300' :
+                                            'bg-brutal-bg/20 text-brutal-bg/70',
+                                )}>
+                                    {project.status.replace('_', ' ')}
+                                </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+
+                        {/* XP Progress Strip */}
+                        <div className="mt-3">
+                            <XPProgressStrip />
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 mt-5 flex-wrap overflow-x-auto no-scrollbar pb-1">
+                            {(project.files?.length || 0) > 0 && (
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                                               bg-brutal-red text-brutal-bg font-data text-[11px] font-bold uppercase tracking-wider
+                                               border-2 border-brutal-red hover:bg-brutal-bg hover:text-brutal-dark hover:border-brutal-bg transition-all"
+                                >
+                                    <Download size={13} /> Download Files
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setRemixModalOpen(true)}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                                           font-data text-[11px] font-bold uppercase tracking-wider
+                                           border-2 border-brutal-bg/40 text-brutal-bg/90 hover:border-brutal-bg hover:text-brutal-bg
+                                           backdrop-blur-sm transition-all"
+                            >
+                                <GitFork size={13} /> Remix
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => handleReaction('like')}
-                                aria-label={isLiked ? 'Unlike' : 'Like'}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider',
-                                    'border-2 transition-all',
+                                    'inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-data text-[11px] font-bold uppercase tracking-wider border-2 transition-all backdrop-blur-sm',
                                     isLiked
                                         ? 'bg-brutal-red text-brutal-bg border-brutal-red'
-                                        : 'border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-red hover:text-brutal-red',
+                                        : 'border-brutal-bg/30 text-brutal-bg/80 hover:border-brutal-bg',
                                 )}
                             >
-                                <Heart size={11} className={isLiked ? 'fill-current' : ''} />
-                                {counts.likes}
+                                <Heart size={12} className={isLiked ? 'fill-current' : ''} />
+                                {(() => {
+                                    const lCTA = zeroCTA('likes', counts.likes);
+                                    return lCTA.isZero ? null : counts.likes;
+                                })()}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleReaction('bookmark')}
-                                aria-pressed={isBookmarked}
-                                aria-label={isBookmarked ? 'Unsave project' : 'Save project'}
-                                title={isBookmarked ? 'Saved' : 'Save'}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider border-2 transition-all',
+                                    'inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-data text-[11px] font-bold uppercase tracking-wider border-2 transition-all backdrop-blur-sm',
                                     isBookmarked
                                         ? 'bg-brutal-red text-brutal-bg border-brutal-red'
-                                        : 'border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-red hover:text-brutal-red',
+                                        : 'border-brutal-bg/30 text-brutal-bg/80 hover:border-brutal-bg',
                                 )}
                             >
-                                <Bookmark size={11} className={isBookmarked ? 'fill-current' : ''} />
-                                {isBookmarked ? 'Saved' : 'Save'}
+                                <Bookmark size={12} className={isBookmarked ? 'fill-current' : ''} />
                             </button>
                             <button
                                 type="button"
                                 onClick={handleShare}
-                                aria-label="Share"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider border-2 border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-dark hover:text-brutal-dark transition-all"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-data text-[11px] font-bold uppercase tracking-wider border-2 border-brutal-bg/30 text-brutal-bg/80 hover:border-brutal-bg transition-all backdrop-blur-sm"
                             >
-                                <Share2 size={11} /> Share
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setRemixModalOpen(true)}
-                                aria-label="Remix this project"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider bg-brutal-dark text-brutal-bg border-2 border-brutal-dark hover:bg-brutal-red hover:border-brutal-red transition-all"
-                            >
-                                <GitFork size={11} /> Remix
+                                <Share2 size={12} />
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    {/* ─── Bento grid ─── */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
-                        {/* ── Identity column ───────────────────────────── */}
-                        <aside className="lg:col-span-3 lg:max-h-[calc(100vh-9rem)] flex flex-col gap-4">
-                            {/* Title card */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.12)]">
+                {/* Scroll indicator */}
+                <div className="scroll-indicator absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+                    <ChevronDown size={18} className="text-brutal-bg/30" />
+                </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════
+                MOBILE INFO STRIP — shown below hero on <lg screens
+                Surfaces sidebar content that is hidden on mobile.
+            ═══════════════════════════════════════════════════════ */}
+            <div className="lg:hidden bg-brutal-bg border-b-2 border-brutal-dark/10">
+                <div className="px-4 py-4 space-y-3">
+                    {/* Owner + contribution XP */}
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-xs border-2 border-brutal-dark flex-shrink-0">
+                                {project.ownerName?.charAt(0) || '?'}
+                            </div>
+                            <div>
+                                <span className="font-data text-[11px] font-bold text-brutal-dark block leading-tight">{project.ownerName}</span>
                                 {project.domain && (
-                                    <span className="inline-block font-data text-[9px] font-bold uppercase tracking-widest text-brutal-red mb-2">
-                                        #{project.domain}
-                                    </span>
+                                    <span className="font-data text-[9px] text-brutal-dark/40 uppercase tracking-wider">{project.domain}</span>
                                 )}
-                                <h1 className="font-drama italic text-2xl leading-[1.05] text-brutal-dark mb-3">
-                                    {project.title}
-                                </h1>
-                                {project.status && (
-                                    <span className={cn(
-                                        'inline-block px-2 py-0.5 font-data text-[9px] font-bold uppercase tracking-widest rounded-full',
-                                        project.status === 'active' ? 'bg-green-700/10 text-green-700' :
-                                            project.status === 'pending_review' ? 'bg-yellow-700/10 text-yellow-700' :
-                                                project.status === 'rejected' ? 'bg-brutal-red/10 text-brutal-red' :
-                                                    'bg-brutal-dark/5 text-brutal-dark/60',
-                                    )}>
-                                        {project.status.replace('_', ' ')}
-                                    </span>
-                                )}
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] px-3 py-2 text-right flex-shrink-0">
+                            <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40 block">Contribution</span>
+                            <span className="font-heading font-bold text-sm text-brutal-red">+{xpEarned} XP</span>
+                        </div>
+                    </div>
 
-                                {/* Owner */}
-                                <div className="mt-4 pt-4 border-t border-brutal-dark/10 flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-xs">
-                                        {project.ownerName?.charAt(0) || '?'}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="font-data text-[11px] font-bold text-brutal-dark truncate">
-                                            {project.ownerName}
-                                        </div>
-                                        <div className="font-data text-[8px] text-brutal-red font-bold uppercase tracking-widest">
-                                            Owner
-                                        </div>
-                                    </div>
+                    {/* Progress bar (if milestones exist) */}
+                    {milestones.length > 0 && (
+                        <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] px-3 py-2.5 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">Build Progress</span>
+                                <span className="font-heading font-bold text-xs text-brutal-red tabular-nums">{milestonePct}%</span>
+                            </div>
+                            <div className="h-1.5 bg-brutal-dark/10 rounded-full overflow-hidden border border-brutal-dark/15">
+                                <div className="h-full bg-brutal-red rounded-full transition-all duration-700" style={{ width: `${milestonePct}%` }} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-4 gap-2">
+                        <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2 text-center">
+                            <Heart size={11} className="mx-auto text-brutal-red mb-0.5" />
+                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-dark block leading-none">{counts.likes}</span>
+                            <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40">Likes</span>
+                        </div>
+                        <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2 text-center">
+                            <MessageCircle size={11} className="mx-auto text-brutal-red mb-0.5" />
+                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-dark block leading-none">{comments.length}</span>
+                            <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40">Comments</span>
+                        </div>
+                        <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2 text-center">
+                            <ImageIcon size={11} className="mx-auto text-brutal-red mb-0.5" />
+                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-dark block leading-none">{project.images?.length || 0}</span>
+                            <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40">Photos</span>
+                        </div>
+                        <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2 text-center">
+                            <VideoIcon size={11} className="mx-auto text-brutal-red mb-0.5" />
+                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-dark block leading-none">{videos.length}</span>
+                            <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40">Videos</span>
+                        </div>
+                    </div>
+
+                    {/* Remix CTA */}
+                    <button
+                        type="button"
+                        onClick={() => setRemixModalOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 border-brutal-dark/15 bg-transparent font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/60 hover:border-brutal-red hover:text-brutal-red hover:bg-brutal-red/[0.03] transition-all"
+                    >
+                        <GitFork size={12} /> Remix This Project
+                    </button>
+                </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════
+                TWO-COLUMN LAYOUT — Sidebar + Tabbed Content
+                Mirrors the Projects listing page structure.
+            ═══════════════════════════════════════════════════════ */}
+            <div className="flex min-h-[60vh]">
+
+                {/* ── LEFT SIDEBAR (sticky, hidden <lg) ─────────────── */}
+                <aside className="hidden lg:block w-64 flex-shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto bg-brutal-bg px-4 py-5 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+
+                    {/* Sidebar card container — mirrors dashboard cockpit */}
+                    <div className="rounded-2xl border-2 border-brutal-dark/15 bg-brutal-bg p-4 shadow-[6px_6px_0_0_rgba(20,20,20,0.08)] space-y-4">
+
+                    {/* Owner identity */}
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-xs border-2 border-brutal-dark">
+                            {project.ownerName?.charAt(0) || '?'}
+                        </div>
+                        <div>
+                            <span className="font-data text-[11px] font-bold text-brutal-dark block leading-tight">{project.ownerName}</span>
+                            {project.domain && (
+                                <span className="font-data text-[9px] text-brutal-dark/40 uppercase tracking-wider">{project.domain}</span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Contribution Meter */}
+                    <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">
+                                Contribution
+                            </span>
+                            <span className="font-heading font-bold text-xs text-brutal-red">+{xpEarned} XP</span>
+                        </div>
+                        <div className="h-2 bg-brutal-dark/10 rounded-full overflow-hidden border border-brutal-dark/15">
+                            <div
+                                className="h-full bg-brutal-red rounded-full transition-all duration-1000"
+                                style={{ width: `${Math.min((xpEarned / xpPotential) * 100, 100)}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="font-data text-[9px] text-brutal-dark/30">{xpEarned} XP</span>
+                            <span className="font-data text-[9px] text-brutal-dark/30">+{xpPotential} XP</span>
+                        </div>
+                    </div>
+
+                    {/* Quick stats */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <StatCard
+                            label="Likes"
+                            value={counts.likes}
+                            icon={<Heart size={12} />}
+                            onClick={() => handleReaction('like')}
+                        />
+                        <StatCard
+                            label="Comments"
+                            value={comments.length}
+                            icon={<MessageCircle size={12} />}
+                        />
+                        <StatCard label="Photos" value={project.images?.length || 0} icon={<ImageIcon size={12} />} />
+                        <StatCard label="Videos" value={videos.length} icon={<VideoIcon size={12} />} />
+                        {(project.members?.length || 0) > 0 && (
+                            <StatCard label="Team" value={(project.members?.length || 0) + 1} icon={<Users size={12} />} />
+                        )}
+                        {milestones.length > 0 && (
+                            <StatCard label="Progress" value={`${milestonePct}%`} icon={<CheckCircle2 size={12} />} />
+                        )}
+                    </div>
+
+                    {/* Remix CTA */}
+                    <button
+                        type="button"
+                        onClick={() => setRemixModalOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                                   border-2 border-brutal-dark/15 bg-transparent font-data text-[10px] font-bold uppercase tracking-wider
+                                   text-brutal-dark/60 hover:border-brutal-red hover:text-brutal-red hover:bg-brutal-red/[0.03] transition-all"
+                    >
+                        <GitFork size={12} /> Remix This Project
+                    </button>
+
+                    </div>{/* end sidebar card container */}
+
+                    {/* Community Remixes (compact) */}
+                    <RemixesCarousel projectId={project.id} />
+                </aside>
+
+                {/* ── RIGHT CONTENT (tabs + discussion) ─────────────── */}
+                <main className="flex-1 min-w-0">
+
+                    {/* Tab bar */}
+                    <div className="sticky top-16 z-20 bg-brutal-bg/95 backdrop-blur-sm border-b-2 border-brutal-dark/15">
+                        <nav className="flex items-center overflow-x-auto no-scrollbar px-4 md:px-6 lg:px-8">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.key)}
+                                    className={cn(
+                                        'flex items-center gap-2 px-4 py-3.5 font-data text-[11px] font-bold uppercase tracking-wider transition-all relative whitespace-nowrap flex-shrink-0',
+                                        activeTab === tab.key
+                                            ? 'text-brutal-red'
+                                            : 'text-brutal-dark/40 hover:text-brutal-dark/70',
+                                    )}
+                                >
+                                    {tab.icon}
+                                    {tab.label}
+                                    {activeTab === tab.key && (
+                                        <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-brutal-red rounded-t-full" />
+                                    )}
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+
+                    {/* Tab content */}
+                    <div className="tab-content-area px-4 md:px-6 lg:px-8 py-6 space-y-8">
+
+                        {/* ── VISUAL BOM TAB ── */}
+                        {activeTab === 'bom' && (
+                            <StorySection>
+                                <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 md:p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.14)]">
+                                    <ProjectBomTab projectId={project.id} isOwner={isOwner} variant="grid" />
                                 </div>
+                            </StorySection>
+                        )}
 
-                                {/* Tags */}
-                                {project.tags && project.tags.length > 0 && (
-                                    <div className="mt-4 flex flex-wrap gap-1">
-                                        {project.tags.slice(0, 6).map((t: string) => (
-                                            <span
-                                                key={t}
-                                                className="font-data text-[9px] font-bold uppercase tracking-wider text-brutal-dark/55 bg-brutal-dark/[0.04] border border-brutal-dark/10 px-1.5 py-0.5 rounded-full"
-                                            >
-                                                #{t}
+                        {/* ── BUILD STEPS TAB ── */}
+                        {activeTab === 'milestones' && (
+                            <StorySection>
+                                {milestones.length > 0 ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-4 mb-2">
+                                            <div className="flex-1 h-2 bg-brutal-dark/10 rounded-full overflow-hidden border border-brutal-dark/15">
+                                                <div
+                                                    className="h-full bg-brutal-red transition-all duration-700 rounded-full"
+                                                    style={{ width: `${milestonePct}%` }}
+                                                />
+                                            </div>
+                                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-red">
+                                                {milestonePct}%
                                             </span>
+                                        </div>
+                                        {milestones.map((m: any, i: number) => (
+                                            <div key={m.id} className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 hover:border-brutal-red/30 hover:shadow-[4px_4px_0_0_rgba(196,41,30,0.14)] transition-all">
+                                                <div className="flex items-start gap-3">
+                                                    <div className={cn(
+                                                        'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-heading font-bold text-xs',
+                                                        m.is_complete
+                                                            ? 'bg-brutal-red text-brutal-bg'
+                                                            : 'bg-brutal-dark/[0.06] text-brutal-dark/40',
+                                                    )}>
+                                                        {m.is_complete ? <CheckCircle2 size={14} /> : i + 1}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className={cn(
+                                                            'font-heading font-bold text-xs uppercase tracking-tight',
+                                                            m.is_complete ? 'text-brutal-dark/40 line-through' : 'text-brutal-dark',
+                                                        )}>
+                                                            {m.title}
+                                                        </h4>
+                                                        {m.description && (
+                                                            <p className="font-data text-xs text-brutal-dark/60 leading-relaxed mt-1.5 whitespace-pre-wrap">
+                                                                {m.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12">
+                                        <Target size={32} className="mx-auto text-brutal-dark/12 mb-3" />
+                                        <p className="font-data text-sm text-brutal-dark/30">No build steps documented yet.</p>
+                                        {isOwner && (
+                                            <Link
+                                                to={`/projects/${project.id}/edit`}
+                                                className="inline-flex items-center gap-1.5 mt-4 font-data text-[11px] font-bold text-brutal-red hover:text-brutal-dark transition-colors"
+                                            >
+                                                <CheckCircle2 size={12} />
+                                                Add build steps <span className="text-brutal-red/60">(+50 XP)</span>
+                                            </Link>
+                                        )}
                                     </div>
                                 )}
-                            </div>
+                            </StorySection>
+                        )}
 
-                            {/* Stats grid */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4 grid grid-cols-3 gap-2">
-                                <Stat icon={<Heart size={11} />} label="Likes" value={counts.likes} />
-                                <Stat icon={<MessageCircle size={11} />} label="Comments" value={comments.length} />
-                                <Stat icon={<Users size={11} />} label="Members" value={(project.members?.length || 0) + 1} />
-                                <Stat icon={<ImageIcon size={11} />} label="Photos" value={project.images?.length || 0} />
-                                <Stat icon={<VideoIcon size={11} />} label="Videos" value={videos.length} />
-                                <Stat icon={<CheckCircle2 size={11} />} label="Done" value={`${milestonesDone}/${milestones.length || 0}`} />
-                            </div>
+                        {/* ── OVERVIEW & FILES TAB ── */}
+                        {activeTab === 'overview' && (
+                            <div className="space-y-6">
+                                <StorySection>
+                                    <SectionLabel>About This Project</SectionLabel>
+                                    {project.description ? (
+                                        <p className="font-data text-[13px] text-brutal-dark/80 leading-[1.75] whitespace-pre-wrap">
+                                            {project.description}
+                                        </p>
+                                    ) : project.summary ? (
+                                        <p className="font-data text-[13px] text-brutal-dark/80 leading-[1.75]">
+                                            {project.summary}
+                                        </p>
+                                    ) : (
+                                        <p className="font-data text-sm text-brutal-dark/35">
+                                            No description yet.
+                                        </p>
+                                    )}
+                                    {isOwner && project.description && project.description.split(/\s+/).length < 100 && (
+                                        <div className="mt-3 rounded-xl border border-dashed border-brutal-red/20 bg-brutal-red/[0.03] p-3">
+                                            <p className="font-data text-[11px] text-brutal-dark/50">
+                                                <Sparkles size={11} className="inline text-brutal-red mr-1.5" />
+                                                Add more details — <span className="font-bold text-brutal-red">earn +50 XP</span>
+                                            </p>
+                                        </div>
+                                    )}
+                                </StorySection>
 
-                            {/* XP Rewards */}
-                            <div className="rounded-2xl border-2 border-brutal-red/15 bg-brutal-red/[0.04] p-4 space-y-2">
-                                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 mb-1">
-                                    Project XP
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-data text-[10px] text-brutal-dark/60">Approved</span>
-                                    <XpRewardBadge amount={XP_REWARDS.project_approved} />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-data text-[10px] text-brutal-dark/60">Active (published)</span>
-                                    <XpRewardBadge amount={XP_REWARDS.project_active} />
-                                </div>
-                            </div>
-
-                            {/* Milestone progress (if any) */}
-                            {milestones.length > 0 && (
-                                <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4 flex-1 min-h-0 flex flex-col">
-                                    <div className="flex items-baseline justify-between mb-2">
-                                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                            Milestones
-                                        </span>
-                                        <span className="font-data text-[10px] font-bold tabular-nums text-brutal-red">
-                                            {milestonePct}%
-                                        </span>
+                                <StorySection>
+                                    <SectionLabel>Files & Source Code</SectionLabel>
+                                    <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 shadow-[4px_4px_0_0_rgba(196,41,30,0.10)]">
+                                        <ProjectFilesTab githubUrl={project.github_url} />
                                     </div>
-                                    <div className="h-1.5 bg-brutal-dark/8 rounded-full overflow-hidden mb-3">
-                                        <div className="h-full bg-brutal-red transition-all duration-700" style={{ width: `${milestonePct}%` }} />
-                                    </div>
-                                    <ul className="space-y-1.5 overflow-y-auto pr-1">
-                                        {milestones.map((m: any) => (
-                                            <li key={m.id} className="flex items-start gap-2">
-                                                {m.is_complete ? (
-                                                    <CheckCircle2 size={11} className="text-brutal-red mt-0.5 flex-shrink-0" />
-                                                ) : (
-                                                    <Circle size={11} className="text-brutal-dark/25 mt-0.5 flex-shrink-0" />
-                                                )}
-                                                <span className={cn(
-                                                    'font-data text-[10px] leading-snug',
-                                                    m.is_complete ? 'text-brutal-dark/60 line-through' : 'text-brutal-dark/80',
-                                                )}>
-                                                    {m.title}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </aside>
+                                </StorySection>
 
-                        {/* ── Center column: hero + content tabs ────────── */}
-                        <main className="lg:col-span-6 flex flex-col gap-4 lg:max-h-[calc(100vh-9rem)] min-h-0">
-                            {/* Cover */}
-                            {coverImage && (
-                                <div className="relative rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark/5 aspect-[16/8] flex-shrink-0">
-                                    <img
-                                        src={coverImage}
-                                        alt={`${project.title} cover`}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Tabs strip */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg flex-1 min-h-0 flex flex-col">
-                                <div className="flex border-b-2 border-brutal-dark/10 px-4 flex-shrink-0">
-                                    {([
-                                        { k: 'overview', label: 'Overview', count: comments.length },
-                                        { k: 'milestones', label: 'Milestones', count: milestones.length },
-                                        { k: 'media', label: 'Media', count: videos.length + galleryImages.length },
-                                    ] as const).map((t) => (
-                                        <button
-                                            key={t.k}
-                                            type="button"
-                                            onClick={() => setCenterTab(t.k)}
-                                            className={cn(
-                                                'px-3 py-3 font-data text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 -mb-[2px]',
-                                                centerTab === t.k
-                                                    ? 'border-brutal-red text-brutal-red'
-                                                    : 'border-transparent text-brutal-dark/40 hover:text-brutal-dark/70',
-                                            )}
-                                        >
-                                            {t.label}
-                                            {t.count > 0 && (
-                                                <span className="ml-1.5 tabular-nums text-brutal-dark/35">{t.count}</span>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className="flex-1 min-h-0 overflow-y-auto p-5">
-                                    {centerTab === 'overview' && (
-                                        <div className="space-y-6">
-                                            {/* Description */}
-                                            {project.description ? (
-                                                <p className="font-data text-[13px] text-brutal-dark/75 leading-relaxed whitespace-pre-wrap">
-                                                    {project.description}
-                                                </p>
-                                            ) : project.summary ? (
-                                                <p className="font-data text-[13px] text-brutal-dark/75 leading-relaxed">
-                                                    {project.summary}
-                                                </p>
-                                            ) : (
-                                                <p className="font-data text-xs text-brutal-dark/35 italic">
-                                                    No description yet.
-                                                </p>
-                                            )}
-
-                                            {/* Discussion */}
-                                            <div className="pt-5 border-t border-brutal-dark/10">
-                                                <h3 className="font-heading font-bold text-xs uppercase tracking-widest text-brutal-dark/70 mb-3">
-                                                    Discussion · {comments.length}
-                                                </h3>
-                                                {user ? (
-                                                    <form onSubmit={handleComment} className="flex items-start gap-2 mb-4">
-                                                        <div className="w-7 h-7 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-[10px] flex-shrink-0">
-                                                            {user.email?.charAt(0).toUpperCase() || '?'}
+                                {(videos.length > 0 || galleryImages.length > 0) && (
+                                    <StorySection>
+                                        <SectionLabel>Media</SectionLabel>
+                                        <div className="space-y-3">
+                                            {videos.map((vid: any) => (
+                                                <LazyVideo
+                                                    key={vid.id}
+                                                    vid={vid}
+                                                    playing={playingVideoId === vid.id}
+                                                    onPlay={() => setPlayingVideoId(vid.id)}
+                                                />
+                                            ))}
+                                            {galleryImages.length > 0 && (
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                    {galleryImages.map((img: any, i: number) => (
+                                                        <div key={i} className="rounded-lg overflow-hidden border border-brutal-dark/10 bg-brutal-dark/5 aspect-[4/3]">
+                                                            <img
+                                                                src={img.image_url}
+                                                                alt={img.caption || 'Gallery'}
+                                                                loading="lazy"
+                                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                                                            />
                                                         </div>
-                                                        <div className="flex-1">
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </StorySection>
+                                )}
+
+                                {project.tags && project.tags.length > 0 && (
+                                    <StorySection>
+                                        <div className="flex flex-wrap gap-2">
+                                            {project.tags.map((t: string) => (
+                                                <span
+                                                    key={t}
+                                                    className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/50
+                                                               bg-brutal-dark/[0.04] border border-brutal-dark/10 px-2.5 py-1 rounded-full"
+                                                >
+                                                    #{t}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </StorySection>
+                                )}
+
+                                {project.github_url && (
+                                    <StorySection>
+                                        <a
+                                            href={project.github_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-lg border-2 border-brutal-dark/10 bg-white px-4 py-2.5
+                                                       font-data text-[11px] font-bold uppercase tracking-widest text-brutal-dark/70
+                                                       hover:border-brutal-red hover:text-brutal-red transition-all"
+                                        >
+                                            <ExternalLink size={12} /> View on GitHub
+                                        </a>
+                                    </StorySection>
+                                )}
+
+                                {/* Makes inline on overview tab */}
+                                <StorySection>
+                                    <SectionLabel>Community Makes</SectionLabel>
+                                    <ProjectMakesTab projectId={project.id} />
+                                </StorySection>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── DISCUSSION (below tabs, inside right column) ── */}
+                    <div className="border-t-2 border-brutal-dark/15 px-4 md:px-6 lg:px-8 py-6">
+                        <StorySection id="discussion">
+                            <SectionLabel>
+                                Discussion
+                                {comments.length > 0 && (
+                                    <span className="ml-2 tabular-nums text-brutal-dark/35">{comments.length}</span>
+                                )}
+                            </SectionLabel>
+
+                            {user ? (
+                                <form onSubmit={handleComment} className="flex items-start gap-3 mb-5">
+                                    <div className="w-7 h-7 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-[10px] flex-shrink-0">
+                                        {user.email?.charAt(0).toUpperCase() || '?'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            value={commentText}
+                                            maxLength={MAX_COMMENT}
+                                            onChange={(e) => setCommentText(e.target.value)}
+                                            placeholder="Add a comment..."
+                                            className="w-full bg-transparent text-brutal-dark border-b-2 border-brutal-dark/10 px-0 py-2
+                                                       font-data text-sm placeholder:text-brutal-dark/30
+                                                       focus:outline-none focus:border-brutal-red/50 transition-colors"
+                                        />
+                                        {commentText.trim() && (
+                                            <div className="flex items-center justify-end gap-2 mt-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCommentText('')}
+                                                    className="font-data text-[11px] font-bold uppercase tracking-wider text-brutal-dark/40 hover:text-brutal-dark px-3 py-1.5"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="submit"
+                                                    disabled={submittingComment}
+                                                    className="font-data text-[11px] font-bold uppercase tracking-wider bg-brutal-red text-brutal-bg px-4 py-1.5 rounded-lg disabled:opacity-50 hover:bg-brutal-dark transition-colors"
+                                                >
+                                                    {submittingComment ? 'Posting...' : 'Post'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </form>
+                            ) : (
+                                <p className="font-data text-sm text-brutal-dark/50 mb-5">
+                                    <Link to="/login" className="text-brutal-red font-bold hover:underline">Log in</Link> to join the discussion.
+                                </p>
+                            )}
+
+                            <div className="space-y-1">
+                                {comments.map((c: any) => {
+                                    const timeAgo = (() => {
+                                        const diff = Date.now() - new Date(c.created_at).getTime();
+                                        const mins = Math.floor(diff / 60000);
+                                        if (mins < 1) return 'just now';
+                                        if (mins < 60) return `${mins}m`;
+                                        const hrs = Math.floor(mins / 60);
+                                        if (hrs < 24) return `${hrs}h`;
+                                        const days = Math.floor(hrs / 24);
+                                        if (days < 7) return `${days}d`;
+                                        return new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                    })();
+                                    const isEdited = c.updated_at && c.created_at && c.updated_at !== c.created_at;
+                                    const isOwner = user && c.user_id === user.id;
+                                    return (
+                                        <div key={c.id} className="py-3 border-b border-brutal-dark/5 last:border-0">
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-6 h-6 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-[9px] flex-shrink-0">
+                                                    {c.userName?.charAt(0) || '?'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-data text-[11px] font-bold text-brutal-dark">{c.userName || 'Anonymous'}</span>
+                                                        <span className="font-data text-[10px] text-brutal-dark/30">{timeAgo}</span>
+                                                        {isEdited && <span className="font-data text-[9px] italic text-brutal-dark/25">(edited)</span>}
+                                                    </div>
+                                                    {editingCommentId === c.id ? (
+                                                        <div className="mt-1 space-y-2">
                                                             <input
                                                                 type="text"
-                                                                value={commentText}
+                                                                value={editCommentText}
                                                                 maxLength={MAX_COMMENT}
-                                                                onChange={(e) => setCommentText(e.target.value)}
-                                                                placeholder="Add a comment…"
-                                                                className="w-full bg-transparent text-brutal-dark border-b-2 border-brutal-dark/10 px-0 py-1.5 font-data text-xs placeholder:text-brutal-dark/30 focus:outline-none focus:border-brutal-red/50"
+                                                                onChange={(e) => setEditCommentText(e.target.value)}
+                                                                className="w-full bg-white border-b-2 border-brutal-dark/20 px-0 py-1.5 font-data text-[12px] text-brutal-dark focus:outline-none focus:border-brutal-red/50 transition-colors"
+                                                                autoFocus
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        const trimmed = editCommentText.trim();
+                                                                        if (trimmed) {
+                                                                            editComment(c.id, trimmed);
+                                                                            setEditingCommentId(null);
+                                                                            setEditCommentText('');
+                                                                        }
+                                                                    }
+                                                                    if (e.key === 'Escape') {
+                                                                        setEditingCommentId(null);
+                                                                        setEditCommentText('');
+                                                                    }
+                                                                }}
                                                             />
-                                                            {commentText.trim() && (
-                                                                <div className="flex items-center justify-end gap-2 mt-2">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setCommentText('')}
-                                                                        className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/40 hover:text-brutal-dark px-2 py-1"
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                    <button
-                                                                        type="submit"
-                                                                        disabled={submittingComment}
-                                                                        className="font-data text-[10px] font-bold uppercase tracking-wider bg-brutal-red text-brutal-bg px-3 py-1 rounded disabled:opacity-50"
-                                                                    >
-                                                                        {submittingComment ? 'Posting…' : 'Post'}
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </form>
-                                                ) : (
-                                                    <p className="font-data text-xs text-brutal-dark/50 mb-4">
-                                                        <Link to="/login" className="text-brutal-red font-bold hover:underline">Log in</Link> to comment.
-                                                    </p>
-                                                )}
-
-                                                <div className="space-y-2">
-                                                    {comments.map((c: any) => {
-                                                        const timeAgo = (() => {
-                                                            const diff = Date.now() - new Date(c.created_at).getTime();
-                                                            const mins = Math.floor(diff / 60000);
-                                                            if (mins < 1) return 'just now';
-                                                            if (mins < 60) return `${mins}m`;
-                                                            const hrs = Math.floor(mins / 60);
-                                                            if (hrs < 24) return `${hrs}h`;
-                                                            const days = Math.floor(hrs / 24);
-                                                            if (days < 7) return `${days}d`;
-                                                            return new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                                        })();
-                                                        return (
-                                                            <div key={c.id} className="flex items-start gap-2 py-2 group">
-                                                                <div className="w-6 h-6 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-[10px] flex-shrink-0">
-                                                                    {c.userName?.charAt(0) || '?'}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="font-data text-[11px] font-bold text-brutal-dark">{c.userName || 'Anonymous'}</span>
-                                                                        <span className="font-data text-[9px] text-brutal-dark/30">{timeAgo}</span>
-                                                                    </div>
-                                                                    <p className="font-data text-[12px] text-brutal-dark/75 leading-snug mt-0.5">
-                                                                        {c.content}
-                                                                    </p>
-                                                                    {user && c.user_id === user.id && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => deleteComment(c.id)}
-                                                                            className="font-data text-[9px] font-bold uppercase tracking-wider text-brutal-dark/30 hover:text-brutal-red mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                        >
-                                                                            Delete
-                                                                        </button>
-                                                                    )}
-                                                                </div>
+                                                            <div className="flex items-center gap-2 justify-end">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { setEditingCommentId(null); setEditCommentText(''); }}
+                                                                    className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/40 hover:text-brutal-dark px-2 py-1"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={!editCommentText.trim()}
+                                                                    onClick={() => {
+                                                                        const trimmed = editCommentText.trim();
+                                                                        if (trimmed) {
+                                                                            editComment(c.id, trimmed);
+                                                                            setEditingCommentId(null);
+                                                                            setEditCommentText('');
+                                                                        }
+                                                                    }}
+                                                                    className="font-data text-[10px] font-bold uppercase tracking-wider bg-brutal-red text-brutal-bg px-3 py-1 rounded disabled:opacity-50 hover:bg-brutal-dark transition-colors"
+                                                                >
+                                                                    Save
+                                                                </button>
                                                             </div>
-                                                        );
-                                                    })}
-                                                    {comments.length === 0 && (
-                                                        <p className="font-data text-xs text-brutal-dark/30 py-4 text-center">
-                                                            No comments yet.
+                                                        </div>
+                                                    ) : (
+                                                        <p className="font-data text-[12px] text-brutal-dark/75 leading-relaxed mt-0.5">
+                                                            {c.content}
                                                         </p>
                                                     )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {centerTab === 'milestones' && (
-                                        <div className="space-y-3">
-                                            {milestones.length === 0 ? (
-                                                <p className="font-data text-xs text-brutal-dark/35 italic text-center py-8">
-                                                    No milestones yet.
-                                                </p>
-                                            ) : (
-                                                milestones.map((m: any, i: number) => (
-                                                    <div key={m.id} className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-4">
-                                                        <div className="flex items-start gap-3">
-                                                            <div className={cn(
-                                                                'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-data text-[10px] font-bold',
-                                                                m.is_complete ? 'bg-brutal-red text-brutal-bg' : 'bg-brutal-dark/8 text-brutal-dark/50',
-                                                            )}>
-                                                                {i + 1}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="font-heading font-bold text-sm uppercase tracking-tight text-brutal-dark">
-                                                                    {m.title}
-                                                                </h4>
-                                                                {m.description && (
-                                                                    <p className="font-data text-xs text-brutal-dark/60 leading-relaxed mt-1.5 whitespace-pre-wrap">
-                                                                        {m.description}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {centerTab === 'media' && (
-                                        <div className="space-y-4">
-                                            {videos.length === 0 && galleryImages.length === 0 ? (
-                                                <p className="font-data text-xs text-brutal-dark/35 italic text-center py-8">
-                                                    No additional media.
-                                                </p>
-                                            ) : (
-                                                <>
-                                                    {videos.map((vid: any) => (
-                                                        <LazyVideo
-                                                            key={vid.id}
-                                                            vid={vid}
-                                                            playing={playingVideoId === vid.id}
-                                                            onPlay={() => setPlayingVideoId(vid.id)}
-                                                        />
-                                                    ))}
-                                                    {galleryImages.length > 0 && (
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            {galleryImages.map((img: any, i: number) => (
-                                                                <div key={i} className="rounded-xl overflow-hidden border border-brutal-dark/10 bg-brutal-dark/5">
-                                                                    <img
-                                                                        src={img.image_url}
-                                                                        alt={img.caption || 'Gallery'}
-                                                                        loading="lazy"
-                                                                        className="w-full h-32 object-cover hover:scale-105 transition-transform duration-500"
-                                                                    />
-                                                                </div>
-                                                            ))}
+                                            {/* Action menu below comment — always visible to owner, hidden for others */}
+                                            {isOwner && editingCommentId !== c.id && (
+                                                <div className="relative ml-9 mt-1" ref={commentMenuOpenId === c.id ? commentMenuRef : null}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCommentMenuOpenId(commentMenuOpenId === c.id ? null : c.id)}
+                                                        className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-brutal-dark/10 transition-colors text-brutal-dark/40 hover:text-brutal-dark/70"
+                                                        aria-label="Comment actions"
+                                                    >
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </button>
+                                                    {commentMenuOpenId === c.id && (
+                                                        <div className="absolute left-0 top-full mt-1 z-20 bg-white border-2 border-brutal-dark/10 rounded-lg shadow-lg py-1 min-w-[130px]">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); setCommentMenuOpenId(null); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left font-data text-[11px] text-brutal-dark/70 hover:bg-brutal-dark/5 transition-colors"
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" /> Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setCommentMenuOpenId(null); deleteComment(c.id); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left font-data text-[11px] text-brutal-red hover:bg-brutal-red/5 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                                                            </button>
                                                         </div>
                                                     )}
-                                                </>
+                                                </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                    );
+                                })}
+                                {comments.length === 0 && (
+                                    <p className="font-data text-sm text-brutal-dark/25 py-4 text-center">
+                                        No comments yet. Be the first to share your thoughts.
+                                    </p>
+                                )}
                             </div>
-                        </main>
-
-                        {/* ── Side column: BOM/Files/Makes ──────────────── */}
-                        <aside className="lg:col-span-3 lg:max-h-[calc(100vh-9rem)] flex flex-col">
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg flex-1 min-h-0 flex flex-col">
-                                <div className="flex border-b-2 border-brutal-dark/10 px-3 flex-shrink-0">
-                                    {([
-                                        { k: 'bom', label: 'BOM' },
-                                        { k: 'files', label: 'Files' },
-                                        { k: 'makes', label: 'Makes' },
-                                    ] as const).map((t) => (
-                                        <button
-                                            key={t.k}
-                                            type="button"
-                                            onClick={() => setSideTab(t.k)}
-                                            className={cn(
-                                                'flex-1 px-2 py-3 font-data text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 -mb-[2px]',
-                                                sideTab === t.k
-                                                    ? 'border-brutal-red text-brutal-red'
-                                                    : 'border-transparent text-brutal-dark/40 hover:text-brutal-dark/70',
-                                            )}
-                                        >
-                                            {t.label}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="flex-1 min-h-0 overflow-y-auto p-4">
-                                    {sideTab === 'bom' && (
-                                        <>
-                                            <TabBlurb>
-                                                <strong className="text-brutal-dark/70">Bill of Materials.</strong>{' '}
-                                                Every part, component, and consumable needed to build this project — quantities, sources, and cost.
-                                            </TabBlurb>
-                                            <ProjectBomTab projectId={project.id} isOwner={project.owner_id === user?.id} />
-                                        </>
-                                    )}
-                                    {sideTab === 'files' && (
-                                        <>
-                                            <TabBlurb>
-                                                <strong className="text-brutal-dark/70">Files & Source.</strong>{' '}
-                                                Code, CAD, schematics, datasheets, and the GitHub repo. Everything you need to remix or fabricate this build.
-                                            </TabBlurb>
-                                            <ProjectFilesTab githubUrl={project.github_url} />
-                                        </>
-                                    )}
-                                    {sideTab === 'makes' && (
-                                        <>
-                                            <TabBlurb>
-                                                <strong className="text-brutal-dark/70">Makes.</strong>{' '}
-                                                Builds the community has actually constructed from this project. Post yours once you've built it to earn XP.
-                                            </TabBlurb>
-                                            <ProjectMakesTab projectId={project.id} />
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* GitHub quick-link if present */}
-                            {project.github_url && (
-                                <a
-                                    href={project.github_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border-2 border-brutal-dark/10 bg-brutal-bg px-4 py-2.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/70 hover:border-brutal-red hover:text-brutal-red transition-all"
-                                >
-                                    <ExternalLink size={11} /> View on GitHub
-                                </a>
-                            )}
-                        </aside>
+                        </StorySection>
                     </div>
-                </div>
+
+                    {/* ── What's Next (compact, inside right column) ── */}
+                    <div className="border-t-2 border-brutal-dark/15 px-4 md:px-6 lg:px-8 py-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setRemixModalOpen(true)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg hover:border-brutal-red/40 hover:shadow-[4px_4px_0_0_rgba(196,41,30,0.14)] transition-all group/cta text-left"
+                            >
+                                <GitFork size={14} className="text-brutal-dark/25 group-hover/cta:text-brutal-red transition-colors flex-shrink-0" />
+                                <div>
+                                    <div className="font-heading font-bold text-[10px] uppercase text-brutal-dark/70 group-hover/cta:text-brutal-red transition-colors">Remix it</div>
+                                    <div className="font-data text-[9px] text-brutal-dark/40">Fork and build your version</div>
+                                </div>
+                            </button>
+                            <Link
+                                to="/dashboard"
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg hover:border-brutal-red/40 hover:shadow-[4px_4px_0_0_rgba(196,41,30,0.14)] transition-all group/cta"
+                            >
+                                <Sparkles size={14} className="text-brutal-dark/25 group-hover/cta:text-brutal-red transition-colors flex-shrink-0" />
+                                <div>
+                                    <div className="font-heading font-bold text-[10px] uppercase text-brutal-dark/70 group-hover/cta:text-brutal-red transition-colors">Start your own</div>
+                                    <div className="font-data text-[9px] text-brutal-dark/40">Post a project, earn XP</div>
+                                </div>
+                            </Link>
+                            <Link
+                                to="/projects"
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg hover:border-brutal-dark/40 hover:shadow-[4px_4px_0_0_rgba(17,17,17,0.08)] transition-all group/cta"
+                            >
+                                <ArrowLeft size={14} className="text-brutal-dark/25 group-hover/cta:text-brutal-dark/60 transition-colors flex-shrink-0" />
+                                <div>
+                                    <div className="font-heading font-bold text-[10px] uppercase text-brutal-dark/70 transition-colors">Browse more</div>
+                                    <div className="font-data text-[9px] text-brutal-dark/40">Explore other builds</div>
+                                </div>
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Maker flywheel closure */}
+                    <div className="px-4 md:px-6 lg:px-8 pb-8">
+                        <WhatsNextClosure variant="project" />
+                    </div>
+                </main>
             </div>
 
+            {/* ═══════════════════════════════════════════════════════
+                MODALS
+            ═══════════════════════════════════════════════════════ */}
             <RemixModal
                 open={remixModalOpen}
                 origin={project ? {
@@ -741,28 +1201,44 @@ export function ProjectDetails() {
     );
 }
 
-// ─── Tiny stat tile ────────────────────────────────────────────────────────
+// ─── Helper components ────────────────────────────────────────────────────
 
-// ─── Tab explainer blurb ──────────────────────────────────────────────────
-// One-line "what is this tab?" hint shown above each side-tab's content.
-// Keeps the panels self-explanatory for first-time visitors without taking
-// up valuable vertical space.
-function TabBlurb({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
-        <p className="font-data text-[10px] leading-relaxed text-brutal-dark/45 mb-4 pb-3 border-b border-brutal-dark/8">
-            {children}
-        </p>
+        <div className="flex items-center gap-3 mb-4">
+            <h2 className="font-heading font-bold text-xs uppercase tracking-widest text-brutal-dark/50">
+                {children}
+            </h2>
+            <div className="flex-1 h-px bg-brutal-dark/15" />
+        </div>
     );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+function StatCard({ label, value, icon, onClick }: {
+    label: string;
+    value: React.ReactNode;
+    icon: React.ReactNode;
+    onClick?: () => void;
+}) {
+    const Tag = onClick ? 'button' : 'div';
     return (
-        <div className="text-center">
-            <div className="flex items-center justify-center text-brutal-red mb-1">{icon}</div>
-            <div className="font-heading font-bold text-sm tabular-nums text-brutal-dark leading-none">{value}</div>
-            <div className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40 mt-1">
-                {label}
+        <Tag
+            type={onClick ? 'button' : undefined}
+            onClick={onClick}
+            className={cn(
+                'rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2.5 text-left transition-all',
+                onClick && 'hover:border-brutal-red/30 hover:bg-brutal-red/[0.03] cursor-pointer',
+            )}
+        >
+            <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-brutal-red">{icon}</span>
+                <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/45">
+                    {label}
+                </span>
             </div>
-        </div>
+            <span className="font-heading font-bold text-lg tabular-nums text-brutal-dark leading-none">
+                {value}
+            </span>
+        </Tag>
     );
 }

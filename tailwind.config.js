@@ -35,8 +35,20 @@ export default {
           '0%': { opacity: '0', transform: 'scale(0.85)' },
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in-up': 'fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'fade-in-up-d1': 'fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both',
+        'fade-in-up-d2': 'fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both',
+        'fade-in-up-d3': 'fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both',
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/container-queries'),
+  ],
 }

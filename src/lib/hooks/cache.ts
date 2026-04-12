@@ -90,7 +90,7 @@ export function acquireSharedChannel(
             )
             .subscribe((status, err) => {
                 if (status === 'CHANNEL_ERROR') {
-                    console.error(`[realtime] rt:${key} subscription error:`, err);
+                    console.warn(`[realtime] rt:${key} subscription error:`, err ?? 'unknown reason — ensure Realtime is enabled for the reaction/comment tables and RLS permits access');
                 }
             });
         entry = { channel, listeners, refCount: 0 };

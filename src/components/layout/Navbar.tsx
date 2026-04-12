@@ -3,11 +3,22 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../lib/auth';
-import { LogOut, LayoutDashboard, Menu, X, Shield, ChevronDown } from 'lucide-react';
+import { LogOut, LayoutDashboard, Menu, X, Shield, ChevronDown, ArrowLeft } from 'lucide-react';
 // ParamLogo removed from navbar per redesign
 import { useRankAccess } from '../../lib/hooks';
 import { RankBadge } from '../ui/RankBadge';
 import { XPHudPill } from './XPHudPill';
+
+// Hoisted outside component to avoid re-creating on every render.
+const navLinks = [
+    { to: '/projects', label: 'Projects', prefetch: () => import('../../pages/Projects') },
+    { to: '/challenges', label: 'Explorer Hub', prefetch: () => import('../../pages/Challenges') },
+    { to: '/events', label: 'Events', prefetch: () => import('../../pages/Events') },
+    { to: '/makers', label: 'Makers', prefetch: () => import('../../pages/Makers') },
+    { to: '/store', label: 'Store', prefetch: () => import('../../pages/Store') },
+];
+
+const topLevelPaths = new Set(['/', '/projects', '/challenges', '/events', '/makers', '/store', '/login', '/register']);
 
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -56,22 +67,6 @@ export function Navbar() {
         window.scrollTo({ top: 0, behavior: 'auto' });
     };
 
-    // Top-level nav: 5 items only. Badges merged into Store per product direction.
-    // "Explorer Hub" renamed to "Challenges" — matches the URL and removes jargon.
-    //
-    // Each entry also carries a `prefetch` that triggers the route's lazy
-    // chunk download on hover/focus. The lazy route chunks are tiny on their
-    // own but adding ~150-250ms network latency between click and first
-    // paint is what made navigation feel "laggy" in the user's testing. By
-    // warming the chunk before the click lands, the navigation flips to the
-    // new route on the next frame.
-    const navLinks = [
-        { to: '/projects', label: 'Projects', prefetch: () => import('../../pages/Projects') },
-        { to: '/challenges', label: 'Explorer Hub', prefetch: () => import('../../pages/Challenges') },
-        { to: '/events', label: 'Events', prefetch: () => import('../../pages/Events') },
-        { to: '/makers', label: 'Makers', prefetch: () => import('../../pages/Makers') },
-        { to: '/store', label: 'Store', prefetch: () => import('../../pages/Store') },
-    ];
     const prefetchedRoutes = useRef(new Set<string>());
     const prefetchRoute = (to: string, loader: () => Promise<unknown>) => {
         if (prefetchedRoutes.current.has(to)) return;
@@ -80,12 +75,37 @@ export function Navbar() {
         loader().catch(() => { prefetchedRoutes.current.delete(to); });
     };
 
+    // Show back button on sub-pages (anything beyond top-level routes)
+    const showBack = !topLevelPaths.has(location.pathname);
+
+    const goBack = () => {
+        if (typeof window !== 'undefined' && window.history.length > 1) navigate(-1);
+        else navigate('/');
+    };
+
     // Hero (logged out) needs a low-opacity tint + blur so the nav is legible
     // against the dark slab. Keep transparent feel, just bump contrast.
     const onDarkHero = isHome && !scrolled;
 
     return (
-        <header className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+        <header className="fixed top-6 left-0 right-0 z-50 flex justify-center items-center gap-1.5 sm:gap-2.5 px-2 sm:px-4 pointer-events-none">
+            {/* Back pill — separate from navbar, sits to its left */}
+            {showBack && (
+                <button
+                    type="button"
+                    onClick={goBack}
+                    className={cn(
+                        "pointer-events-auto inline-flex items-center justify-center w-9 h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2.5 rounded-full transition-all duration-500 font-data text-[11px] font-bold uppercase tracking-wider flex-shrink-0",
+                        scrolled || !isHome
+                            ? "bg-brutal-bg/80 backdrop-blur-xl border-2 border-brutal-dark/10 shadow-lg text-brutal-dark/70 hover:text-brutal-dark"
+                            : "bg-brutal-dark/35 backdrop-blur-md border-2 border-brutal-bg/10 text-brutal-bg/80 hover:text-brutal-bg"
+                    )}
+                    aria-label="Go back"
+                >
+                    <ArrowLeft size={13} />
+                </button>
+            )}
+
             <nav
                 className={cn(
                     "pointer-events-auto flex items-center justify-between px-5 py-2.5 rounded-full transition-all duration-500 w-full max-w-5xl",
@@ -160,7 +180,7 @@ export function Navbar() {
 
                             {/* Dropdown menu */}
                             {avatarOpen && (
-                                <div className="absolute right-0 top-[calc(100%+12px)] w-64 bg-brutal-bg border-2 border-brutal-dark/10 rounded-2xl shadow-2xl overflow-hidden">
+                                <div className="absolute right-0 top-[calc(100%+12px)] w-56 sm:w-64 max-w-[90vw] bg-brutal-bg border-2 border-brutal-dark/10 rounded-2xl shadow-2xl overflow-hidden">
                                     {/* User identity strip */}
                                     <div className="px-4 py-3 border-b border-brutal-dark/8 bg-brutal-dark/[0.02]">
                                         <p className="font-heading font-bold text-sm text-brutal-dark truncate">{user.name}</p>

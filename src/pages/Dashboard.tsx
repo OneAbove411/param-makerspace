@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense } fr
 import { gsap } from 'gsap';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
     useMyProjects,
     useMyStats,
@@ -100,6 +100,7 @@ const ROLE_LABELS: Record<string, string> = {
 export function Dashboard() {
     const { user, role } = useAuth();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     useRequireProfile();
 
     // ── Data hooks (unchanged from prior pass) ──
@@ -208,6 +209,9 @@ export function Dashboard() {
         });
     }, [sidebarStorageKey]);
 
+    // ── Quick Post: auto-open form when ?mode=quick ──
+    const quickMode = searchParams.get('mode') === 'quick';
+
     // ── New-project form state (unchanged from prior pass) ──
     const [showNewProject, setShowNewProject] = useState(false);
     const emptyProjectForm = { title: '', summary: '', domain: '', tier: '', videoUrl: '' };
@@ -244,6 +248,20 @@ export function Dashboard() {
 
     const pageRef = useRef<HTMLDivElement>(null);
     const formRef = useRef<HTMLDivElement>(null);
+
+    // Auto-open the project form when arriving via ?mode=quick
+    useEffect(() => {
+        if (quickMode && !showNewProject) {
+            setShowNewProject(true);
+            setActiveTab('my-work');
+            // Clear the query param so refresh doesn't re-trigger
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('mode');
+                return next;
+            }, { replace: true });
+        }
+    }, [quickMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (showNewProject && formRef.current) {

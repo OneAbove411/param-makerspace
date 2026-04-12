@@ -165,6 +165,7 @@ CREATE TABLE project_bom_line (
     source_url    TEXT,
     cost_cents    INT,
     notes         TEXT,
+    image_url     TEXT,
     display_order INT NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -739,9 +740,10 @@ CREATE POLICY ss_insert ON showcase_slot FOR INSERT WITH CHECK (user_id = get_my
 CREATE POLICY ss_read ON showcase_slot FOR SELECT USING (true);
 CREATE POLICY ss_mentor_update ON showcase_slot FOR UPDATE USING (get_my_role() IN ('mentor','admin'));
 
--- ── comment: public read, own insert, own delete ──
+-- ── comment: public read, own insert, own update, own delete ──
 CREATE POLICY comment_read ON comment FOR SELECT USING (true);
 CREATE POLICY comment_insert ON comment FOR INSERT WITH CHECK (user_id = get_my_app_user_id());
+CREATE POLICY comment_update_own ON comment FOR UPDATE USING (user_id = get_my_app_user_id()) WITH CHECK (user_id = get_my_app_user_id());
 CREATE POLICY comment_delete_own ON comment FOR DELETE USING (user_id = get_my_app_user_id());
 
 -- ── reaction: public read, own toggle ──

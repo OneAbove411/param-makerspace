@@ -33,6 +33,8 @@ import {
 import { getYoutubeThumbnail } from '../../lib/videoUtils';
 import type { Project } from '../../lib/database.types';
 import { EditProjectContext } from './EditProjectContext';
+import { ProjectBomTab } from '../../components/project/ProjectBomTab';
+import { Package } from 'lucide-react';
 
 // ─── Bento helpers — match Dashboard brutalism ─────────────────────────────
 // All form controls now share the same warm bg, thicker border, and the
@@ -128,7 +130,7 @@ function HeroCard({
 }) {
   return (
     <section
-      className={`relative flex flex-col bg-brutal-dark text-brutal-bg border-2 border-brutal-dark rounded-2xl p-6 shadow-[8px_8px_0_0_rgba(196,41,30,0.55)] overflow-hidden ${className}`}
+      className={`relative flex flex-col bg-brutal-dark text-brutal-bg border-2 border-brutal-dark rounded-2xl p-6 shadow-[8px_8px_0_0_rgba(196,41,30,0.24)] overflow-hidden ${className}`}
     >
       {/* red top stripe */}
       <div aria-hidden className="absolute top-0 left-0 right-0 h-1 bg-brutal-red" />
@@ -170,8 +172,8 @@ function AutosaveStatusChip({
       ? lastSavedAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
       : '';
     return (
-      <span className={`${base} text-green-700`} aria-live="polite">
-        <Check size={12} aria-hidden="true" />
+      <span className={`${base} text-brutal-dark/70`} aria-live="polite">
+        <CheckCircle2 size={12} aria-hidden="true" />
         Saved{time ? ` · ${time}` : ''}
       </span>
     );
@@ -748,7 +750,7 @@ export function EditProjectShell() {
           </div>
         )}
 
-        <div className="pt-24 md:pt-24 px-4 md:px-8 lg:px-12 pb-12">
+        <div className="pt-24 md:pt-24 px-4 md:px-8 lg:px-12 pb-24">
           <div className="max-w-[1480px] mx-auto">
             {/* ── Header strip ──────────────────────────────────────── */}
             <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
@@ -815,7 +817,7 @@ export function EditProjectShell() {
                   type="button"
                   onClick={(e: any) => handleSave(e)}
                   disabled={actionLoading || isLocked}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-dashed border-brutal-dark/30 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark hover:bg-brutal-dark hover:text-brutal-bg hover:border-brutal-dark transition-colors disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-dashed border-brutal-dark/30 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark hover:bg-brutal-dark hover:text-brutal-bg hover:border-brutal-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:border-brutal-dark/10"
                 >
                   <Save size={12} /> Save Now
                 </button>
@@ -824,7 +826,7 @@ export function EditProjectShell() {
                     type="button"
                     onClick={handleSubmitForReview}
                     disabled={actionLoading}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brutal-red text-brutal-bg border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[4px_4px_0_0_rgba(20,20,20,0.9)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_rgba(20,20,20,1)] transition-all disabled:opacity-40"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brutal-red text-brutal-bg border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[5px_5px_0_0_rgba(196,41,30,0.18)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:border-brutal-dark/10"
                   >
                     <Send size={12} /> Submit for Review
                   </button>
@@ -834,9 +836,9 @@ export function EditProjectShell() {
 
             {/* Status banner — slim brutalist strip */}
             <div className={`mb-6 px-4 py-2 rounded-xl border-2 font-data text-[10px] font-bold uppercase tracking-widest text-center ${
-              project.status === 'pending_review' ? 'bg-yellow-50 border-yellow-500/60 text-yellow-800 shadow-[4px_4px_0_0_rgba(234,179,8,0.18)]' :
-              project.status === 'active' ? 'bg-green-50 border-green-600/40 text-green-800 shadow-[4px_4px_0_0_rgba(22,163,74,0.18)]' :
-              'bg-brutal-bg border-brutal-dark/15 text-brutal-dark/55 shadow-[4px_4px_0_0_rgba(196,41,30,0.10)]'
+              project.status === 'pending_review' ? 'bg-yellow-50 border-yellow-500/60 text-yellow-800 shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]' :
+              project.status === 'active' ? 'bg-green-50 border-green-600/40 text-green-800 shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]' :
+              'bg-brutal-bg border-brutal-dark/15 text-brutal-dark/55 shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]'
             }`}>
               {project.status === 'pending_review' ? 'Under Review — core fields locked' :
                project.status === 'active' ? 'Live — edits publish on save' :
@@ -864,7 +866,7 @@ export function EditProjectShell() {
                 >
                   {isLocked && (
                     <div className="absolute inset-0 bg-brutal-dark/85 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
-                      <div className="bg-yellow-50 px-6 py-4 border-2 border-yellow-500 text-center rounded-xl shadow-[6px_6px_0_0_rgba(234,179,8,0.4)] max-w-[80%]">
+                      <div className="bg-yellow-50 px-6 py-4 border-2 border-yellow-500 text-center rounded-xl shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] max-w-[80%]">
                         <h3 className="font-heading font-bold text-base text-yellow-700 uppercase">Locked</h3>
                         <p className="font-data text-[11px] text-yellow-800 mt-1">Core details are locked while under review.</p>
                       </div>
@@ -989,7 +991,7 @@ export function EditProjectShell() {
                         type="button"
                         onClick={handleAddMilestone}
                         disabled={actionLoading || !newMilestoneTitle.trim()}
-                        className="bg-brutal-dark text-brutal-bg px-3 rounded-xl border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.6)] hover:shadow-[4px_4px_0_0_rgba(196,41,30,0.8)] hover:translate-x-[-1px] hover:translate-y-[-1px] disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-1"
+                        className="bg-brutal-dark text-brutal-bg px-3 rounded-xl border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] hover:shadow-[5px_5px_0_0_rgba(196,41,30,0.18)] hover:translate-x-[-1px] hover:translate-y-[-1px] disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed disabled:border-brutal-dark/10 transition-all flex items-center gap-1"
                       >
                         <Plus size={12} /> Add
                       </button>
@@ -1004,7 +1006,7 @@ export function EditProjectShell() {
                           className={`group flex items-start gap-2.5 p-2.5 rounded-xl border-2 transition-all ${
                             m.is_complete
                               ? 'bg-brutal-dark/[0.02] border-brutal-dark/8 opacity-60'
-                              : 'bg-brutal-bg border-brutal-dark/12 hover:border-brutal-red/40 hover:shadow-[3px_3px_0_0_rgba(196,41,30,0.15)]'
+                              : 'bg-brutal-bg border-brutal-dark/12 hover:border-brutal-red/40 hover:shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]'
                           }`}
                         >
                           <button
@@ -1091,7 +1093,7 @@ export function EditProjectShell() {
                             onClick={() => setMediaTab(t.id)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md font-data text-[9px] font-bold uppercase tracking-widest transition-colors ${
                               active
-                                ? 'bg-brutal-dark text-brutal-bg shadow-[2px_2px_0_0_rgba(196,41,30,0.6)]'
+                                ? 'bg-brutal-dark text-brutal-bg shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]'
                                 : 'text-brutal-dark/55 hover:bg-brutal-dark/5'
                             }`}
                           >
@@ -1162,14 +1164,14 @@ export function EditProjectShell() {
                             ref={newVideoUrlRef}
                             type="url"
                             placeholder="https://youtu.be/…"
-                            className={`${inputClass} flex-1 ${videoUrlError ? '!border-brutal-red' : ''}`}
+                            className={`${inputClass} flex-1 ${videoUrlError ? '!border-brutal-red bg-brutal-red/5' : ''}`}
                             value={newVideoUrl}
                             onChange={(e) => { setNewVideoUrl(e.target.value); setVideoUrlError(''); }}
                           />
                           <button
                             type="submit"
                             disabled={addingVideo || !newVideoUrl.trim() || !!videoUrlError}
-                            className="bg-brutal-dark text-brutal-bg px-3 rounded-xl border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.6)] hover:shadow-[4px_4px_0_0_rgba(196,41,30,0.8)] hover:translate-x-[-1px] hover:translate-y-[-1px] disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-1"
+                            className="bg-brutal-dark text-brutal-bg px-3 rounded-xl border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] hover:shadow-[5px_5px_0_0_rgba(196,41,30,0.18)] hover:translate-x-[-1px] hover:translate-y-[-1px] disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed disabled:border-brutal-dark/10 transition-all flex items-center gap-1"
                           >
                             {addingVideo ? <Loader2 size={11} className="animate-spin" /> : <><Plus size={11} /> Add</>}
                           </button>
@@ -1183,7 +1185,7 @@ export function EditProjectShell() {
                           videos.map((vid) => {
                             const thumb = getYoutubeThumbnail(vid.video_url);
                             return (
-                              <div key={vid.id} className="flex items-center gap-2 p-2 bg-brutal-bg border-2 border-brutal-dark/12 rounded-xl group shadow-[2px_2px_0_0_rgba(196,41,30,0.10)]">
+                              <div key={vid.id} className="flex items-center gap-2 p-2 bg-brutal-bg border-2 border-brutal-dark/12 rounded-xl group shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]">
                                 {thumb ? (
                                   <img src={thumb} alt="" loading="lazy" className="w-14 h-9 rounded object-cover flex-shrink-0 border border-brutal-dark/15" />
                                 ) : (
@@ -1219,7 +1221,7 @@ export function EditProjectShell() {
                   {mediaTab === 'files' && (
                     <div className="flex flex-col flex-1">
                       <label className="block w-full mb-3 flex-shrink-0">
-                        <span className={`flex items-center justify-center gap-2 w-full px-3 py-2 bg-brutal-dark text-brutal-bg rounded-xl border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.6)] hover:shadow-[4px_4px_0_0_rgba(196,41,30,0.8)] hover:translate-x-[-1px] hover:translate-y-[-1px] cursor-pointer transition-all ${uploadingFile ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <span className={`flex items-center justify-center gap-2 w-full px-3 py-2 bg-brutal-dark text-brutal-bg rounded-xl border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] hover:shadow-[5px_5px_0_0_rgba(196,41,30,0.18)] hover:translate-x-[-1px] hover:translate-y-[-1px] cursor-pointer transition-all ${uploadingFile ? 'opacity-50 pointer-events-none' : ''}`}>
                           {uploadingFile ? (
                             <><Loader2 size={12} className="animate-spin" /> Uploading…</>
                           ) : (
@@ -1231,7 +1233,7 @@ export function EditProjectShell() {
                       <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-2 scrollbar-thin">
                         {project.files && project.files.length > 0 ? (
                           project.files.map((file) => (
-                            <div key={file.id} className="flex items-center gap-2 p-2 bg-brutal-bg border-2 border-brutal-dark/12 rounded-xl group shadow-[2px_2px_0_0_rgba(196,41,30,0.10)]">
+                            <div key={file.id} className="flex items-center gap-2 p-2 bg-brutal-bg border-2 border-brutal-dark/12 rounded-xl group shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]">
                               <div className="w-8 h-8 rounded-lg bg-brutal-dark/5 border border-brutal-dark/10 flex items-center justify-center flex-shrink-0">
                                 <FileText size={13} className="text-brutal-dark/55" />
                               </div>
@@ -1283,7 +1285,7 @@ export function EditProjectShell() {
                         onClick={() => setAddingRole(r)}
                         className={`flex-1 py-1.5 rounded-md font-data text-[10px] font-bold uppercase tracking-widest transition-colors ${
                           addingRole === r
-                            ? 'bg-brutal-dark text-brutal-bg shadow-[2px_2px_0_0_rgba(196,41,30,0.6)]'
+                            ? 'bg-brutal-dark text-brutal-bg shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]'
                             : 'text-brutal-dark/55 hover:bg-brutal-dark/5'
                         }`}
                       >
@@ -1304,7 +1306,7 @@ export function EditProjectShell() {
                       <Loader2 size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-brutal-dark/60 animate-spin" />
                     )}
                     {searchResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-brutal-bg border-2 border-brutal-dark/20 rounded-xl shadow-[6px_6px_0_0_rgba(196,41,30,0.25)] z-30 max-h-44 overflow-y-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-brutal-bg border-2 border-brutal-dark/20 rounded-xl shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] z-30 max-h-44 overflow-y-auto">
                         {searchResults.map((res) => (
                           <button
                             key={res.id}
@@ -1373,9 +1375,91 @@ export function EditProjectShell() {
                   </div>
                 </BentoCard>
               </div>
+
+              {/* ─── BOM — Bill of Materials (full-width row 3) ──────── */}
+              <div className="lg:col-span-12 lg:row-start-3">
+                <BentoCard
+                  eyebrow="05 · Components"
+                  title="Bill of Materials"
+                  className="min-h-[200px]"
+                  rightSlot={
+                    <div className="flex items-center gap-1.5 font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40">
+                      <Package size={10} /> Parts list
+                    </div>
+                  }
+                >
+                  <ProjectBomTab projectId={project.id} isOwner={true} variant="grid" />
+                </BentoCard>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* ── Sticky footer bar — always-visible submit action ──────── */}
+        {(() => {
+          const hasTitle = !!(form.title?.trim());
+          const hasSummary = !!(form.summary?.trim());
+          const hasImage = (project.images?.length || 0) > 0;
+          const hasDescription = (form.description?.trim()?.length || 0) >= 50;
+          const readyToSubmit = hasTitle && hasSummary && hasImage && hasDescription;
+          const isDraft = project.status === 'draft';
+
+          return (
+            <div className="fixed bottom-0 inset-x-0 bg-brutal-bg border-t-2 border-brutal-dark/10 py-3 px-6 z-30">
+              <div className="max-w-[1480px] mx-auto flex items-center justify-between gap-4">
+                {/* Left: autosave status */}
+                <div className="flex-shrink-0">
+                  <AutosaveStatusChip status={autosaveStatus} lastSavedAt={lastSavedAt} />
+                  {autosaveStatus === 'idle' && formDirty && (
+                    <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red inline-flex items-center gap-1.5" aria-live="polite">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brutal-red animate-pulse" aria-hidden="true" />
+                      Unsaved
+                    </span>
+                  )}
+                </div>
+
+                {/* Right: readiness checklist + submit */}
+                {isDraft && (
+                  <div className="flex items-center gap-4">
+                    {/* Readiness checklist */}
+                    <div className="hidden md:flex items-center gap-3">
+                      {[
+                        { label: 'Title', ok: hasTitle },
+                        { label: 'Summary', ok: hasSummary },
+                        { label: '1+ Image', ok: hasImage },
+                        { label: 'Desc 50+', ok: hasDescription },
+                      ].map((item) => (
+                        <span
+                          key={item.label}
+                          className={`font-data text-[10px] uppercase tracking-widest inline-flex items-center gap-1 ${
+                            item.ok ? 'text-brutal-dark/70 font-bold' : 'text-brutal-dark/30'
+                          }`}
+                        >
+                          {item.ok ? (
+                            <CheckCircle2 size={11} className="text-brutal-dark/70" aria-hidden />
+                          ) : (
+                            <Circle size={11} className="text-brutal-dark/30" aria-hidden />
+                          )}
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Submit button */}
+                    <button
+                      type="button"
+                      onClick={handleSubmitForReview}
+                      disabled={actionLoading || !readyToSubmit}
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brutal-red text-brutal-bg border-2 border-brutal-dark font-data text-[10px] font-bold uppercase tracking-widest shadow-[3px_3px_0_0_rgba(196,41,30,0.12)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[5px_5px_0_0_rgba(196,41,30,0.18)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:border-brutal-dark/10"
+                    >
+                      <Send size={12} /> Submit for Review
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </EditProjectContext.Provider>
   );

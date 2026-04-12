@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import type { ReactNode, FormEvent } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router';
 import { useChallenge, useChallengeCompletion, useReaction } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -17,61 +18,66 @@ import {
     Layers,
     BookOpen,
     Image as ImageIcon,
-    Video as VideoIcon,
     Wrench,
     Target,
     ShieldCheck,
     HelpCircle,
+    Zap,
+    Crosshair,
+    ChevronRight,
+    AlertTriangle,
+    ArrowRight,
 } from 'lucide-react';
 import { getEmbedUrl } from '../lib/videoUtils';
 import { cn } from '../lib/utils';
-import { XpRewardBadge } from '../components/ui/XpRewardBadge';
 import { XP_REWARDS } from '../lib/constants';
+import { XPProgressStrip } from '../components/shared/XPProgressStrip';
+import { WhatsNextClosure } from '../components/shared/WhatsNextClosure';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §10 Challenge Cockpit — bento redesign matching ProjectDetails.
-//
-// Replaces the prior long-scroll 2-col layout with a single-viewport bento:
-//
-//   ┌─────────── 12 col grid ─────────────────────────────────┐
-//   │ IDENTITY (3) │ HERO + TABS (6)         │ ACTION (3)     │
-//   │ title/tier   │ cover + brief/steps/    │ completion CTA │
-//   │ stats/tier   │ levels/concepts/media   │ materials      │
-//   │ tags         │                          │ mystery        │
-//   └──────────────────────────────────────────────────────────┘
-//
-// Mirrors ProjectDetails' tokens: rounded-2xl, border-2 border-brutal-dark/10,
-// font-drama italic titles, font-data uppercase microcopy, brutal-red accents,
-// 6px offset red shadow on the title card.
+// Challenge Details — visual language matches Dashboard bento grid:
+//   • Hard 6px offset red shadows: shadow-[6px_6px_0_0_rgba(196,41,30,0.9)]
+//   • border-2 border-brutal-dark (dark cards) / border-brutal-dark/20 (light)
+//   • Dark bounty card: bg-brutal-dark text-brutal-bg
+//   • Hover lift: translate-x-[-2px] translate-y-[-2px] + larger shadow
+//   • No dot-grid textures, no glow shadows, no corner bracket divs
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 
 function DetailsSkeleton() {
     return (
-        <div className="flex-1 w-full bg-brutal-bg min-h-screen pt-24 px-6 md:px-10">
-            <div className="max-w-[1480px] mx-auto grid grid-cols-12 gap-6 animate-pulse">
-                <div className="col-span-3 h-[520px] rounded-2xl bg-brutal-dark/5" />
-                <div className="col-span-6 h-[520px] rounded-2xl bg-brutal-dark/5" />
-                <div className="col-span-3 h-[520px] rounded-2xl bg-brutal-dark/5" />
+        <div className="flex-1 w-full bg-brutal-bg min-h-screen">
+            <div className="h-[40vh] md:h-[50vh] bg-brutal-dark/5 animate-pulse" />
+            <div className="flex animate-pulse gap-4 px-4 pt-5">
+                <div className="hidden lg:block w-72 flex-shrink-0">
+                    <div className="h-[480px] rounded-2xl bg-brutal-dark/5" />
+                </div>
+                <div className="flex-1">
+                    <div className="h-10 w-48 bg-brutal-dark/5 rounded mb-4" />
+                    <div className="h-[280px] bg-brutal-dark/5 rounded-2xl" />
+                </div>
             </div>
         </div>
     );
 }
 
-// ─── Tier dot colour ───────────────────────────────────────────────────────
+// ─── Tier helpers ──────────────────────────────────────────────────────────
 
 const tierDot = (tier?: string | null) =>
     tier === 'Tier 1' ? 'bg-green-500'
-    : tier === 'Tier 2' ? 'bg-yellow-500'
-    : tier === 'Tier 3' ? 'bg-brutal-red'
-    : 'bg-brutal-dark/30';
+        : tier === 'Tier 2' ? 'bg-yellow-500'
+            : tier === 'Tier 3' ? 'bg-brutal-red'
+                : 'bg-brutal-dark/30';
 
 const tierBlurb = (tier?: string | null) =>
     tier === 'Tier 1' ? 'Open to all — no prerequisites.'
-    : tier === 'Tier 2' ? 'Requires Tier 1 completion or direct domain experience.'
-    : tier === 'Tier 3' ? 'Requires Tier 2 completion or mentor approval.'
-    : 'Tier access information unavailable.';
+        : tier === 'Tier 2' ? 'Requires Tier 1 completion or direct domain experience.'
+            : tier === 'Tier 3' ? 'Requires Tier 2 completion or mentor approval.'
+                : 'Tier access information unavailable.';
+
+const tierLabel = (tier?: string | null) =>
+    tier === 'Tier 1' ? 'COMMON' : tier === 'Tier 2' ? 'RARE' : tier === 'Tier 3' ? 'LEGENDARY' : 'STANDARD';
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
@@ -90,7 +96,7 @@ export function ChallengeDetails() {
     const [evidenceUrl, setEvidenceUrl] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    // T3 gate: check if user has any verified Tier 2 completion
+    // T3 gate
     const [hasT2Completion, setHasT2Completion] = useState<boolean | null>(null);
     useEffect(() => {
         if (!user) { setHasT2Completion(null); return; }
@@ -120,7 +126,7 @@ export function ChallengeDetails() {
                 await (navigator as any).share({ title, url });
                 return;
             }
-        } catch { /* user cancelled */ }
+        } catch { /* cancelled */ }
         try {
             await navigator.clipboard.writeText(url);
             toast.success('Link copied to clipboard.');
@@ -134,7 +140,7 @@ export function ChallengeDetails() {
         toggle(type);
     };
 
-    const handleMarkComplete = async (e?: React.FormEvent) => {
+    const handleMarkComplete = async (e?: FormEvent) => {
         if (e) e.preventDefault();
         setSubmitting(true);
         await markComplete(notes, evidenceUrl);
@@ -156,23 +162,18 @@ export function ChallengeDetails() {
     if (loading) return <DetailsSkeleton />;
 
     if (!challenge) {
-        const canGoBack = typeof window !== 'undefined' && window.history.length > 1;
         return (
-            <div className="flex-1 w-full bg-brutal-bg pt-32 px-12 min-h-screen">
+            <div className="flex-1 w-full bg-brutal-bg pt-32 px-6 md:px-12 min-h-screen">
                 <div className="max-w-2xl mx-auto text-center py-32">
-                    <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading text-brutal-dark/20">
+                    <h1 className="font-heading font-bold text-3xl md:text-5xl uppercase tracking-tight-heading text-brutal-dark/20">
                         Challenge Not Found
                     </h1>
                     <p className="font-data text-sm text-brutal-dark/40 mt-4">
                         This challenge may have been removed or doesn't exist.
                     </p>
-                    <button
-                        type="button"
-                        onClick={goBack}
-                        className="inline-flex items-center gap-2 mt-8 font-heading font-bold text-sm
-                                   uppercase text-brutal-dark hover:text-brutal-red transition-colors"
-                    >
-                        <ArrowLeft size={16} /> {canGoBack ? 'Back' : 'Browse all challenges'}
+                    <button type="button" onClick={goBack}
+                        className="inline-flex items-center gap-2 mt-8 font-heading font-bold text-sm uppercase text-brutal-dark hover:text-brutal-red transition-colors">
+                        <ArrowLeft size={16} /> Back
                     </button>
                 </div>
             </div>
@@ -181,564 +182,487 @@ export function ChallengeDetails() {
 
     const isLiked = myReactions.includes('like');
     const isBookmarked = myReactions.includes('bookmark');
-
     const completionState = completion?.status;
 
-    // Tabs that actually have content
     const hasBrief = !!(challenge.core_idea || challenge.mission || challenge.success_criteria);
     const hasSteps = challenge.steps.length > 0;
     const hasLevels = challenge.levels.length > 0;
     const hasConcepts = challenge.vocabulary.length > 0 || challenge.skills.length > 0;
     const hasMedia = galleryImages.length > 0 || challenge.videos.length > 0;
 
+    const bountyXP = challenge.tier === 'Tier 3' ? XP_REWARDS.tier3_challenge
+        : challenge.tier === 'Tier 2' ? XP_REWARDS.tier2_challenge
+            : XP_REWARDS.tier1_challenge;
+
+    const availableTabs = [
+        { k: 'brief' as const, label: 'Brief', icon: <BookOpen size={12} />, show: hasBrief },
+        { k: 'steps' as const, label: 'Steps', icon: <ListChecks size={12} />, show: hasSteps },
+        { k: 'levels' as const, label: 'Levels', icon: <Layers size={12} />, show: hasLevels },
+        { k: 'concepts' as const, label: 'Concepts', icon: <Sparkles size={12} />, show: hasConcepts },
+        { k: 'media' as const, label: 'Media', icon: <ImageIcon size={12} />, show: hasMedia },
+    ].filter(t => t.show);
+
     return (
         <div className="flex-1 w-full bg-brutal-bg min-h-screen">
-            <div className="pt-24 md:pt-24 pb-10 px-4 md:px-8 lg:px-10">
-                <div className="max-w-[1480px] mx-auto">
 
-                    {/* ── Compact breadcrumb + actions strip ──────────────── */}
-                    <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <button
-                                type="button"
-                                onClick={goBack}
-                                className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest
-                                           text-brutal-dark/50 hover:text-brutal-red transition-colors"
-                            >
-                                <ArrowLeft size={12} /> Back
-                            </button>
-                            <span className="hidden sm:inline font-data text-[10px] text-brutal-dark/30">/</span>
-                            <Link
-                                to="/challenges"
-                                className="hidden sm:inline-flex font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 hover:text-brutal-red transition-colors"
-                            >
-                                Explorer Hub
-                            </Link>
-                            {challenge.domain && (
-                                <>
-                                    <span className="hidden md:inline font-data text-[10px] text-brutal-dark/30">/</span>
-                                    <span className="hidden md:inline font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 truncate">
-                                        {challenge.domain}
-                                    </span>
-                                </>
+            {/* ══════════════════════════════════════════════════
+                HERO
+            ══════════════════════════════════════════════════ */}
+            <div className="relative w-full h-[40vh] md:h-[50vh] overflow-hidden bg-brutal-bg">
+                {coverImage ? (
+                    <img src={coverImage} alt={`${challenge.title} cover`}
+                        className="absolute inset-0 w-full h-[120%] object-cover opacity-50" />
+                ) : (
+                    <div className="absolute inset-0 bg-brutal-dark" style={{
+                        backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.05) 1px, transparent 1px)',
+                        backgroundSize: '24px 24px',
+                    }} />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-brutal-bg via-brutal-bg/80 to-brutal-dark/30" />
+
+
+
+                {/* Rarity — top right */}
+                <div className="absolute top-24 right-4 md:right-8 lg:right-16 z-10">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brutal-bg/80 backdrop-blur-sm border border-brutal-dark/15">
+                        <span className={cn('w-2 h-2 rounded-full flex-shrink-0', tierDot(challenge.tier))} />
+                        <span className="font-data text-[9px] font-bold uppercase tracking-[0.2em] text-brutal-dark/65">
+                            {tierLabel(challenge.tier)} Bounty
+                        </span>
+                    </div>
+                </div>
+
+                {/* Bottom content */}
+                <div className="absolute bottom-0 inset-x-0 px-4 md:px-8 lg:px-16 pb-6 md:pb-10 z-10">
+                    <div className="max-w-5xl">
+                        {challenge.domain && (
+                            <span className="inline-block font-data text-[9px] font-bold uppercase tracking-[0.25em] text-brutal-red bg-brutal-red/10 border border-brutal-red/25 px-2.5 py-1 rounded-full mb-3">
+                                {challenge.domain}
+                            </span>
+                        )}
+                        <h1 className="font-heading font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl uppercase tracking-tight leading-[1.05] text-brutal-dark">
+                            {challenge.title}
+                        </h1>
+
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                            {challenge.tier && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 font-data text-[9px] font-bold uppercase tracking-widest rounded-full bg-brutal-dark/8 border border-brutal-dark/20 text-brutal-dark/70">
+                                    <span className={cn('w-1.5 h-1.5 rounded-full', tierDot(challenge.tier))} />
+                                    {challenge.tier}
+                                </span>
                             )}
+                            {challenge.time_estimate && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 font-data text-[9px] font-bold uppercase tracking-widest rounded-full bg-brutal-dark/8 border border-brutal-dark/20 text-brutal-dark/60">
+                                    <Clock size={9} /> {challenge.time_estimate}
+                                </span>
+                            )}
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 font-data text-[9px] font-bold uppercase tracking-widest rounded-full bg-brutal-red/10 border border-brutal-red/30 text-brutal-red">
+                                <Zap size={9} className="fill-current" /> +{bountyXP} XP
+                            </span>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => handleReaction('like')}
-                                aria-label={isLiked ? 'Unlike' : 'Like'}
+
+                        <div className="mt-3"><XPProgressStrip /></div>
+
+                        <div className="flex items-center gap-2 mt-4">
+                            <button type="button" onClick={() => handleReaction('like')} aria-label={isLiked ? 'Unlike' : 'Like'}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider',
-                                    'border-2 transition-all',
-                                    isLiked
-                                        ? 'bg-brutal-red text-brutal-bg border-brutal-red'
-                                        : 'border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-red hover:text-brutal-red',
-                                )}
-                            >
+                                    'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-data text-[10px] font-bold uppercase tracking-wider border-2 transition-all',
+                                    isLiked ? 'bg-brutal-red text-brutal-bg border-brutal-red' : 'border-brutal-dark/20 text-brutal-dark/60 hover:border-brutal-dark/40',
+                                )}>
                                 <Heart size={11} className={isLiked ? 'fill-current' : ''} />
-                                {counts.likes}
+                                {counts.likes > 0 && counts.likes}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => handleReaction('bookmark')}
-                                aria-pressed={isBookmarked}
-                                aria-label={isBookmarked ? 'Unsave' : 'Save'}
-                                title={isBookmarked ? 'Saved' : 'Save'}
+                            <button type="button" onClick={() => handleReaction('bookmark')} aria-pressed={isBookmarked} aria-label={isBookmarked ? 'Unsave' : 'Save'}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider border-2 transition-all',
-                                    isBookmarked
-                                        ? 'bg-brutal-red text-brutal-bg border-brutal-red'
-                                        : 'border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-red hover:text-brutal-red',
-                                )}
-                            >
+                                    'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-data text-[10px] font-bold uppercase tracking-wider border-2 transition-all',
+                                    isBookmarked ? 'bg-brutal-red text-brutal-bg border-brutal-red' : 'border-brutal-dark/20 text-brutal-dark/60 hover:border-brutal-dark/40',
+                                )}>
                                 <Bookmark size={11} className={isBookmarked ? 'fill-current' : ''} />
-                                {isBookmarked ? 'Saved' : 'Save'}
                             </button>
-                            <button
-                                type="button"
-                                onClick={handleShare}
-                                aria-label="Share"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-data text-[10px] font-bold uppercase tracking-wider border-2 border-brutal-dark/15 text-brutal-dark/60 hover:border-brutal-dark hover:text-brutal-dark transition-all"
-                            >
-                                <Share2 size={11} /> Share
+                            <button type="button" onClick={handleShare} aria-label="Share"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-data text-[10px] font-bold uppercase tracking-wider border-2 border-brutal-dark/20 text-brutal-dark/60 hover:border-brutal-dark/40 transition-all">
+                                <Share2 size={11} />
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    {/* ── Bento grid ──────────────────────────────────────── */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
+            {/* ══════════════════════════════════════════════════
+                MOBILE STATS STRIP — visible only < lg
+            ══════════════════════════════════════════════════ */}
+            <div className="lg:hidden bg-brutal-bg border-b-2 border-brutal-dark/10">
+                <div className="px-4 py-4 space-y-3">
+                    {/* Bounty card — light */}
+                    <div className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-4">
+                        <p className="font-data text-[9px] font-bold uppercase tracking-[0.2em] text-brutal-dark/50 mb-1">Bounty Reward</p>
+                        <div className="flex items-baseline gap-1.5">
+                            <span className="font-heading font-bold text-3xl tabular-nums text-brutal-dark leading-none">+{bountyXP}</span>
+                            <span className="font-data text-sm font-bold text-brutal-red uppercase tracking-wider">XP</span>
+                        </div>
+                        <p className="font-data text-[9px] text-brutal-dark/45 mt-1 uppercase tracking-widest">
+                            {tierLabel(challenge.tier)} · {challenge.tier || 'Open'} Challenge
+                        </p>
+                    </div>
 
-                        {/* ── Identity column ───────────────────────────── */}
-                        <aside className="lg:col-span-3 lg:max-h-[calc(100vh-9rem)] flex flex-col gap-4">
+                    {/* Stats row */}
+                    <div className="grid grid-cols-5 gap-2">
+                        {[
+                            { icon: <ShieldCheck size={10} />, label: 'Tier', value: challenge.tier?.replace('Tier ', 'T') || '—' },
+                            { icon: <Clock size={10} />, label: 'Time', value: challenge.time_estimate || '—' },
+                            { icon: <ListChecks size={10} />, label: 'Steps', value: String(challenge.steps.length) },
+                            { icon: <Layers size={10} />, label: 'Levels', value: String(challenge.levels.length) },
+                            { icon: <Heart size={10} />, label: 'Likes', value: String(counts.likes) },
+                        ].map(({ icon, label, value }) => (
+                            <div key={label} className="rounded-lg border-2 border-brutal-dark/12 bg-brutal-bg py-2 px-1 text-center">
+                                <div className="flex justify-center text-brutal-red mb-0.5">{icon}</div>
+                                <div className="font-heading font-bold text-xs tabular-nums text-brutal-dark leading-none truncate">{value}</div>
+                                <div className="font-data text-[7px] font-bold uppercase tracking-[0.1em] text-brutal-dark/45 mt-0.5">{label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
 
-                            {/* Title card */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.12)]">
-                                {challenge.domain && (
-                                    <span className="inline-block font-data text-[9px] font-bold uppercase tracking-widest text-brutal-red mb-2">
-                                        #{challenge.domain}
-                                    </span>
-                                )}
-                                <h1 className="font-drama italic text-2xl leading-[1.05] text-brutal-dark mb-3">
-                                    {challenge.title}
-                                </h1>
+            {/* ══════════════════════════════════════════════════
+                BODY — Sidebar + Main
+            ══════════════════════════════════════════════════ */}
+            <div className="flex min-h-[50vh]">
 
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {challenge.tier && (
-                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-data text-[9px] font-bold uppercase tracking-widest rounded-full bg-brutal-dark text-brutal-bg">
-                                            <span className={cn('w-1.5 h-1.5 rounded-full', tierDot(challenge.tier))} />
-                                            {challenge.tier}
-                                        </span>
-                                    )}
-                                    {challenge.time_estimate && (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 font-data text-[9px] font-bold uppercase tracking-widest rounded-full bg-brutal-dark/5 text-brutal-dark/60 border border-brutal-dark/10">
-                                            <Clock size={10} /> {challenge.time_estimate}
-                                        </span>
-                                    )}
+                {/* ── DESKTOP SIDEBAR ──────────────────────────── */}
+                <aside className="hidden lg:block w-72 flex-shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto bg-brutal-bg px-4 py-5 space-y-4 no-scrollbar">
+
+                    {/* Bounty — light card */}
+                    <div className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-5">
+                        <p className="font-data text-[9px] font-bold uppercase tracking-[0.2em] text-brutal-dark/50 mb-2">Bounty Reward</p>
+                        <div className="flex items-baseline gap-2 mb-1">
+                            <span className="font-heading font-bold text-4xl tabular-nums text-brutal-dark leading-none">+{bountyXP}</span>
+                            <span className="font-data text-base font-bold text-brutal-red uppercase tracking-wider">XP</span>
+                        </div>
+                        <p className="font-data text-[9px] text-brutal-dark/45 uppercase tracking-widest">
+                            {tierLabel(challenge.tier)} · {challenge.tier || 'Open'} Challenge
+                        </p>
+
+                        <hr className="border-brutal-dark/10 my-4" />
+
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                            <div className="rounded-lg bg-brutal-dark/[0.04] border border-brutal-dark/10 p-2.5">
+                                <div className="flex items-center gap-1 mb-1">
+                                    <ShieldCheck size={9} className="text-brutal-red" />
+                                    <span className="font-data text-[7px] font-bold uppercase tracking-widest text-brutal-dark/45">Tier</span>
                                 </div>
+                                <span className="font-heading font-bold text-sm text-brutal-dark leading-none">
+                                    {challenge.tier?.replace('Tier ', 'T') || '—'}
+                                </span>
+                            </div>
+                            <div className="rounded-lg bg-brutal-dark/[0.04] border border-brutal-dark/10 p-2.5">
+                                <div className="flex items-center gap-1 mb-1">
+                                    <Clock size={9} className="text-brutal-red" />
+                                    <span className="font-data text-[7px] font-bold uppercase tracking-widest text-brutal-dark/45">Time</span>
+                                </div>
+                                <span className="font-heading font-bold text-sm text-brutal-dark leading-none truncate block">
+                                    {challenge.time_estimate || '—'}
+                                </span>
+                            </div>
+                        </div>
 
-                                {/* Success criteria teaser */}
+                        <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                                { icon: <ListChecks size={10} />, label: 'Steps', value: challenge.steps.length },
+                                { icon: <Layers size={10} />, label: 'Levels', value: challenge.levels.length },
+                                { icon: <Heart size={10} />, label: 'Likes', value: counts.likes },
+                            ].map(({ icon, label, value }) => (
+                                <div key={label} className="rounded-lg bg-brutal-dark/[0.04] border border-brutal-dark/10 py-2 text-center">
+                                    <div className="flex justify-center text-brutal-red mb-0.5">{icon}</div>
+                                    <div className="font-heading font-bold text-sm tabular-nums text-brutal-dark leading-none">{value}</div>
+                                    <div className="font-data text-[7px] font-bold uppercase tracking-[0.15em] text-brutal-dark/45 mt-0.5">{label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Tier access card */}
+                    <div className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-5">
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className={cn('w-2 h-2 rounded-full', tierDot(challenge.tier))} />
+                            <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/50">Access</span>
+                        </div>
+                        <p className="font-data text-[12px] text-brutal-dark/75 leading-relaxed">{tierBlurb(challenge.tier)}</p>
+                        {challenge.tags && challenge.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                {challenge.tags.slice(0, 8).map((t) => (
+                                    <span key={t} className="font-data text-[9px] font-bold uppercase tracking-wider text-brutal-dark/60 bg-brutal-dark/[0.04] border border-brutal-dark/10 px-2 py-0.5 rounded-md">
+                                        #{t}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {challenge.materials.length > 0 && <MaterialsCard materials={challenge.materials} />}
+                    {challenge.skills.length > 0 && <SkillsCard skills={challenge.skills} />}
+                    {challenge.mystery && <MysteryCard mystery={challenge.mystery} />}
+                </aside>
+
+                {/* ── MAIN CONTENT ─────────────────────────────── */}
+                <main className="flex-1 min-w-0">
+
+                    {/* Tab bar — scrollable on mobile */}
+                    <div className="sticky top-16 z-20 bg-brutal-bg/96 backdrop-blur-sm border-b-2 border-brutal-dark/12">
+                        <nav className="flex items-center overflow-x-auto no-scrollbar px-4 md:px-6 lg:px-8">
+                            {availableTabs.map((tab) => (
+                                <button key={tab.k} type="button" onClick={() => setCenterTab(tab.k)}
+                                    className={cn(
+                                        'flex items-center gap-1.5 px-3 md:px-4 py-3.5 font-data text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors relative whitespace-nowrap flex-shrink-0',
+                                        centerTab === tab.k ? 'text-brutal-red' : 'text-brutal-dark/35 hover:text-brutal-dark/65',
+                                    )}>
+                                    {tab.icon}
+                                    {tab.label}
+                                    {centerTab === tab.k && (
+                                        <span className="absolute bottom-0 left-2 right-2 h-[2.5px] bg-brutal-red rounded-t-full" />
+                                    )}
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+
+                    {/* Tab content */}
+                    <div className="px-4 md:px-6 lg:px-8 py-5 md:py-6 space-y-4">
+
+                        {/* ── BRIEF ── */}
+                        {centerTab === 'brief' && (
+                            <div className="space-y-4">
+                                {challenge.core_idea && (
+                                    <BriefCard index="01" label="Core Idea" icon={<Sparkles size={11} className="text-brutal-red" />}>
+                                        <p className="font-data text-[12px] md:text-[13px] text-brutal-dark/80 leading-relaxed">{challenge.core_idea}</p>
+                                    </BriefCard>
+                                )}
+                                {challenge.mission && (
+                                    <BriefCard index="02" label="Mission" icon={<Crosshair size={11} className="text-brutal-red" />}>
+                                        <p className="font-data text-[12px] md:text-[13px] text-brutal-dark/80 leading-relaxed">{challenge.mission}</p>
+                                    </BriefCard>
+                                )}
                                 {challenge.success_criteria && (
-                                    <div className="mt-4 pt-4 border-t border-brutal-dark/10">
-                                        <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-red block mb-1.5">
-                                            Success Criteria
-                                        </span>
-                                        <p className="font-data text-[11px] text-brutal-dark/70 leading-snug">
-                                            {challenge.success_criteria}
-                                        </p>
-                                    </div>
+                                    <BriefCard index="03" label="Success Criteria" icon={<CheckCircle2 size={11} className="text-brutal-red" />} accent>
+                                        <p className="font-data text-[12px] md:text-[13px] font-bold text-brutal-dark leading-relaxed">{challenge.success_criteria}</p>
+                                    </BriefCard>
                                 )}
-
-                                {/* Tags */}
-                                {challenge.tags && challenge.tags.length > 0 && (
-                                    <div className="mt-4 flex flex-wrap gap-1">
-                                        {challenge.tags.slice(0, 8).map((t) => (
-                                            <span
-                                                key={t}
-                                                className="font-data text-[9px] font-bold uppercase tracking-wider text-brutal-dark/55 bg-brutal-dark/[0.04] border border-brutal-dark/10 px-1.5 py-0.5 rounded-full"
-                                            >
-                                                #{t}
-                                            </span>
-                                        ))}
+                                {!hasBrief && (
+                                    <div className="text-center py-16">
+                                        <BookOpen size={32} className="mx-auto text-brutal-dark/15 mb-3" />
+                                        <p className="font-data text-sm text-brutal-dark/30">No brief yet.</p>
                                     </div>
                                 )}
                             </div>
+                        )}
 
-                            {/* Stats grid */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4 grid grid-cols-3 gap-2">
-                                <Stat icon={<ListChecks size={11} />} label="Steps" value={challenge.steps.length} />
-                                <Stat icon={<Layers size={11} />} label="Levels" value={challenge.levels.length} />
-                                <Stat icon={<Sparkles size={11} />} label="Skills" value={challenge.skills.length} />
-                                <Stat icon={<BookOpen size={11} />} label="Concepts" value={challenge.vocabulary.length} />
-                                <Stat icon={<Wrench size={11} />} label="Parts" value={challenge.materials.length} />
-                                <Stat icon={<Heart size={11} />} label="Likes" value={counts.likes} />
-                            </div>
-
-                            {/* Tier access explainer */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4">
-                                <div className="flex items-center gap-2 mb-1.5">
-                                    <ShieldCheck size={12} className="text-brutal-red" />
-                                    <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                        Tier Access
-                                    </span>
-                                </div>
-                                <p className="font-data text-[10px] text-brutal-dark/60 leading-relaxed">
-                                    {tierBlurb(challenge.tier)}
-                                </p>
-                            </div>
-
-                            {/* XP Reward */}
-                            <XpRewardBadge
-                                variant="card"
-                                amount={
-                                    challenge.tier === 'Tier 3' ? XP_REWARDS.tier3_challenge
-                                    : challenge.tier === 'Tier 2' ? XP_REWARDS.tier2_challenge
-                                    : XP_REWARDS.tier1_challenge
-                                }
-                                label="Completion Reward"
-                                description={`Complete and get verified to earn ${
-                                    challenge.tier === 'Tier 3' ? XP_REWARDS.tier3_challenge
-                                    : challenge.tier === 'Tier 2' ? XP_REWARDS.tier2_challenge
-                                    : XP_REWARDS.tier1_challenge
-                                } XP toward your next rank.`}
-                            />
-
-                            {/* Skills pills (if any) — only shows when compact room allows */}
-                            {challenge.skills.length > 0 && (
-                                <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4">
-                                    <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 block mb-2">
-                                        Skills You'll Develop
-                                    </span>
-                                    <div className="flex flex-wrap gap-1">
-                                        {challenge.skills.map((s, i) => (
-                                            <span
-                                                key={i}
-                                                className="px-2 py-0.5 bg-brutal-dark text-brutal-bg rounded-full font-data text-[9px] font-bold uppercase tracking-wider"
-                                            >
-                                                {s}
-                                            </span>
+                        {/* ── STEPS ── */}
+                        {centerTab === 'steps' && (
+                            <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 md:p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">{challenge.steps.length} Steps</span>
+                                    <div className="flex items-center gap-1">
+                                        {challenge.steps.map((_, idx) => (
+                                            <div key={idx} className="h-1 w-4 md:w-6 rounded-full bg-brutal-dark/10" />
                                         ))}
                                     </div>
                                 </div>
-                            )}
-                        </aside>
+                                <ol className="space-y-2.5">
+                                    {challenge.steps.map((step, idx) => (
+                                        <li key={idx} className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-3 md:p-4 flex items-start gap-3 hover:border-brutal-dark/25 transition-colors">
+                                            <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-brutal-dark text-brutal-bg font-data text-[9px] font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
+                                                {String(idx + 1).padStart(2, '0')}
+                                            </div>
+                                            <p className="font-data text-[12px] md:text-[13px] text-brutal-dark/75 leading-relaxed pt-0.5">{step}</p>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        )}
 
-                        {/* ── Center column: cover + tabbed content ─────── */}
-                        <main className="lg:col-span-6 flex flex-col gap-4 lg:max-h-[calc(100vh-9rem)] min-h-0">
-
-                            {/* Cover */}
-                            {coverImage ? (
-                                <div className="relative rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark/5 aspect-[16/8] flex-shrink-0">
-                                    <img
-                                        src={coverImage}
-                                        alt={`${challenge.title} cover`}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="relative rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark text-brutal-bg aspect-[16/8] flex-shrink-0 flex items-center justify-center">
-                                    <div className="absolute inset-0 opacity-[0.04] font-heading text-[20rem] font-bold leading-none flex items-center justify-center pointer-events-none select-none">?</div>
-                                    <div className="relative z-10 text-center px-6">
-                                        <span className="font-data text-[9px] font-bold tracking-[0.25em] text-brutal-red uppercase block mb-2">
-                                            The Mystery
-                                        </span>
-                                        <p className="font-drama italic text-xl md:text-2xl leading-tight max-w-lg mx-auto">
-                                            {challenge.mystery || 'Decode this challenge by reading its brief.'}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tabs strip */}
-                            <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg flex-1 min-h-0 flex flex-col">
-                                <div className="flex border-b-2 border-brutal-dark/10 px-4 flex-shrink-0 overflow-x-auto">
-                                    {([
-                                        { k: 'brief', label: 'Brief', show: hasBrief, count: 0 },
-                                        { k: 'steps', label: 'Steps', show: hasSteps, count: challenge.steps.length },
-                                        { k: 'levels', label: 'Levels', show: hasLevels, count: challenge.levels.length },
-                                        { k: 'concepts', label: 'Concepts', show: hasConcepts, count: challenge.vocabulary.length },
-                                        { k: 'media', label: 'Media', show: hasMedia, count: galleryImages.length + challenge.videos.length },
-                                    ] as const).filter(t => t.show).map((t) => (
-                                        <button
-                                            key={t.k}
-                                            type="button"
-                                            onClick={() => setCenterTab(t.k)}
-                                            className={cn(
-                                                'px-3 py-3 font-data text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 -mb-[2px] whitespace-nowrap',
-                                                centerTab === t.k
-                                                    ? 'border-brutal-red text-brutal-red'
-                                                    : 'border-transparent text-brutal-dark/40 hover:text-brutal-dark/70',
-                                            )}
-                                        >
-                                            {t.label}
-                                            {t.count > 0 && (
-                                                <span className="ml-1.5 tabular-nums text-brutal-dark/35">{t.count}</span>
-                                            )}
-                                        </button>
+                        {/* ── LEVELS ── */}
+                        {centerTab === 'levels' && (
+                            <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 md:p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]">
+                                <div className="space-y-2.5">
+                                    {challenge.levels.map((lvl, idx) => (
+                                        <div key={idx} className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-3 md:p-4 flex items-start gap-3 hover:border-brutal-dark/25 transition-colors">
+                                            <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-brutal-dark/8 text-brutal-dark/50 font-data text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                                {idx + 1}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-heading font-bold text-sm uppercase tracking-tight text-brutal-dark">{lvl.level_name}</h4>
+                                                {lvl.description && (
+                                                    <p className="font-data text-xs text-brutal-dark/60 leading-relaxed mt-1">{lvl.description}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
-
-                                <div className="flex-1 min-h-0 overflow-y-auto p-5">
-
-                                    {/* ── BRIEF ── */}
-                                    {centerTab === 'brief' && (
-                                        <div className="space-y-5">
-                                            {challenge.core_idea && (
-                                                <div>
-                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                        <Sparkles size={11} className="text-brutal-red" />
-                                                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                                            Core Idea
-                                                        </span>
-                                                    </div>
-                                                    <p className="font-data text-[13px] text-brutal-dark/80 leading-relaxed">
-                                                        {challenge.core_idea}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {challenge.mission && (
-                                                <div className="pt-4 border-t border-brutal-dark/8">
-                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                        <Target size={11} className="text-brutal-red" />
-                                                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                                            Mission
-                                                        </span>
-                                                    </div>
-                                                    <p className="font-data text-[13px] text-brutal-dark/80 leading-relaxed">
-                                                        {challenge.mission}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {challenge.success_criteria && (
-                                                <div className="rounded-xl border border-brutal-red/20 bg-brutal-red/[0.04] p-4">
-                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                        <CheckCircle2 size={11} className="text-brutal-red" />
-                                                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-red">
-                                                            Success Criteria
-                                                        </span>
-                                                    </div>
-                                                    <p className="font-data text-[12px] font-bold text-brutal-dark leading-relaxed">
-                                                        {challenge.success_criteria}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {!hasBrief && (
-                                                <p className="font-data text-xs text-brutal-dark/35 italic text-center py-8">
-                                                    No brief yet.
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* ── STEPS ── */}
-                                    {centerTab === 'steps' && (
-                                        <ol className="space-y-3">
-                                            {challenge.steps.map((step, idx) => (
-                                                <li
-                                                    key={idx}
-                                                    className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-4 flex items-start gap-3"
-                                                >
-                                                    <div className="w-7 h-7 rounded-full bg-brutal-red text-brutal-bg font-data text-[10px] font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
-                                                        {String(idx + 1).padStart(2, '0')}
-                                                    </div>
-                                                    <p className="font-data text-[13px] text-brutal-dark/80 leading-relaxed">
-                                                        {step}
-                                                    </p>
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    )}
-
-                                    {/* ── LEVELS ── */}
-                                    {centerTab === 'levels' && (
-                                        <div className="space-y-3">
-                                            {challenge.levels.map((lvl, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-4"
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="w-7 h-7 rounded-full bg-brutal-dark/8 text-brutal-dark/50 font-data text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                                            {idx + 1}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <h4 className="font-heading font-bold text-sm uppercase tracking-tight text-brutal-dark">
-                                                                {lvl.level_name}
-                                                            </h4>
-                                                            {lvl.description && (
-                                                                <p className="font-data text-xs text-brutal-dark/60 leading-relaxed mt-1.5">
-                                                                    {lvl.description}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* ── CONCEPTS ── */}
-                                    {centerTab === 'concepts' && (
-                                        <div className="space-y-5">
-                                            {challenge.vocabulary.length > 0 && (
-                                                <div>
-                                                    <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 block mb-3">
-                                                        Key Vocabulary
-                                                    </span>
-                                                    <dl className="space-y-3">
-                                                        {challenge.vocabulary.map((v, i) => (
-                                                            <div
-                                                                key={i}
-                                                                className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-4"
-                                                            >
-                                                                <dt className="font-heading font-bold text-sm text-brutal-dark">
-                                                                    {v.term}
-                                                                </dt>
-                                                                {v.definition && (
-                                                                    <dd className="font-data text-xs text-brutal-dark/60 mt-1 leading-relaxed">
-                                                                        {v.definition}
-                                                                    </dd>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </dl>
-                                                </div>
-                                            )}
-
-                                            {challenge.skills.length > 0 && (
-                                                <div className="pt-4 border-t border-brutal-dark/8">
-                                                    <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 block mb-3">
-                                                        Skills Developed
-                                                    </span>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {challenge.skills.map((s, i) => (
-                                                            <span
-                                                                key={i}
-                                                                className="px-2.5 py-1 bg-brutal-dark text-brutal-bg rounded-full font-data text-[10px] font-bold uppercase tracking-wider"
-                                                            >
-                                                                {s}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* ── MEDIA ── */}
-                                    {centerTab === 'media' && (
-                                        <div className="space-y-4">
-                                            {challenge.videos.length === 0 && galleryImages.length === 0 ? (
-                                                <p className="font-data text-xs text-brutal-dark/35 italic text-center py-8">
-                                                    No additional media.
-                                                </p>
-                                            ) : (
-                                                <>
-                                                    {challenge.videos.map((vid, idx) => (
-                                                        <div
-                                                            key={idx}
-                                                            className="relative w-full aspect-video rounded-xl overflow-hidden border border-brutal-dark/10 bg-brutal-dark"
-                                                        >
-                                                            <iframe
-                                                                title={vid.title || `Challenge video ${idx + 1}`}
-                                                                src={getEmbedUrl(vid.video_url)}
-                                                                className="absolute inset-0 w-full h-full"
-                                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                                allowFullScreen
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                    {galleryImages.length > 0 && (
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            {galleryImages.map((img, idx) => (
-                                                                <div
-                                                                    key={idx}
-                                                                    className="rounded-xl overflow-hidden border border-brutal-dark/10 bg-brutal-dark/5"
-                                                                >
-                                                                    <img
-                                                                        src={img.image_url}
-                                                                        alt={img.caption || `Image ${idx + 1}`}
-                                                                        loading="lazy"
-                                                                        className="w-full h-32 object-cover hover:scale-105 transition-transform duration-500"
-                                                                    />
-                                                                    {img.caption && (
-                                                                        <p className="font-data text-[9px] text-brutal-dark/50 text-center py-1.5 px-2">
-                                                                            {img.caption}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
                             </div>
-                        </main>
+                        )}
 
-                        {/* ── Action column: completion + materials + mystery */}
-                        <aside className="lg:col-span-3 lg:max-h-[calc(100vh-9rem)] flex flex-col gap-4 min-h-0">
-
-                            {/* Completion status / CTA */}
-                            {completionState ? (
-                                <div
-                                    className={cn(
-                                        'rounded-2xl border-2 p-5 text-center',
-                                        completionState === 'verified'
-                                            ? 'bg-green-50 text-green-700 border-green-200'
-                                            : completionState === 'declined'
-                                                ? 'bg-brutal-red/5 text-brutal-red border-brutal-red/20'
-                                                : 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                                    )}
-                                >
-                                    <div className="font-data text-[9px] font-bold uppercase tracking-widest opacity-70 mb-1">
-                                        Your Status
+                        {/* ── CONCEPTS ── */}
+                        {centerTab === 'concepts' && (
+                            <div className="space-y-4">
+                                {challenge.vocabulary.length > 0 && (
+                                    <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 md:p-5 shadow-[4px_4px_0_0_rgba(196,41,30,0.18)]">
+                                        <p className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 mb-3">Key Vocabulary</p>
+                                        <dl className="space-y-2.5">
+                                            {challenge.vocabulary.map((v, i) => (
+                                                <div key={i} className="rounded-xl border-2 border-brutal-dark/10 p-3 md:p-4">
+                                                    <dt className="font-heading font-bold text-sm text-brutal-dark">{v.term}</dt>
+                                                    {v.definition && <dd className="font-data text-xs text-brutal-dark/60 mt-1 leading-relaxed">{v.definition}</dd>}
+                                                </div>
+                                            ))}
+                                        </dl>
                                     </div>
-                                    <div className="font-heading font-bold text-base uppercase tracking-tight">
-                                        {completionState === 'verified' ? '✓ Verified Complete'
-                                            : completionState === 'declined' ? '✗ Declined'
-                                            : '⏳ Pending Verification'}
-                                    </div>
-                                </div>
-                            ) : user ? (
-                                challenge?.tier === 'Tier 3' && hasT2Completion === false ? (
-                                    /* T3 soft gate — user hasn't completed any T2 challenge yet */
-                                    <div className="rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-5 text-center space-y-3">
-                                        <div className="font-data text-[9px] font-bold uppercase tracking-widest text-yellow-700/70">
-                                            Tier 3 Prerequisite
+                                )}
+                                {challenge.skills.length > 0 && (
+                                    <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-4 md:p-5 shadow-[4px_4px_0_0_rgba(196,41,30,0.18)]">
+                                        <p className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 mb-3">Skills Developed</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {challenge.skills.map((s, i) => (
+                                                <span key={i} className="px-2.5 py-1 bg-brutal-dark text-brutal-bg rounded-full font-data text-[10px] font-bold uppercase tracking-wider">{s}</span>
+                                            ))}
                                         </div>
-                                        <p className="font-data text-[11px] text-yellow-800 leading-relaxed">
-                                            Complete at least one <strong>Tier 2</strong> challenge (or obtain mentor approval) to unlock Tier 3 submissions.
-                                        </p>
-                                        <Link
-                                            to="/challenges?tier=Tier+2"
-                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 text-brutal-dark hover:bg-yellow-600 transition-colors px-4 py-2.5 font-data text-[10px] font-bold uppercase tracking-widest"
-                                        >
-                                            <Target size={12} /> Browse Tier 2 Challenges
-                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── MEDIA ── */}
+                        {centerTab === 'media' && (
+                            <div className="space-y-4">
+                                {challenge.videos.length === 0 && galleryImages.length === 0 ? (
+                                    <div className="text-center py-16">
+                                        <ImageIcon size={32} className="mx-auto text-brutal-dark/15 mb-3" />
+                                        <p className="font-data text-sm text-brutal-dark/30">No additional media.</p>
                                     </div>
                                 ) : (
-                                <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4">
+                                    <>
+                                        {challenge.videos.map((vid, idx) => (
+                                            <div key={idx} className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-brutal-dark/20 bg-brutal-dark shadow-[4px_4px_0_0_rgba(196,41,30,0.18)]">
+                                                <iframe title={vid.title || `Video ${idx + 1}`} src={getEmbedUrl(vid.video_url)}
+                                                    className="absolute inset-0 w-full h-full"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen />
+                                            </div>
+                                        ))}
+                                        {galleryImages.length > 0 && (
+                                            <div className="grid grid-cols-2 gap-2 md:gap-3">
+                                                {galleryImages.map((img, idx) => (
+                                                    <div key={idx} className="rounded-xl border-2 border-brutal-dark/15 overflow-hidden bg-brutal-dark/5 hover:border-brutal-dark/30 transition-colors">
+                                                        <img src={img.image_url} alt={img.caption || `Image ${idx + 1}`} loading="lazy"
+                                                            className="w-full h-28 md:h-32 object-cover" />
+                                                        {img.caption && <p className="font-data text-[9px] text-brutal-dark/50 text-center py-1.5 px-2">{img.caption}</p>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── MOBILE: sidebar content inline ──────────── */}
+                    <div className="lg:hidden px-4 pb-4 space-y-3 border-t-2 border-brutal-dark/10 pt-4">
+                        <div className="rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]">
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <span className={cn('w-2 h-2 rounded-full', tierDot(challenge.tier))} />
+                                <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">Access</span>
+                            </div>
+                            <p className="font-data text-[11px] text-brutal-dark/60 leading-relaxed">{tierBlurb(challenge.tier)}</p>
+                            {challenge.tags && challenge.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-3">
+                                    {challenge.tags.slice(0, 6).map((t) => (
+                                        <span key={t} className="font-data text-[9px] font-bold uppercase tracking-wider text-brutal-dark/50 bg-brutal-dark/5 border border-brutal-dark/10 px-1.5 py-0.5 rounded-full">#{t}</span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        {challenge.materials.length > 0 && <MaterialsCard materials={challenge.materials} />}
+                        {challenge.skills.length > 0 && <SkillsCard skills={challenge.skills} />}
+                        {challenge.mystery && <MysteryCard mystery={challenge.mystery} />}
+                    </div>
+
+                    {/* ── COMPLETION CTA ───────────────────────────── */}
+                    <div className="border-t-2 border-brutal-dark/12 px-4 md:px-6 lg:px-8 py-5 md:py-6">
+                        {completionState ? (
+                            <div className={cn(
+                                'rounded-2xl border-2 p-4 md:p-5 text-center',
+                                completionState === 'verified'
+                                    ? 'bg-green-50 border-green-300 text-green-700 shadow-[4px_4px_0_0_rgba(34,197,94,0.25)]'
+                                    : completionState === 'declined'
+                                        ? 'bg-brutal-red/5 border-brutal-red/30 text-brutal-red shadow-[4px_4px_0_0_rgba(196,41,30,0.18)]'
+                                        : 'bg-yellow-50 border-yellow-300 text-yellow-700 shadow-[4px_4px_0_0_rgba(234,179,8,0.25)]',
+                            )}>
+                                <p className="font-data text-[9px] font-bold uppercase tracking-widest opacity-60 mb-1">Quest Status</p>
+                                <div className="font-heading font-bold text-sm md:text-base uppercase tracking-tight flex items-center justify-center gap-2">
+                                    {completionState === 'verified' && <CheckCircle2 size={15} />}
+                                    {completionState === 'pending_review' && <Loader2 size={15} className="animate-spin" />}
+                                    {completionState === 'verified' ? 'Bounty Claimed'
+                                        : completionState === 'declined' ? 'Submission Declined' : 'Pending Verification'}
+                                </div>
+                            </div>
+                        ) : user ? (
+                            challenge?.tier === 'Tier 3' && hasT2Completion === false ? (
+                                <div className="rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-4 md:p-5 text-center space-y-3 shadow-[4px_4px_0_0_rgba(234,179,8,0.25)]">
+                                    <div className="flex items-center justify-center gap-2">
+                                        <AlertTriangle size={11} className="text-yellow-600" />
+                                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-yellow-700/70">Tier 3 Prerequisite</span>
+                                    </div>
+                                    <p className="font-data text-[11px] text-yellow-800 leading-relaxed">
+                                        Complete at least one <strong>Tier 2</strong> challenge to unlock Tier 3 submissions.
+                                    </p>
+                                    <Link to="/challenges?tier=Tier+2"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-yellow-500 text-brutal-dark hover:bg-yellow-600 transition-colors px-4 py-2.5 font-data text-[10px] font-bold uppercase tracking-widest">
+                                        <Target size={11} /> Browse Tier 2
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border-2 border-brutal-dark/15 bg-brutal-bg p-4 md:p-5 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]">
                                     {!showCompleteForm ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCompleteForm(true)}
-                                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brutal-dark text-brutal-bg hover:bg-brutal-red transition-colors px-4 py-3 font-data text-[11px] font-bold uppercase tracking-widest"
-                                        >
-                                            <CheckCircle2 size={13} /> Mark as Completed
-                                        </button>
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                                            <div className="flex-1">
+                                                <p className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 mb-1">Ready to claim?</p>
+                                                <p className="font-heading font-bold text-sm text-brutal-dark">
+                                                    Submit your build to earn <span className="text-brutal-red">+{bountyXP} XP</span>
+                                                </p>
+                                            </div>
+                                            <button type="button" onClick={() => setShowCompleteForm(true)}
+                                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brutal-dark text-brutal-bg hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_0_rgba(196,41,30,1)] px-5 py-3 font-data text-[11px] font-bold uppercase tracking-widest shadow-[6px_6px_0_0_rgba(196,41,30,0.9)] transition-all duration-150 w-full sm:w-auto">
+                                                <Zap size={12} className="fill-current" /> Claim Bounty
+                                                <ArrowRight size={12} />
+                                            </button>
+                                        </div>
                                     ) : (
                                         <form onSubmit={handleMarkComplete} className="space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <CheckCircle2 size={12} className="text-brutal-red" />
-                                                <h4 className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/70">
-                                                    Submit Evidence
-                                                </h4>
+                                                <h4 className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/65">Submit Evidence</h4>
                                             </div>
                                             <div>
-                                                <label className="block font-data text-[9px] font-bold text-brutal-dark/45 uppercase tracking-widest mb-1">
-                                                    Build Notes
-                                                </label>
-                                                <textarea
-                                                    required
-                                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/10 p-2.5 rounded-lg font-data min-h-[80px] text-[11px]
-                                                               focus:outline-none focus:border-brutal-red/40 transition-colors"
+                                                <label className="block font-data text-[9px] font-bold text-brutal-dark/40 uppercase tracking-widest mb-1.5">Build Notes *</label>
+                                                <textarea required
+                                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/15 p-2.5 rounded-xl font-data min-h-[80px] text-[12px] focus:outline-none focus:border-brutal-dark/40 transition-colors resize-none"
                                                     placeholder="What did you make? What did you learn?"
-                                                    value={notes}
-                                                    onChange={(e) => setNotes(e.target.value)}
-                                                />
+                                                    value={notes} onChange={(e) => setNotes(e.target.value)} />
                                             </div>
                                             <div>
-                                                <label className="block font-data text-[9px] font-bold text-brutal-dark/45 uppercase tracking-widest mb-1">
-                                                    Evidence URL (Optional)
-                                                </label>
-                                                <input
-                                                    type="url"
-                                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/10 p-2.5 rounded-lg font-data text-[11px]
-                                                               focus:outline-none focus:border-brutal-red/40 transition-colors"
+                                                <label className="block font-data text-[9px] font-bold text-brutal-dark/40 uppercase tracking-widest mb-1.5">Evidence URL (Optional)</label>
+                                                <input type="url"
+                                                    className="w-full bg-brutal-bg border-2 border-brutal-dark/15 p-2.5 rounded-xl font-data text-[12px] focus:outline-none focus:border-brutal-dark/40 transition-colors"
                                                     placeholder="GitHub, video, or photo link..."
-                                                    value={evidenceUrl}
-                                                    onChange={(e) => setEvidenceUrl(e.target.value)}
-                                                />
+                                                    value={evidenceUrl} onChange={(e) => setEvidenceUrl(e.target.value)} />
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowCompleteForm(false)}
-                                                    className="flex-1 rounded-lg border-2 border-brutal-dark/10 px-3 py-2 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/60 hover:border-brutal-dark/30 transition-colors"
-                                                >
+                                            <div className="flex gap-2 pt-1">
+                                                <button type="button" onClick={() => setShowCompleteForm(false)}
+                                                    className="flex-1 rounded-xl border-2 border-brutal-dark/15 px-3 py-2.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/55 hover:border-brutal-dark/30 transition-colors">
                                                     Cancel
                                                 </button>
-                                                <button
-                                                    type="submit"
-                                                    disabled={submitting}
-                                                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brutal-red text-brutal-bg hover:bg-brutal-dark transition-colors px-3 py-2 font-data text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
-                                                >
+                                                <button type="submit" disabled={submitting}
+                                                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-brutal-red text-brutal-bg hover:bg-brutal-dark transition-colors px-3 py-2.5 font-data text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 shadow-[3px_3px_0_0_rgba(20,20,20,0.4)]">
                                                     {submitting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                                                     Submit
                                                 </button>
@@ -746,79 +670,110 @@ export function ChallengeDetails() {
                                         </form>
                                     )}
                                 </div>
-                                )
-                            ) : (
-                                <Link
-                                    to="/login"
-                                    className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-5 text-center hover:border-brutal-red hover:text-brutal-red transition-colors block"
-                                >
-                                    <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45 mb-1">
-                                        Track Progress
-                                    </div>
-                                    <div className="font-heading font-bold text-sm uppercase tracking-tight text-brutal-dark">
-                                        Log in to Begin
-                                    </div>
-                                </Link>
-                            )}
-
-                            {/* Required materials */}
-                            {challenge.materials.length > 0 && (
-                                <div className="rounded-2xl border-2 border-brutal-dark/10 bg-brutal-bg p-4">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Wrench size={12} className="text-brutal-red" />
-                                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                            Required Materials
-                                        </span>
-                                    </div>
-                                    <ul className="space-y-1.5">
-                                        {challenge.materials.map((m, i) => (
-                                            <li
-                                                key={i}
-                                                className="flex items-center gap-2 font-data text-[11px] text-brutal-dark/75"
-                                            >
-                                                <div className="w-1 h-1 rounded-full bg-brutal-red flex-shrink-0" />
-                                                {m}
-                                            </li>
-                                        ))}
-                                    </ul>
+                            )
+                        ) : (
+                            <Link to="/login"
+                                className="group block rounded-2xl border-2 border-brutal-dark/20 bg-brutal-bg p-5 md:p-6 text-center hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_0_rgba(196,41,30,0.28)] hover:border-brutal-red/40 transition-all duration-150 shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]">
+                                <p className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/40 mb-1.5">Track Progress</p>
+                                <div className="font-heading font-bold text-sm md:text-base uppercase tracking-tight text-brutal-dark group-hover:text-brutal-red transition-colors flex items-center justify-center gap-2">
+                                    Log in to Accept Quest
+                                    <ChevronRight size={14} className="opacity-40 group-hover:translate-x-1 transition-transform" />
                                 </div>
-                            )}
-
-                            {/* Mystery card — only if there's a cover above so we haven't used it as hero */}
-                            {coverImage && challenge.mystery && (
-                                <div className="rounded-2xl border-2 border-brutal-dark bg-brutal-dark text-brutal-bg p-5 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-4 opacity-5 text-brutal-bg font-heading text-7xl font-bold leading-none pointer-events-none select-none">
-                                        ?
-                                    </div>
-                                    <div className="flex items-center gap-2 mb-2 relative z-10">
-                                        <HelpCircle size={12} className="text-brutal-red" />
-                                        <span className="font-data text-[9px] font-bold tracking-[0.2em] text-brutal-red uppercase">
-                                            The Mystery
-                                        </span>
-                                    </div>
-                                    <p className="font-drama italic text-base leading-snug relative z-10">
-                                        {challenge.mystery}
-                                    </p>
-                                </div>
-                            )}
-                        </aside>
+                            </Link>
+                        )}
                     </div>
-                </div>
+
+                    <div className="px-4 md:px-6 lg:px-8 pb-10">
+                        <WhatsNextClosure variant="challenge" />
+                    </div>
+                </main>
             </div>
         </div>
     );
 }
 
-// ─── Tiny stat tile (mirrors ProjectDetails) ──────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Sub-components
+// ═══════════════════════════════════════════════════════════════════════════
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+// ─── Brief Card ─────────────────────────────────────────────────────────────
+// Clean card matching dashboard's border-2 + hard offset shadow.
+// No dot-grid, no pseudo brackets, no glow effects.
+
+function BriefCard({ index, label, icon, accent = false, children }: {
+    index: string; label: string; icon: ReactNode; accent?: boolean; children: ReactNode;
+}) {
     return (
-        <div className="text-center">
-            <div className="flex items-center justify-center text-brutal-red mb-1">{icon}</div>
-            <div className="font-heading font-bold text-sm tabular-nums text-brutal-dark leading-none">{value}</div>
-            <div className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40 mt-1">
-                {label}
+        <div className={cn(
+            'rounded-2xl border-2 p-4 md:p-5',
+            accent
+                ? 'border-brutal-red/35 bg-brutal-red/[0.03] shadow-[6px_6px_0_0_rgba(196,41,30,0.28)]'
+                : 'border-brutal-dark/20 bg-brutal-bg shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]',
+        )}>
+            <div className="flex items-center gap-2 mb-3">
+                <span className="font-data text-[9px] font-bold tabular-nums text-brutal-dark/25">{index} //</span>
+                {icon}
+                <span className={cn(
+                    'font-data text-[9px] font-bold uppercase tracking-[0.2em]',
+                    accent ? 'text-brutal-red' : 'text-brutal-dark/45',
+                )}>
+                    {label}
+                </span>
             </div>
+            {children}
+        </div>
+    );
+}
+
+// ─── Materials Card ────────────────────────────────────────────────────────
+
+function MaterialsCard({ materials }: { materials: string[] }) {
+    return (
+        <div className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-5">
+            <div className="flex items-center gap-2 mb-3">
+                <Wrench size={11} className="text-brutal-red" />
+                <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/50">Required Materials</span>
+            </div>
+            <ul className="space-y-1.5">
+                {materials.map((m, i) => (
+                    <li key={i} className="flex items-center gap-2 font-data text-[12px] text-brutal-dark/80">
+                        <span className="w-1 h-1 rounded-full bg-brutal-red flex-shrink-0" />
+                        {m}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+// ─── Skills Card ───────────────────────────────────────────────────────────
+
+function SkillsCard({ skills }: { skills: string[] }) {
+    return (
+        <div className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-5">
+            <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/50 block mb-2.5">
+                Skills You'll Develop
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+                {skills.map((s, i) => (
+                    <span key={i} className="px-2.5 py-1 bg-brutal-dark/[0.06] border border-brutal-dark/12 text-brutal-dark/80 rounded-md font-data text-[10px] font-bold uppercase tracking-wider">{s}</span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ─── Mystery Card ──────────────────────────────────────────────────────────
+
+function MysteryCard({ mystery }: { mystery: string }) {
+    return (
+        <div className="rounded-xl border-2 border-brutal-dark/12 bg-brutal-bg p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 font-heading text-[72px] font-bold leading-none text-brutal-red/[0.06] pointer-events-none select-none">?</div>
+            <div className="relative z-10 flex items-center gap-2 mb-2">
+                <HelpCircle size={11} className="text-brutal-red" />
+                <span className="font-data text-[9px] font-bold uppercase tracking-[0.2em] text-brutal-red">The Mystery</span>
+            </div>
+            <p className="relative z-10 font-data text-[12px] text-brutal-dark/70 leading-relaxed italic">{mystery}</p>
         </div>
     );
 }

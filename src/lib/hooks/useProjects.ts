@@ -206,7 +206,7 @@ export function useProjects(
             )
             .subscribe((status, err) => {
                 if (status === 'CHANNEL_ERROR') {
-                    console.error('[realtime] projects_list_realtime subscription error:', err);
+                    console.warn('[realtime] projects_list_realtime subscription error:', err ?? 'unknown reason — ensure Realtime is enabled for the project table and RLS permits access');
                 }
             });
         return () => {
@@ -602,7 +602,7 @@ export function useProjectBom(projectId: string | undefined) {
         }
         const { data, error } = await supabase
             .from('project_bom_line')
-            .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, display_order, created_at')
+            .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, image_url, display_order, created_at')
             .eq('project_id', projectId)
             .order('display_order', { ascending: true })
             .abortSignal(signal);
@@ -624,7 +624,7 @@ export function useProjectBomMutations() {
         const { data, error } = await supabase
             .from('project_bom_line')
             .insert([line])
-            .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, display_order, created_at')
+            .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, image_url, display_order, created_at')
             .single();
         if (!error) invalidateProjectCache(projectId);
         return { data, error };
@@ -635,7 +635,7 @@ export function useProjectBomMutations() {
             .from('project_bom_line')
             .update(updates)
             .eq('id', id)
-            .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, display_order, created_at')
+            .select('id, project_id, reference, part, quantity, source_url, cost_cents, notes, image_url, display_order, created_at')
             .single();
         if (!error) invalidateProjectCache(projectId);
         return { data, error };

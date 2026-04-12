@@ -5,6 +5,7 @@
 import { supabase } from '../supabase';
 import { useSupabaseQuery } from './cache';
 import { invalidateProjectCache } from './cache';
+import { sendNotificationEmail } from '../notifications';
 import type {
     AppUser, MakerProfile, Project, Challenge, ChallengeCompletion, Role,
 } from '../database.types';
@@ -153,13 +154,20 @@ export function useProjectReviewMutations() {
             status: 'active',
             visibility: 'public',
         }).eq('id', id);
+        if (!error) {
+            sendNotificationEmail('project_approved', { project_id: id });
+        }
         return { error: error?.message || null };
     };
 
-    const rejectProject = async (id: string) => {
+    const rejectProject = async (id: string, reason?: string) => {
         const { error } = await supabase.from('project').update({
             status: 'rejected',
+            review_note: reason || null,
         }).eq('id', id);
+        if (!error) {
+            sendNotificationEmail('project_rejected', { project_id: id, reason: reason || '' });
+        }
         return { error: error?.message || null };
     };
 

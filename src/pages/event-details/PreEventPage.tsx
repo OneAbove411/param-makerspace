@@ -1,6 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router';
-import { ArrowLeft } from 'lucide-react';
 import { formatEventType } from '../Events';
 import HostedBySection from './HostedBySection';
 import EventWebsiteBanner from './EventWebsiteBanner';
@@ -38,13 +36,7 @@ const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps
                 )}
                 <div className={`absolute inset-0 bg-gradient-to-t ${accents[event.event_type] || accents.maker_meetup}`} />
 
-                {/* Back button */}
-                <Link
-                    to="/events"
-                    className="absolute top-24 md:top-26 left-6 md:left-12 lg:left-24 z-20 inline-flex items-center gap-2 font-data text-[10px] font-bold uppercase text-brutal-bg/70 hover:text-brutal-bg transition-colors bg-brutal-bg/10 backdrop-blur-sm px-2.5 py-1.5 rounded-full border border-brutal-bg/10"
-                >
-                    <ArrowLeft className="w-3 h-3" /> Back
-                </Link>
+                {/* Back button removed — navbar back pill handles navigation globally */}
 
                 {/* Hero content — compact */}
                 <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-8 md:pb-10 pt-32 md:pt-36 max-w-7xl mx-auto">

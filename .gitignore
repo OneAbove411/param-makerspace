@@ -26,6 +26,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.md
+*.sql
 
 # Build artifacts (temporary build variants — should not be tracked)
 dist-tmp

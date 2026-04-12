@@ -290,11 +290,11 @@ export function WebsiteUploadPanel({
     const stepIndex = steps.findIndex(s => s.key === step);
 
     const StepIndicator = () => (
-        <div className="flex items-center justify-center gap-2 mb-6">
+        <div className="flex items-center justify-center gap-3 mb-6">
             {steps.map((s, i) => (
                 <React.Fragment key={s.key}>
-                    <div className="flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center font-data text-[10px] font-bold transition-all ${
+                    <div className="flex items-center gap-3">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-data text-[10px] font-bold transition-all ${
                             i < stepIndex ? 'bg-green-500 text-white' :
                             i === stepIndex ? 'bg-brutal-dark text-brutal-bg' :
                             'bg-brutal-dark/10 text-brutal-dark/40'
@@ -327,8 +327,8 @@ export function WebsiteUploadPanel({
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
-                        dragOver ? 'border-brutal-red bg-brutal-red/5 scale-[1.01]' :
+                    className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 focus-within:ring-2 focus-within:ring-brutal-red focus-within:ring-offset-2 ${
+                        dragOver ? 'border-brutal-red bg-brutal-red/5 scale-[1.02] shadow-[6px_6px_0_0_rgba(196,41,30,0.18)]' :
                         htmlContent ? 'border-green-400 bg-green-50/50' :
                         'border-brutal-dark/20 hover:border-brutal-dark/40 bg-brutal-dark/[0.02]'
                     }`}
@@ -437,7 +437,7 @@ export function WebsiteUploadPanel({
                         value={title}
                         onChange={e => setTitle(e.target.value)}
                         placeholder="My Mars Landing Page"
-                        className="w-full bg-brutal-bg border border-brutal-dark/15 px-4 py-3 rounded-xl font-data text-sm focus:outline-none focus:border-brutal-dark/30"
+                        className="w-full bg-brutal-bg border border-brutal-dark/15 px-4 py-3 rounded-xl font-data text-sm focus:outline-none focus:border-brutal-dark focus:ring-1 focus:ring-brutal-dark/20"
                         autoFocus
                     />
                 </div>
@@ -452,7 +452,7 @@ export function WebsiteUploadPanel({
                         onChange={e => setDescription(e.target.value)}
                         placeholder="A brief description of your website..."
                         rows={2}
-                        className="w-full bg-brutal-bg border border-brutal-dark/15 px-4 py-3 rounded-xl font-data text-xs focus:outline-none focus:border-brutal-dark/30 resize-y"
+                        className="w-full bg-brutal-bg border border-brutal-dark/15 px-4 py-3 rounded-xl font-data text-xs focus:outline-none focus:border-brutal-dark focus:ring-1 focus:ring-brutal-dark/20 resize-y"
                     />
                 </div>
 
@@ -479,7 +479,7 @@ export function WebsiteUploadPanel({
                             value={newHostName}
                             onChange={e => setNewHostName(e.target.value)}
                             placeholder="Add a teammate..."
-                            className="flex-1 bg-brutal-bg border border-brutal-dark/15 px-3 py-2 rounded-xl font-data text-xs focus:outline-none focus:border-brutal-dark/30"
+                            className="flex-1 bg-brutal-bg border border-brutal-dark/15 px-3 py-2 rounded-xl font-data text-xs focus:outline-none focus:border-brutal-dark focus:ring-1 focus:ring-brutal-dark/20"
                             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addHost(); } }}
                         />
                         <button type="button" onClick={addHost} className="px-3 py-2 bg-brutal-dark/10 rounded-xl hover:bg-brutal-dark/20 transition-colors">

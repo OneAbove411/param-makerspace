@@ -56,6 +56,10 @@ export function EditCoreTab() {
             onChange={(e) => updateField('description', e.target.value)}
             placeholder="Detailed project description, goals, and technical approach..."
           />
+          {/* Phase 3B — AI-assisted documentation teaser (UI hook only) */}
+          <p className="mt-1.5 font-data text-[10px] text-brutal-dark/30 italic">
+            Stuck? AI can help you write this from your photos &mdash; coming soon
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Input

@@ -82,15 +82,15 @@ export const ProjectsCommandBar = forwardRef<HTMLDivElement, ProjectsCommandBarP
             <div
                 ref={ref}
                 className={cn(
-                    'filter-rail sticky top-20 z-30 -mx-6 md:-mx-12 lg:-mx-24 mb-8',
+                    'filter-rail lg:hidden sticky top-20 z-30 -mx-6 md:-mx-12 lg:-mx-24 mb-8',
                     'backdrop-blur-md bg-brutal-bg/85 border-y border-brutal-dark/10',
                 )}
                 role="region"
                 aria-label="Project search and sort"
             >
-                <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 h-[72px] flex items-center gap-4">
-                    {/* ── Search (full-width) ───────────────────────── */}
-                    <div className="relative flex-1">
+                <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 h-[56px] flex items-center gap-4">
+                    {/* ── Search (visible on < lg only, sidebar has it on lg+) ───── */}
+                    <div className="relative flex-1 lg:hidden">
                         <Search
                             size={14}
                             className="absolute left-3 top-1/2 -translate-y-1/2 text-brutal-dark/40 pointer-events-none"

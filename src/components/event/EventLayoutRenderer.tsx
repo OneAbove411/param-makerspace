@@ -515,24 +515,31 @@ const BlockShell: React.FC<BlockShellProps> = ({ block, index, total, editing, o
                     </span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <button
-                        type="button"
-                        onClick={() => onMove(-1)}
-                        disabled={index === 0}
-                        className="w-7 h-7 rounded-md border border-brutal-dark/15 text-brutal-dark/55 hover:text-brutal-dark hover:border-brutal-dark/35 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors bg-brutal-bg"
-                        aria-label="Move up"
-                    >
-                        <ArrowUp className="w-3 h-3" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onMove(1)}
-                        disabled={index === total - 1}
-                        className="w-7 h-7 rounded-md border border-brutal-dark/15 text-brutal-dark/55 hover:text-brutal-dark hover:border-brutal-dark/35 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors bg-brutal-bg"
-                        aria-label="Move down"
-                    >
-                        <ArrowDown className="w-3 h-3" />
-                    </button>
+                    {/* Left group: reorder */}
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={() => onMove(-1)}
+                            disabled={index === 0}
+                            className="w-7 h-7 rounded-md border border-brutal-dark/15 text-brutal-dark/55 hover:text-brutal-dark hover:border-brutal-dark/35 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors bg-brutal-bg"
+                            aria-label="Move up"
+                        >
+                            <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onMove(1)}
+                            disabled={index === total - 1}
+                            className="w-7 h-7 rounded-md border border-brutal-dark/15 text-brutal-dark/55 hover:text-brutal-dark hover:border-brutal-dark/35 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors bg-brutal-bg"
+                            aria-label="Move down"
+                        >
+                            <ArrowDown className="w-3 h-3" />
+                        </button>
+                    </div>
+                    {/* Separator */}
+                    <div className="h-6 w-px bg-brutal-dark/10 mx-0.5" />
+                    {/* Right group: actions */}
+                    <div className="flex items-center gap-1">
                     {localEdit ? (
                         <>
                             <button
@@ -565,13 +572,14 @@ const BlockShell: React.FC<BlockShellProps> = ({ block, index, total, editing, o
                             <button
                                 type="button"
                                 onClick={onDelete}
-                                className="w-7 h-7 rounded-md border border-brutal-dark/15 text-brutal-dark/55 hover:text-brutal-red hover:border-brutal-red/35 flex items-center justify-center transition-colors bg-brutal-bg"
+                                className="w-7 h-7 rounded-md border border-brutal-red/20 text-brutal-red hover:text-brutal-red hover:border-brutal-red/35 flex items-center justify-center transition-colors bg-brutal-bg"
                                 aria-label="Delete block"
                             >
                                 <Trash2 className="w-3 h-3" />
                             </button>
                         </>
                     )}
+                    </div>
                 </div>
             </div>
 
@@ -620,7 +628,7 @@ const Inserter: React.FC<{ onInsert: (type: BlockType) => void }> = ({ onInsert 
                     <Plus className="w-3 h-3" /> Add block
                 </button>
             ) : (
-                <div className="w-full bg-brutal-bg border-2 border-brutal-dark/15 rounded-xl p-2 shadow-[4px_4px_0_0_rgba(196,41,30,0.15)]">
+                <div className="w-full bg-brutal-bg border-2 border-brutal-dark/15 rounded-xl p-2 shadow-[3px_3px_0_0_rgba(196,41,30,0.12)]">
                     <div className="flex items-center justify-between mb-1.5 px-1">
                         <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/45">
                             Insert block
@@ -665,11 +673,16 @@ interface EventLayoutRendererProps {
 }
 
 export const EventLayoutRenderer: React.FC<EventLayoutRendererProps> = ({ layout, editing, registrationProps, onChange }) => {
+    const [removingBlockIds, setRemovingBlockIds] = useState<Set<string>>(new Set());
     const updateBlock = (id: string, next: AnyBlock) => {
         onChange(layout.map(b => b.id === id ? next : b));
     };
     const deleteBlock = (id: string) => {
-        onChange(layout.filter(b => b.id !== id));
+        setRemovingBlockIds(prev => new Set(prev).add(id));
+        setTimeout(() => {
+            onChange(layout.filter(b => b.id !== id));
+            setRemovingBlockIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+        }, 250);
     };
     const moveBlock = (id: string, delta: -1 | 1) => {
         const idx = layout.findIndex(b => b.id === id);
@@ -702,6 +715,7 @@ export const EventLayoutRenderer: React.FC<EventLayoutRendererProps> = ({ layout
             {editing && <Inserter onInsert={(type) => insertBlock(0, type)} />}
             {layout.map((block, i) => (
                 <React.Fragment key={block.id}>
+                    <div className={removingBlockIds.has(block.id) ? 'transition-all duration-250 opacity-0 translate-x-2.5' : 'transition-all duration-250'}>
                     <BlockShell
                         block={block}
                         index={i}
@@ -712,6 +726,7 @@ export const EventLayoutRenderer: React.FC<EventLayoutRendererProps> = ({ layout
                         onChange={(next) => updateBlock(block.id, next)}
                         registrationProps={registrationProps}
                     />
+                    </div>
                     {editing && <Inserter onInsert={(type) => insertBlock(i + 1, type)} />}
                 </React.Fragment>
             ))}

@@ -157,6 +157,7 @@ export interface ProjectBomLine {
     source_url: string | null;
     cost_cents: number | null;
     notes: string | null;
+    image_url: string | null;
     display_order: number;
     created_at: string;
 }
@@ -454,6 +455,39 @@ export interface Inventory {
     updated_at: string;
 }
 
+// ─── Notifications ───
+
+export type NotificationType =
+  | 'project_approved'
+  | 'project_rejected'
+  | 'new_comment'
+  | 'new_reaction'
+  | 'event_broadcast'
+  | 'event_update'
+  | 'event_reminder'
+  | 'welcome_back';
+
+export interface Notification {
+    id: string;
+    user_id: string;
+    type: NotificationType;
+    title: string;
+    body: string | null;
+    link: string | null;
+    is_read: boolean;
+    created_at: string;
+}
+
+export interface EventEmailLog {
+    id: string;
+    event_id: string;
+    sent_by: string;
+    subject: string;
+    body: string;
+    recipient_count: number;
+    sent_at: string;
+}
+
 // ─── Store ───
 
 export interface StoreProduct {
@@ -533,6 +567,8 @@ export interface Database {
             equipment_induction: { Row: EquipmentInduction & Record<string, unknown>; Insert: (Partial<EquipmentInduction> & Pick<EquipmentInduction, 'equipment_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EquipmentInduction> & Record<string, unknown>; Relationships: [] };
             equipment_booking: { Row: EquipmentBooking & Record<string, unknown>; Insert: (Partial<EquipmentBooking> & Pick<EquipmentBooking, 'equipment_id' | 'user_id' | 'start_time' | 'end_time'>) & Record<string, unknown>; Update: Partial<EquipmentBooking> & Record<string, unknown>; Relationships: [] };
             inventory: { Row: Inventory & Record<string, unknown>; Insert: (Partial<Inventory> & Pick<Inventory, 'name' | 'quantity'>) & Record<string, unknown>; Update: Partial<Inventory> & Record<string, unknown>; Relationships: [] };
+            notification: { Row: Notification & Record<string, unknown>; Insert: (Partial<Notification> & Pick<Notification, 'user_id' | 'type' | 'title'>) & Record<string, unknown>; Update: Partial<Notification> & Record<string, unknown>; Relationships: [] };
+            event_email_log: { Row: EventEmailLog & Record<string, unknown>; Insert: (Partial<EventEmailLog> & Pick<EventEmailLog, 'event_id' | 'sent_by' | 'subject' | 'body'>) & Record<string, unknown>; Update: Partial<EventEmailLog> & Record<string, unknown>; Relationships: [] };
             store_product: { Row: StoreProduct & Record<string, unknown>; Insert: (Partial<StoreProduct> & Pick<StoreProduct, 'name' | 'description' | 'price'>) & Record<string, unknown>; Update: Partial<StoreProduct> & Record<string, unknown>; Relationships: [] };
             store_order: { Row: StoreOrder & Record<string, unknown>; Insert: (Partial<StoreOrder> & Pick<StoreOrder, 'user_id' | 'total'>) & Record<string, unknown>; Update: Partial<StoreOrder> & Record<string, unknown>; Relationships: [] };
             store_order_item: { Row: StoreOrderItem & Record<string, unknown>; Insert: (Partial<StoreOrderItem> & Pick<StoreOrderItem, 'order_id' | 'product_id' | 'quantity' | 'unit_price'>) & Record<string, unknown>; Update: Partial<StoreOrderItem> & Record<string, unknown>; Relationships: [] };

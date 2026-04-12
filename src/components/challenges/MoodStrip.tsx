@@ -116,7 +116,7 @@ export function MoodStrip({ activeMoodId, onSelectMood, className }: MoodStripPr
                     <h2 className="font-heading font-bold text-sm uppercase tracking-tight-heading text-brutal-dark">
                         What's the mood?
                     </h2>
-                    <span className="font-data text-[10px] text-brutal-dark/40 font-bold uppercase tracking-widest truncate">
+                    <span className="font-data text-[10px] text-brutal-dark/40 font-bold uppercase tracking-wider truncate">
                         One click · tier + domain + sort
                     </span>
                 </div>
@@ -124,7 +124,7 @@ export function MoodStrip({ activeMoodId, onSelectMood, className }: MoodStripPr
                     <button
                         type="button"
                         onClick={() => onSelectMood(null)}
-                        className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red hover:underline flex-shrink-0"
+                        className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-red px-2 py-1 rounded-lg border border-brutal-red/20 hover:bg-brutal-red/5 transition-colors flex-shrink-0"
                     >
                         Clear mood
                     </button>
@@ -147,13 +147,13 @@ export function MoodStrip({ activeMoodId, onSelectMood, className }: MoodStripPr
                             aria-selected={active}
                             onClick={() => onSelectMood(active ? null : preset)}
                             className={cn(
-                                'flex-shrink-0 group flex items-center gap-3 px-4 py-3 rounded-2xl border-2 text-left min-w-[180px]',
-                                'transition-all duration-150 ease-out',
+                                'flex-shrink-0 group flex items-center gap-3 px-4 py-3 rounded-2xl border-2 text-left min-w-[140px] md:min-w-[180px]',
+                                'transition-all duration-200 ease-out',
                                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brutal-red focus-visible:ring-offset-2 focus-visible:ring-offset-brutal-bg',
                                 'hover:translate-x-[-1px] hover:translate-y-[-1px] motion-reduce:hover:translate-x-0 motion-reduce:hover:translate-y-0',
                                 active
-                                    ? 'bg-brutal-dark text-brutal-bg border-brutal-dark shadow-[4px_4px_0_0_rgba(196,41,30,0.9)] hover:shadow-[6px_6px_0_0_rgba(196,41,30,1)]'
-                                    : 'bg-brutal-bg text-brutal-dark border-brutal-dark/15 shadow-[4px_4px_0_0_rgba(196,41,30,0.15)] hover:border-brutal-red/40 hover:shadow-[6px_6px_0_0_rgba(196,41,30,0.25)]',
+                                    ? 'bg-brutal-dark text-brutal-bg border-brutal-dark shadow-[4px_4px_0_0_rgba(196,41,30,0.5)] hover:shadow-[6px_6px_0_0_rgba(196,41,30,0.56)]'
+                                    : 'bg-brutal-bg text-brutal-dark border-brutal-dark/15 shadow-[4px_4px_0_0_rgba(196,41,30,0.15)] hover:border-brutal-red/40 hover:shadow-[6px_6px_0_0_rgba(196,41,30,0.21)]',
                             )}
                         >
                             <div

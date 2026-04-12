@@ -34,11 +34,11 @@ export const RANK_THRESHOLDS: Record<string, number> = {
 
 /** Tailwind-compatible color tokens per rank (used by RankBadge, profile, etc.). */
 export const RANK_COLORS: Record<RankName, string> = {
-    'Curious':   'text-gray-400',
-    'Tinkerer':  'text-green-400',
-    'Builder':   'text-blue-400',
-    'Maker':     'text-purple-400',
-    'Innovator': 'text-orange-400',
+    'Curious':   'text-brutal-dark/40',
+    'Tinkerer':  'text-brutal-dark/60',
+    'Builder':   'text-brutal-dark/80',
+    'Maker':     'text-brutal-dark',
+    'Innovator': 'text-brutal-red',
     'Lab Pro':   'text-brutal-red',
 };
 

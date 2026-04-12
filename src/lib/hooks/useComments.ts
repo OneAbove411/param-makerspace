@@ -7,6 +7,7 @@ import { supabase } from '../supabase';
 import { useAuth } from '../auth';
 import { toast } from '../toast';
 import { acquireSharedChannel } from './cache';
+import { sendNotificationEmail } from '../notifications';
 import type { ReactionType, TargetType, Comment } from '../database.types';
 
 // ─── Reactions ───
@@ -91,6 +92,12 @@ export function useReaction(targetType: TargetType, targetId: string | undefined
                     reaction_type: reactionType,
                 });
                 if (error) throw error;
+                sendNotificationEmail('new_reaction', {
+                    target_type: targetType,
+                    target_id: targetId,
+                    reactor_id: user.id,
+                    reaction_type: reactionType,
+                });
             }
             fetchReactions().catch(() => {});
         } catch (err: any) {
@@ -173,13 +180,28 @@ export function useComments(targetType: TargetType, targetId: string | undefined
     const addComment = async (content: string): Promise<{ error: string | null }> => {
         if (!user || !targetId) return { error: 'Not signed in' };
         try {
-            const { error } = await supabase.from('comment').insert({
+            const { data, error } = await supabase.from('comment').insert({
                 target_type: targetType,
                 target_id: targetId,
                 user_id: user.id,
                 content,
-            });
+            }).select('*, app_user:app_user(name)').single();
             if (error) throw error;
+
+            // Optimistically add the comment to local state immediately
+            if (data) {
+                const enriched = { ...(data as any), userName: (data as any).app_user?.name || user.name || 'You' };
+                setComments((prev) =>
+                    prev.some((c) => c.id === enriched.id) ? prev : [...prev, enriched],
+                );
+            }
+
+            sendNotificationEmail('new_comment', {
+                target_type: targetType,
+                target_id: targetId,
+                commenter_id: user.id,
+                comment_content: content,
+            });
             return { error: null };
         } catch (err: any) {
             const msg = String(err?.message || '').toLowerCase();
@@ -193,16 +215,47 @@ export function useComments(targetType: TargetType, targetId: string | undefined
     };
 
     const deleteComment = async (commentId: string): Promise<{ error: string | null }> => {
+        // Optimistically remove the comment from local state immediately
+        const prev = comments;
+        setComments((c) => c.filter((x) => x.id !== commentId));
         try {
             const { error } = await supabase.from('comment').delete().eq('id', commentId);
             if (error) throw error;
             return { error: null };
         } catch (err: any) {
+            // Rollback on failure
+            setComments(prev);
             toast.error("Couldn't delete that comment.");
             return { error: err?.message || 'unknown' };
         }
     };
 
-    const stableComments = useMemo(() => comments, [comments]);
-    return { comments: stableComments, loading, addComment, deleteComment };
+    const editComment = async (commentId: string, newContent: string): Promise<{ error: string | null }> => {
+        if (!user) return { error: 'Not signed in' };
+        // Optimistically update the comment in local state
+        const prev = comments;
+        const now = new Date().toISOString();
+        setComments((c) =>
+            c.map((x) => (x.id === commentId ? { ...x, content: newContent, updated_at: now } : x)),
+        );
+        try {
+            const { data, error } = await supabase
+                .from('comment')
+                .update({ content: newContent, updated_at: now })
+                .eq('id', commentId)
+                .eq('user_id', user.id)
+                .select()
+                .single();
+            if (error) throw error;
+            if (!data) throw new Error('Update returned no rows — you may not have permission.');
+            return { error: null };
+        } catch (err: any) {
+            // Rollback on failure
+            setComments(prev);
+            toast.error("Couldn't edit that comment.");
+            return { error: err?.message || 'unknown' };
+        }
+    };
+
+    return { comments, loading, addComment, deleteComment, editComment };
 }

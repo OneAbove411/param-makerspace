@@ -216,10 +216,10 @@ export const ExplorerHubCommandBar = forwardRef<HTMLDivElement, ExplorerHubComma
                                     tier !== 'All' && 'text-brutal-red border-brutal-red/40',
                                 )}
                             >
-                                <TierIcon size={12} aria-hidden="true" />
+                                <TierIcon size={14} aria-hidden="true" />
                                 <span className="hidden sm:inline">{currentTier.label}</span>
                                 <ChevronDown
-                                    size={12}
+                                    size={14}
                                     aria-hidden="true"
                                     className={tierOpen ? 'rotate-180 transition-transform' : 'transition-transform'}
                                 />
@@ -228,7 +228,7 @@ export const ExplorerHubCommandBar = forwardRef<HTMLDivElement, ExplorerHubComma
                                 <ul
                                     role="listbox"
                                     aria-label="Filter by tier"
-                                    className="absolute right-0 mt-2 w-56 rounded-xl border border-brutal-dark/15 bg-brutal-bg shadow-[0_12px_36px_rgba(0,0,0,0.12)] py-1 z-40"
+                                    className="absolute right-0 mt-2 w-56 rounded-xl border border-brutal-dark/15 bg-brutal-bg shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] py-1 z-40"
                                 >
                                     {TIERS.map((t) => {
                                         const Icon = t.icon;
@@ -250,7 +250,7 @@ export const ExplorerHubCommandBar = forwardRef<HTMLDivElement, ExplorerHubComma
                                                         active ? 'text-brutal-red' : 'text-brutal-dark/80',
                                                     )}
                                                 >
-                                                    <Icon size={13} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+                                                    <Icon size={14} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
                                                     <span className="flex flex-col gap-0.5 min-w-0">
                                                         <span className="uppercase tracking-wider">{t.label}</span>
                                                         <span className="font-normal normal-case text-[10px] text-brutal-dark/45 tracking-normal">
@@ -281,10 +281,10 @@ export const ExplorerHubCommandBar = forwardRef<HTMLDivElement, ExplorerHubComma
                                     'hover:border-brutal-dark/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brutal-red focus-visible:ring-offset-2 focus-visible:ring-offset-brutal-bg',
                                 )}
                             >
-                                <SortIcon size={12} aria-hidden="true" />
+                                <SortIcon size={14} aria-hidden="true" />
                                 <span className="hidden sm:inline">{currentSort.label}</span>
                                 <ChevronDown
-                                    size={12}
+                                    size={14}
                                     aria-hidden="true"
                                     className={sortOpen ? 'rotate-180 transition-transform' : 'transition-transform'}
                                 />
@@ -293,7 +293,7 @@ export const ExplorerHubCommandBar = forwardRef<HTMLDivElement, ExplorerHubComma
                                 <ul
                                     role="listbox"
                                     aria-label="Sort blueprints by"
-                                    className="absolute right-0 mt-2 w-48 rounded-xl border border-brutal-dark/15 bg-brutal-bg shadow-[0_12px_36px_rgba(0,0,0,0.12)] py-1 z-40"
+                                    className="absolute right-0 mt-2 w-48 rounded-xl border border-brutal-dark/15 bg-brutal-bg shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] py-1 z-40"
                                 >
                                     {SORTS.map((s, idx) => {
                                         const Icon = s.icon;
@@ -319,7 +319,7 @@ export const ExplorerHubCommandBar = forwardRef<HTMLDivElement, ExplorerHubComma
                                                         isShuffle && idx > 0 && 'border-t border-brutal-dark/10 mt-1 pt-2.5',
                                                     )}
                                                 >
-                                                    <Icon size={12} aria-hidden="true" />
+                                                    <Icon size={14} aria-hidden="true" />
                                                     {s.label}
                                                 </button>
                                             </li>

@@ -9,6 +9,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import StickyRegisterBar from './event-details/StickyRegisterBar';
 import PreEventPage from './event-details/PreEventPage';
 import PostEventPage from './event-details/PostEventPage';
+import { XPProgressStrip } from '../components/shared/XPProgressStrip';
+import { WhatsNextClosure } from '../components/shared/WhatsNextClosure';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -21,7 +23,7 @@ export function EventDetails() {
     const { data: event, loading } = useEvent(id);
     const { user } = useAuth();
     const { isRegistered, register, unregister } = useEventRegistration(id);
-    const { comments, addComment, deleteComment } = useComments('event', id);
+    const { comments, addComment, deleteComment, editComment } = useComments('event', id);
     const { data: hosts } = useEventHosts(id);
     const [commentText, setCommentText] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
@@ -96,7 +98,7 @@ export function EventDetails() {
     const isPast = new Date(event.date) < new Date();
     const capacityRemaining = event.capacity ? event.capacity - event.registration_count : null;
 
-    const commentsProps = { comments, user, deleteComment, handleComment, commentText, setCommentText };
+    const commentsProps = { comments, user, deleteComment, editComment, handleComment, commentText, setCommentText };
     const registrationProps = { isRegistered, event, user, actionLoading, handleRegister, handleUnregister, capacityRemaining };
 
     return (
@@ -120,6 +122,19 @@ export function EventDetails() {
                     commentsProps={commentsProps}
                 />
             )}
+
+            {/* Extended Action Region */}
+            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-8 bg-brutal-dark/5 border-t-2 border-brutal-dark/10">
+                <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+                    <div className="w-full md:w-auto">
+                        <XPProgressStrip />
+                    </div>
+                </div>
+                <div className="mt-8">
+                    <WhatsNextClosure variant={isPast ? 'event-post' : 'event-pre'} />
+                </div>
+            </div>
+
             {/* Sticky register bar — appears on scroll, hidden for past events inside component */}
             <StickyRegisterBar {...registrationProps} />
         </div>

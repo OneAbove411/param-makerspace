@@ -71,11 +71,11 @@ export function TierPathway({ activeTier, onTierChange, className }: TierPathway
                 <h2 className="font-heading font-bold text-sm uppercase tracking-tight-heading text-brutal-dark">
                     Access Tiers
                 </h2>
-                <span className="font-data text-[10px] text-brutal-dark/40 font-bold uppercase tracking-widest truncate">
+                <span className="font-data text-[10px] text-brutal-dark/40 font-bold uppercase tracking-wider truncate">
                     Click a tier to focus · Explorer → Architect
                 </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {TIER_PATHWAY.map((t) => {
                     const Icon = t.icon;
                     const active = activeTier === t.id;
@@ -88,7 +88,10 @@ export function TierPathway({ activeTier, onTierChange, className }: TierPathway
                             className={cn(
                                 'group relative text-left p-4 rounded-2xl border-2 overflow-hidden',
                                 'transition-all duration-150 ease-out',
-                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-brutal-red focus-visible:ring-offset-2 focus-visible:ring-offset-brutal-bg',
+                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                                active
+                                    ? 'focus-visible:ring-brutal-bg focus-visible:ring-offset-brutal-bg'
+                                    : 'focus-visible:ring-brutal-red focus-visible:ring-offset-brutal-bg',
                                 'hover:translate-x-[-1px] hover:translate-y-[-1px] motion-reduce:hover:translate-x-0 motion-reduce:hover:translate-y-0',
                                 active
                                     ? 'bg-brutal-dark text-brutal-bg border-brutal-dark shadow-[4px_4px_0_0_rgba(196,41,30,0.9)] hover:shadow-[6px_6px_0_0_rgba(196,41,30,1)]'
@@ -121,7 +124,7 @@ export function TierPathway({ activeTier, onTierChange, className }: TierPathway
                                 <div className="flex flex-col min-w-0">
                                     <span
                                         className={cn(
-                                            'font-data text-[10px] font-bold uppercase tracking-widest',
+                                            'font-data text-[10px] font-bold uppercase tracking-wider',
                                             active ? 'text-brutal-bg/60' : 'text-brutal-red',
                                         )}
                                     >

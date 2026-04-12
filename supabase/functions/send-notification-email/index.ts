@@ -642,16 +642,24 @@ Deno.serve(async (req: Request) => {
     }
 
     // Filter out users who have opted out of email notifications
-    const supabaseAdmin = createSupabaseAdmin();
-    const recipientEmails = allMessages.map((m) => m.to);
-    const { data: optedOutUsers } = await supabaseAdmin
-      .from("app_user")
-      .select("email")
-      .in("email", recipientEmails)
-      .eq("email_notifications_enabled", false);
+    // (graceful: if the column doesn't exist yet, skip filtering)
+    let messages = allMessages;
+    try {
+      const supabaseAdmin = createSupabaseAdmin();
+      const recipientEmails = allMessages.map((m) => m.to);
+      const { data: optedOutUsers, error: optOutError } = await supabaseAdmin
+        .from("app_user")
+        .select("email")
+        .in("email", recipientEmails)
+        .eq("email_notifications_enabled", false);
 
-    const optedOutEmails = new Set((optedOutUsers || []).map((u: { email: string }) => u.email));
-    const messages = allMessages.filter((m) => !optedOutEmails.has(m.to));
+      if (!optOutError && optedOutUsers) {
+        const optedOutEmails = new Set(optedOutUsers.map((u: { email: string }) => u.email));
+        messages = allMessages.filter((m) => !optedOutEmails.has(m.to));
+      }
+    } catch (optErr) {
+      console.warn("Opt-out filter skipped (column may not exist):", optErr);
+    }
 
     if (messages.length === 0) {
       return new Response(JSON.stringify({ sent: 0, note: "All recipients have opted out of email notifications" }), {
@@ -671,7 +679,7 @@ Deno.serve(async (req: Request) => {
           from: `${FROM_NAME} <${FROM()}>`,
           to: msg.to,
           subject: msg.subject,
-          content: "auto",
+          content: "",
           html: msg.html,
         });
         sent++;
@@ -852,27 +860,31 @@ const TEMPLATE_SHELL_END = `
 </body></html>`;
 
 function wrapTemplate(title: string, subtitle: string, bodyHtml: string, ctaText: string, ctaUrl: string): string {
-  return `${TEMPLATE_SHELL_START}
-            <tr><td style="padding:0 0 8px 0;">
-              <h1 style="margin:0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.04em;text-transform:uppercase;color:#111111;">${title}</h1>
-            </td></tr>
-            <tr><td style="padding:0 0 32px 0;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-                <td style="width:3px;background-color:#C4291E;"></td>
-                <td style="padding:4px 0 4px 12px;">
-                  <p style="margin:0;font-family:'Space Mono',monospace;font-size:12px;color:rgba(17,17,17,0.5);line-height:1.5;">${subtitle}</p>
-                </td>
-              </tr></table>
-            </td></tr>
-            <tr><td style="padding:0 0 32px 0;">
-              ${bodyHtml}
-            </td></tr>
-            <tr><td style="padding:0 0 32px 0;" align="center">
-              <a href="${ctaUrl}" target="_blank" style="display:inline-block;background-color:#111111;color:#F5F3EE;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;text-decoration:none;padding:16px 48px;border-radius:12px;">
-                ${ctaText}
-              </a>
-            </td></tr>
-  ${TEMPLATE_SHELL_END}`;
+  // Build compact HTML with no inter-tag whitespace (prevents =20 QP artifacts)
+  const html = [
+    TEMPLATE_SHELL_START,
+    `<tr><td style="padding:0 0 8px 0;">`,
+    `<h1 style="margin:0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.04em;text-transform:uppercase;color:#111111;">${title}</h1>`,
+    `</td></tr>`,
+    `<tr><td style="padding:0 0 32px 0;">`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>`,
+    `<td style="width:3px;background-color:#C4291E;"></td>`,
+    `<td style="padding:4px 0 4px 12px;">`,
+    `<p style="margin:0;font-family:'Space Mono',monospace;font-size:12px;color:rgba(17,17,17,0.5);line-height:1.5;">${subtitle}</p>`,
+    `</td>`,
+    `</tr></table>`,
+    `</td></tr>`,
+    `<tr><td style="padding:0 0 32px 0;">`,
+    bodyHtml,
+    `</td></tr>`,
+    `<tr><td style="padding:0 0 32px 0;" align="center">`,
+    `<a href="${ctaUrl}" target="_blank" style="display:inline-block;background-color:#111111;color:#F5F3EE;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;text-decoration:none;padding:16px 48px;border-radius:12px;">`,
+    ctaText,
+    `</a>`,
+    `</td></tr>`,
+    TEMPLATE_SHELL_END,
+  ].join("");
+  return html;
 }
 
 // ─── Individual Templates ───
@@ -996,4 +1008,3 @@ const TEMPLATE_WELCOME_BACK = wrapTemplate(
   "Explore Makerspace",
   "{{site_url}}"
 );
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  

@@ -118,9 +118,22 @@ function MentionInput({ value, onChange, onSubmit, onCancel, placeholder, maxLen
     const [mentionQuery, setMentionQuery] = useState<{ start: number; query: string } | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const hasAutoFocused = useRef(false);
 
     // Load users on mount
     useEffect(() => { ensureUsersLoaded(); }, []);
+
+    // Auto-place cursor at end when value is prefilled with @mention (e.g. reply)
+    useEffect(() => {
+        if (autoFocus && !hasAutoFocused.current && inputRef.current && value) {
+            hasAutoFocused.current = true;
+            const el = inputRef.current;
+            setTimeout(() => {
+                el.focus();
+                el.setSelectionRange(value.length, value.length);
+            }, 0);
+        }
+    }, [autoFocus, value]);
 
     const updateSuggestions = useCallback((text: string, cursorPos: number) => {
         // Find the last @ before cursor that doesn't have a space before the @
@@ -170,8 +183,14 @@ function MentionInput({ value, onChange, onSubmit, onCancel, placeholder, maxLen
         onChange(newValue);
         setSuggestions([]);
         setMentionQuery(null);
-        // Re-focus input
-        setTimeout(() => inputRef.current?.focus(), 0);
+        // Re-focus input and place cursor after the mention
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+                const cursorPos = before.length + userName.length + 2;
+                inputRef.current.setSelectionRange(cursorPos, cursorPos);
+            }
+        }, 0);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -201,8 +220,33 @@ function MentionInput({ value, onChange, onSubmit, onCancel, placeholder, maxLen
         if (e.key === 'Escape' && onCancel) onCancel();
     };
 
+    // Check if value contains any @mentions (for the overlay)
+    const hasMentions = /@\w+/.test(value);
+
+    // Render highlight overlay — shows @mentions in red over the input text
+    const renderHighlight = () => {
+        const parts = value.split(/(@\w+(?:\s\w+)*)/g);
+        return parts.map((part, i) =>
+            part.startsWith('@') ? (
+                <span key={i} className="text-brutal-red font-bold">{part}</span>
+            ) : (
+                <span key={i} style={{ visibility: 'hidden' }}>{part || '\u200b'}</span>
+            )
+        );
+    };
+
     return (
         <div className="relative">
+            {/* Highlight overlay — shows @mentions in red */}
+            {hasMentions && (
+                <div
+                    aria-hidden
+                    className={`${className || ''} absolute inset-0 pointer-events-none whitespace-pre overflow-hidden`}
+                    style={{ color: 'transparent', background: 'transparent', borderColor: 'transparent' }}
+                >
+                    {renderHighlight()}
+                </div>
+            )}
             <input
                 ref={inputRef}
                 type="text"
@@ -213,7 +257,7 @@ function MentionInput({ value, onChange, onSubmit, onCancel, placeholder, maxLen
                 onClick={(e) => updateSuggestions(value, (e.target as HTMLInputElement).selectionStart || value.length)}
                 placeholder={placeholder}
                 className={className}
-                autoFocus={autoFocus}
+                autoFocus={autoFocus && !value}
             />
             {/* Mention autocomplete dropdown */}
             {suggestions.length > 0 && (

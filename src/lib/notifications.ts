@@ -34,8 +34,6 @@ export async function sendNotificationEmail(
       { body: { type, data } },
     );
 
-    // supabase.functions.invoke doesn't throw on server errors —
-    // it returns { error } instead. Log it so we can debug.
     if (error) {
       console.warn('[notifications] Edge Function returned error:', error);
       return;

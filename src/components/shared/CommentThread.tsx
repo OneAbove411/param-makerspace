@@ -89,11 +89,14 @@ let cachePromise: Promise<void> | null = null;
 function ensureUsersLoaded(): Promise<void> {
     if (cachedUsers) return Promise.resolve();
     if (cachePromise) return cachePromise;
-    cachePromise = supabase
-        .from('app_user')
-        .select('id, name')
-        .then(({ data }) => { cachedUsers = data || []; })
-        .catch(() => { cachedUsers = []; });
+    cachePromise = (async () => {
+        try {
+            const { data } = await supabase.from('app_user').select('id, name');
+            cachedUsers = data || [];
+        } catch {
+            cachedUsers = [];
+        }
+    })();
     return cachePromise;
 }
 
@@ -659,12 +662,6 @@ export default function CommentThread({
                     />
                 ))}
             </div>
-
-            {!loading && comments.length === 0 && (
-                <p className="font-data text-sm text-brutal-dark/25 py-4 text-center">
-                    No comments yet. Be the first to share your thoughts.
-                </p>
-            )}
 
             {/* Report modal */}
             {reportingId && (

@@ -472,7 +472,7 @@ export function useComments(targetType: TargetType, targetId: string | undefined
             const { error } = await supabase.from('comment_report').insert({
                 comment_id: commentId,
                 reporter_id: user.id,
-                reason,
+                reason: reason as 'spam' | 'harassment' | 'inappropriate' | 'other',
                 details: details || null,
             });
             if (error) {
@@ -490,11 +490,9 @@ export function useComments(targetType: TargetType, targetId: string | undefined
         }
     };
 
-    const totalCount = flatComments.length;
-
     return {
         comments: threadedComments,
-        totalCount,
+        totalCount: flatComments.length,
         loading,
         sortMode,
         setSortMode,

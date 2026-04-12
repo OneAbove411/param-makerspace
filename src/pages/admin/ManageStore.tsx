@@ -61,7 +61,8 @@ export function ManageStore() {
 
     // Compute counts per category for tab badges
     const catCounts = (products || []).reduce<Record<string, number>>((acc, p) => {
-        acc[p.category] = (acc[p.category] || 0) + 1;
+        const cat = p.category ?? 'uncategorized';
+        acc[cat] = (acc[cat] || 0) + 1;
         return acc;
     }, {});
     const tabsWithCounts = CATEGORY_TABS.map(t => ({

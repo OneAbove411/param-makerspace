@@ -1,13 +1,4 @@
-// ─── Param Makerspace: Notification Email Edge Function ───
-// Single Edge Function that handles ALL outbound transactional emails.
-// Uses Google Workspace SMTP (smtp.gmail.com) via Deno's built-in SMTP support.
-//
-// Environment secrets (set via `supabase secrets set`):
-//   SMTP_USER        = makersadmin@paraminnovation.org
-//   SMTP_PASS        = Google App Password
-//   SUPABASE_URL     = https://jtbiupmtrblbruzjyvvw.supabase.co
-//   SUPABASE_SERVICE_ROLE_KEY = (service role key for server-side DB access)
-//   SITE_URL         = https://makerspace.paraminnovation.org (or your domain)
+
 
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";

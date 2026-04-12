@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { useEvent, useEventRegistration, useComments, useEventHosts } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -23,9 +23,11 @@ export function EventDetails() {
     const { data: event, loading } = useEvent(id);
     const { user } = useAuth();
     const { isRegistered, register, unregister } = useEventRegistration(id);
-    const { comments, addComment, deleteComment, editComment } = useComments('event', id);
+    const {
+        comments, totalCount, loading: commentsLoading, sortMode, setSortMode,
+        addComment, editComment, deleteComment, toggleCommentLike, togglePin, reportComment,
+    } = useComments('event', id);
     const { data: hosts } = useEventHosts(id);
-    const [commentText, setCommentText] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
     const pageRef = useRef<HTMLDivElement>(null);
 
@@ -67,13 +69,6 @@ export function EventDetails() {
         setActionLoading(false);
     };
 
-    const handleComment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!commentText.trim()) return;
-        await addComment(commentText.trim());
-        setCommentText('');
-    };
-
     if (loading) {
         return (
             <div className="pt-32 px-12 flex-1 w-full bg-brutal-bg min-h-screen">
@@ -98,7 +93,14 @@ export function EventDetails() {
     const isPast = new Date(event.date) < new Date();
     const capacityRemaining = event.capacity ? event.capacity - event.registration_count : null;
 
-    const commentsProps = { comments, user, deleteComment, editComment, handleComment, commentText, setCommentText };
+    const isEventOwner = !!(user && event && (event as any).created_by === user.id);
+    const commentsProps = {
+        comments, totalCount, loading: commentsLoading, user,
+        sortMode, setSortMode,
+        addComment, editComment, deleteComment,
+        toggleCommentLike, togglePin, reportComment,
+        isTargetOwner: isEventOwner,
+    };
     const registrationProps = { isRegistered, event, user, actionLoading, handleRegister, handleUnregister, capacityRemaining };
 
     return (

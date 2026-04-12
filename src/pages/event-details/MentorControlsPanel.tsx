@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Check, X } from 'lucide-react';
+import { Shield, Check, X, Send, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useMyEventWebsite, useEventWebsiteMutations } from '../../lib/hooks';
 import { WebsiteUploadPanel } from '../../components/event/WebsiteUploadPanel';
+import { sendNotificationEmail } from '../../lib/notifications';
 
-type MentorTab = 'page' | 'registrations' | 'slots';
+type MentorTab = 'page' | 'registrations' | 'slots' | 'broadcast';
 
 const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) => {
     // ─── HOOKS — MUST be called unconditionally, in the same order every render ───
@@ -16,6 +17,14 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
     const [loadingRegs, setLoadingRegs] = useState(false);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    // Broadcast email state
+    const [broadcastSubject, setBroadcastSubject] = useState('');
+    const [broadcastBody, setBroadcastBody] = useState('');
+    const [broadcastSending, setBroadcastSending] = useState(false);
+    const [broadcastResult, setBroadcastResult] = useState<{ success: boolean; message: string } | null>(null);
+    const [emailLogs, setEmailLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
 
     // Pass undefined when not a mentor so the query no-ops, but the hook is still called.
     const { data: myWebsite, refetch: refetchMyWebsite } = useMyEventWebsite(isMentorOrAdmin ? eventId : undefined as any);
@@ -43,6 +52,40 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
         setLoadingSlots(false);
     };
 
+    const fetchEmailLogs = async () => {
+        setLoadingLogs(true);
+        const { data } = await supabase
+            .from('event_email_log')
+            .select('id, subject, body, recipient_count, sent_at, sent_by, app_user:app_user!sent_by(name)')
+            .eq('event_id', eventId)
+            .order('sent_at', { ascending: false })
+            .limit(10);
+        setEmailLogs(data || []);
+        setLoadingLogs(false);
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!broadcastSubject.trim() || !broadcastBody.trim()) return;
+        setBroadcastSending(true);
+        setBroadcastResult(null);
+        try {
+            await sendNotificationEmail('event_broadcast', {
+                event_id: eventId,
+                subject: broadcastSubject.trim(),
+                body: broadcastBody.trim(),
+                sent_by: user.id,
+            });
+            setBroadcastResult({ success: true, message: 'Broadcast email sent to all registrants.' });
+            setBroadcastSubject('');
+            setBroadcastBody('');
+            // Refresh logs after a short delay to let the Edge Function insert the log
+            setTimeout(() => fetchEmailLogs(), 2000);
+        } catch {
+            setBroadcastResult({ success: false, message: 'Failed to send broadcast. Check console for details.' });
+        }
+        setBroadcastSending(false);
+    };
+
     // Fetch on tab change (only when data needed). Hook is always called.
     useEffect(() => {
         if (!isMentorOrAdmin) return;
@@ -51,6 +94,9 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
         }
         if (activeTab === 'slots' && slots.length === 0 && !loadingSlots) {
             fetchSlots();
+        }
+        if (activeTab === 'broadcast' && emailLogs.length === 0 && !loadingLogs) {
+            fetchEmailLogs();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, isMentorOrAdmin]);
@@ -111,6 +157,7 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
         { key: 'page', label: 'Event Page', count: websiteStatusLabel },
         { key: 'registrations', label: 'Registrations', count: registrations.length },
         { key: 'slots', label: 'Showcase Slots', count: slots.length },
+        { key: 'broadcast', label: 'Email Blast', count: emailLogs.length || undefined },
     ];
 
     const pendingSlots = slots.filter(s => s.status === 'pending');
@@ -257,6 +304,109 @@ const MentorControlsPanel = ({ eventId, user }: { eventId: string; user: any }) 
                                         </div>
                                     </div>
                                 ))
+                            )}
+                        </div>
+                    )}
+
+                    {/* BROADCAST EMAIL TAB */}
+                    {activeTab === 'broadcast' && (
+                        <div className="space-y-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Mail className="w-3.5 h-3.5 text-brutal-red" />
+                                    <h4 className="font-heading font-bold text-sm uppercase tracking-tight-heading text-brutal-dark">
+                                        Email All Registrants
+                                    </h4>
+                                </div>
+                                <p className="font-data text-[11px] text-brutal-dark/55">
+                                    Send a broadcast email to everyone registered for this event. Use this for updates, reminders, or announcements.
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/60 block mb-1">
+                                        Subject
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={broadcastSubject}
+                                        onChange={e => setBroadcastSubject(e.target.value)}
+                                        placeholder="e.g. Important update about Tech Tuesday"
+                                        className="w-full px-3 py-2.5 rounded-lg border-2 border-brutal-dark/10 bg-brutal-bg font-data text-sm text-brutal-dark placeholder:text-brutal-dark/30 focus:outline-none focus:border-brutal-red/40 transition-colors"
+                                        disabled={broadcastSending}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/60 block mb-1">
+                                        Message
+                                    </label>
+                                    <textarea
+                                        value={broadcastBody}
+                                        onChange={e => setBroadcastBody(e.target.value)}
+                                        placeholder="Write your message here... This will be sent as the email body to all registrants."
+                                        rows={5}
+                                        className="w-full px-3 py-2.5 rounded-lg border-2 border-brutal-dark/10 bg-brutal-bg font-data text-sm text-brutal-dark placeholder:text-brutal-dark/30 focus:outline-none focus:border-brutal-red/40 transition-colors resize-y"
+                                        disabled={broadcastSending}
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="font-data text-[10px] text-brutal-dark/40">
+                                        {registrations.length > 0
+                                            ? `Will be sent to ${registrations.length} registrant${registrations.length === 1 ? '' : 's'}`
+                                            : 'Will be sent to all registered attendees'}
+                                    </span>
+                                    <button
+                                        onClick={handleSendBroadcast}
+                                        disabled={broadcastSending || !broadcastSubject.trim() || !broadcastBody.trim()}
+                                        className="inline-flex items-center gap-2 bg-brutal-red text-brutal-bg px-4 py-2 rounded-lg font-data text-xs font-bold uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        {broadcastSending ? 'Sending...' : 'Send Broadcast'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {broadcastResult && (
+                                <div className={`px-3 py-2.5 rounded-lg border-2 font-data text-xs ${
+                                    broadcastResult.success
+                                        ? 'bg-green-50 border-green-200 text-green-700'
+                                        : 'bg-red-50 border-red-200 text-red-700'
+                                }`}>
+                                    {broadcastResult.message}
+                                </div>
+                            )}
+
+                            {/* Previous broadcasts log */}
+                            {emailLogs.length > 0 && (
+                                <div className="pt-3 border-t-2 border-brutal-dark/5">
+                                    <h5 className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/40 mb-2">
+                                        Previous Broadcasts
+                                    </h5>
+                                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                        {emailLogs.map(log => (
+                                            <div key={log.id} className="py-2 px-3 bg-brutal-dark/[0.03] rounded-lg border border-brutal-dark/5">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <span className="font-data text-xs font-bold block truncate">{log.subject}</span>
+                                                        <span className="font-data text-[10px] text-brutal-dark/50 line-clamp-1">{log.body}</span>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="font-data text-[9px] text-brutal-dark/40 block">
+                                                            {new Date(log.sent_at).toLocaleDateString()}
+                                                        </span>
+                                                        <span className="font-data text-[9px] text-brutal-dark/30">
+                                                            {log.recipient_count} recipient{log.recipient_count === 1 ? '' : 's'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <span className="font-data text-[9px] text-brutal-dark/30 mt-0.5 block">
+                                                    by {log.app_user?.name || 'Unknown'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     )}

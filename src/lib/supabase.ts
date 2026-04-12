@@ -188,6 +188,9 @@ const lockFreeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 // lock-free fetch instead of the stale bound fetchWithAuth.
 (supabase as any).fetch = lockFreeFetch;
 (supabase as any).rest.fetch = lockFreeFetch;
+// Also patch the functions client so Edge Function invocations
+// don't get stuck behind auth lock refreshes.
+(supabase as any).functions.fetch = lockFreeFetch;
 
 // ─── Auth error handler (used by auth.tsx) ───
 export function handleAuthError(status: number): void {

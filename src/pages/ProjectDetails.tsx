@@ -29,14 +29,12 @@ import {
     Package,
     Target,
     FileText,
-    MoreHorizontal,
-    Pencil,
-    Trash2,
 } from 'lucide-react';
 import { getEmbedUrl, getYoutubeThumbnail } from '../lib/videoUtils';
 import { ProjectBomTab } from '../components/project/ProjectBomTab';
 import { ProjectFilesTab } from '../components/project/ProjectFilesTab';
 import { ProjectMakesTab } from '../components/project/ProjectMakesTab';
+import CommentThread from '../components/shared/CommentThread';
 import { cn } from '../lib/utils';
 import { XpRewardBadge } from '../components/ui/XpRewardBadge';
 import { XP_REWARDS, RANK_THRESHOLDS, RANK_ORDER } from '../lib/constants';
@@ -269,19 +267,15 @@ export function ProjectDetails() {
     const { data: project, loading } = useProject(id);
     const { user } = useAuth();
     const { counts, myReactions, toggle } = useReaction('project', id);
-    const { comments, addComment, deleteComment, editComment } = useComments('project', id);
+    const {
+        comments, totalCount, loading: commentsLoading, sortMode, setSortMode,
+        addComment, editComment, deleteComment, toggleCommentLike, togglePin, reportComment,
+    } = useComments('project', id);
     const navigate = useNavigate();
     const location = useLocation();
     const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
     const [remixModalOpen, setRemixModalOpen] = useState(false);
-    const [commentText, setCommentText] = useState('');
-    const [submittingComment, setSubmittingComment] = useState(false);
-    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-    const [editCommentText, setEditCommentText] = useState('');
-    const [commentMenuOpenId, setCommentMenuOpenId] = useState<string | null>(null);
-    const commentMenuRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState<ContentTab>('bom');
-    const MAX_COMMENT = 500;
 
     const pageRef = useRef<HTMLDivElement>(null);
     const heroImageRef = useRef<HTMLImageElement>(null);
@@ -315,16 +309,6 @@ export function ProjectDetails() {
         toggle(type);
     };
 
-    const handleComment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const trimmed = commentText.trim();
-        if (!trimmed || trimmed.length > MAX_COMMENT) return;
-        setSubmittingComment(true);
-        const { error } = await addComment(trimmed);
-        setSubmittingComment(false);
-        if (!error) setCommentText('');
-    };
-
     const coverImage = useMemo(() => {
         if (!project) return null;
         return project.images?.[0]?.image_url || (project as any).cover_image_url || null;
@@ -351,17 +335,6 @@ export function ProjectDetails() {
     }, [project]);
 
     const xpPotential = XP_REWARDS.project_active; // max possible for a project
-
-    // Close comment action menu on outside click
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (commentMenuRef.current && !commentMenuRef.current.contains(e.target as Node)) {
-                setCommentMenuOpenId(null);
-            }
-        };
-        if (commentMenuOpenId) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [commentMenuOpenId]);
 
     // ── GSAP ScrollTrigger animations ────────────────────────────
     useEffect(() => {
@@ -637,7 +610,7 @@ export function ProjectDetails() {
                         </div>
                         <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2 text-center">
                             <MessageCircle size={11} className="mx-auto text-brutal-red mb-0.5" />
-                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-dark block leading-none">{comments.length}</span>
+                            <span className="font-heading font-bold text-sm tabular-nums text-brutal-dark block leading-none">{totalCount}</span>
                             <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-dark/40">Comments</span>
                         </div>
                         <div className="rounded-xl border border-brutal-dark/10 bg-brutal-dark/[0.02] p-2 text-center">
@@ -718,7 +691,7 @@ export function ProjectDetails() {
                         />
                         <StatCard
                             label="Comments"
-                            value={comments.length}
+                            value={totalCount}
                             icon={<MessageCircle size={12} />}
                         />
                         <StatCard label="Photos" value={project.images?.length || 0} icon={<ImageIcon size={12} />} />
@@ -960,177 +933,26 @@ export function ProjectDetails() {
                         <StorySection id="discussion">
                             <SectionLabel>
                                 Discussion
-                                {comments.length > 0 && (
-                                    <span className="ml-2 tabular-nums text-brutal-dark/35">{comments.length}</span>
+                                {totalCount > 0 && (
+                                    <span className="ml-2 tabular-nums text-brutal-dark/35">{totalCount}</span>
                                 )}
                             </SectionLabel>
 
-                            {user ? (
-                                <form onSubmit={handleComment} className="flex items-start gap-3 mb-5">
-                                    <div className="w-7 h-7 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-[10px] flex-shrink-0">
-                                        {user.email?.charAt(0).toUpperCase() || '?'}
-                                    </div>
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            value={commentText}
-                                            maxLength={MAX_COMMENT}
-                                            onChange={(e) => setCommentText(e.target.value)}
-                                            placeholder="Add a comment..."
-                                            className="w-full bg-transparent text-brutal-dark border-b-2 border-brutal-dark/10 px-0 py-2
-                                                       font-data text-sm placeholder:text-brutal-dark/30
-                                                       focus:outline-none focus:border-brutal-red/50 transition-colors"
-                                        />
-                                        {commentText.trim() && (
-                                            <div className="flex items-center justify-end gap-2 mt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCommentText('')}
-                                                    className="font-data text-[11px] font-bold uppercase tracking-wider text-brutal-dark/40 hover:text-brutal-dark px-3 py-1.5"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    type="submit"
-                                                    disabled={submittingComment}
-                                                    className="font-data text-[11px] font-bold uppercase tracking-wider bg-brutal-red text-brutal-bg px-4 py-1.5 rounded-lg disabled:opacity-50 hover:bg-brutal-dark transition-colors"
-                                                >
-                                                    {submittingComment ? 'Posting...' : 'Post'}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </form>
-                            ) : (
-                                <p className="font-data text-sm text-brutal-dark/50 mb-5">
-                                    <Link to="/login" className="text-brutal-red font-bold hover:underline">Log in</Link> to join the discussion.
-                                </p>
-                            )}
-
-                            <div className="space-y-1">
-                                {comments.map((c: any) => {
-                                    const timeAgo = (() => {
-                                        const diff = Date.now() - new Date(c.created_at).getTime();
-                                        const mins = Math.floor(diff / 60000);
-                                        if (mins < 1) return 'just now';
-                                        if (mins < 60) return `${mins}m`;
-                                        const hrs = Math.floor(mins / 60);
-                                        if (hrs < 24) return `${hrs}h`;
-                                        const days = Math.floor(hrs / 24);
-                                        if (days < 7) return `${days}d`;
-                                        return new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                    })();
-                                    const isEdited = c.updated_at && c.created_at && c.updated_at !== c.created_at;
-                                    const isOwner = user && c.user_id === user.id;
-                                    return (
-                                        <div key={c.id} className="py-3 border-b border-brutal-dark/5 last:border-0">
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-6 h-6 rounded-full bg-brutal-dark text-brutal-bg font-heading font-bold flex items-center justify-center text-[9px] flex-shrink-0">
-                                                    {c.userName?.charAt(0) || '?'}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-data text-[11px] font-bold text-brutal-dark">{c.userName || 'Anonymous'}</span>
-                                                        <span className="font-data text-[10px] text-brutal-dark/30">{timeAgo}</span>
-                                                        {isEdited && <span className="font-data text-[9px] italic text-brutal-dark/25">(edited)</span>}
-                                                    </div>
-                                                    {editingCommentId === c.id ? (
-                                                        <div className="mt-1 space-y-2">
-                                                            <input
-                                                                type="text"
-                                                                value={editCommentText}
-                                                                maxLength={MAX_COMMENT}
-                                                                onChange={(e) => setEditCommentText(e.target.value)}
-                                                                className="w-full bg-white border-b-2 border-brutal-dark/20 px-0 py-1.5 font-data text-[12px] text-brutal-dark focus:outline-none focus:border-brutal-red/50 transition-colors"
-                                                                autoFocus
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') {
-                                                                        e.preventDefault();
-                                                                        const trimmed = editCommentText.trim();
-                                                                        if (trimmed) {
-                                                                            editComment(c.id, trimmed);
-                                                                            setEditingCommentId(null);
-                                                                            setEditCommentText('');
-                                                                        }
-                                                                    }
-                                                                    if (e.key === 'Escape') {
-                                                                        setEditingCommentId(null);
-                                                                        setEditCommentText('');
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <div className="flex items-center gap-2 justify-end">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => { setEditingCommentId(null); setEditCommentText(''); }}
-                                                                    className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/40 hover:text-brutal-dark px-2 py-1"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={!editCommentText.trim()}
-                                                                    onClick={() => {
-                                                                        const trimmed = editCommentText.trim();
-                                                                        if (trimmed) {
-                                                                            editComment(c.id, trimmed);
-                                                                            setEditingCommentId(null);
-                                                                            setEditCommentText('');
-                                                                        }
-                                                                    }}
-                                                                    className="font-data text-[10px] font-bold uppercase tracking-wider bg-brutal-red text-brutal-bg px-3 py-1 rounded disabled:opacity-50 hover:bg-brutal-dark transition-colors"
-                                                                >
-                                                                    Save
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="font-data text-[12px] text-brutal-dark/75 leading-relaxed mt-0.5">
-                                                            {c.content}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {/* Action menu below comment — always visible to owner, hidden for others */}
-                                            {isOwner && editingCommentId !== c.id && (
-                                                <div className="relative ml-9 mt-1" ref={commentMenuOpenId === c.id ? commentMenuRef : null}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCommentMenuOpenId(commentMenuOpenId === c.id ? null : c.id)}
-                                                        className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-brutal-dark/10 transition-colors text-brutal-dark/40 hover:text-brutal-dark/70"
-                                                        aria-label="Comment actions"
-                                                    >
-                                                        <MoreHorizontal className="w-4 h-4" />
-                                                    </button>
-                                                    {commentMenuOpenId === c.id && (
-                                                        <div className="absolute left-0 top-full mt-1 z-20 bg-white border-2 border-brutal-dark/10 rounded-lg shadow-lg py-1 min-w-[130px]">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); setCommentMenuOpenId(null); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left font-data text-[11px] text-brutal-dark/70 hover:bg-brutal-dark/5 transition-colors"
-                                                            >
-                                                                <Pencil className="w-3.5 h-3.5" /> Edit
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => { setCommentMenuOpenId(null); deleteComment(c.id); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left font-data text-[11px] text-brutal-red hover:bg-brutal-red/5 transition-colors"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" /> Delete
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                                {comments.length === 0 && (
-                                    <p className="font-data text-sm text-brutal-dark/25 py-4 text-center">
-                                        No comments yet. Be the first to share your thoughts.
-                                    </p>
-                                )}
-                            </div>
+                            <CommentThread
+                                comments={comments}
+                                totalCount={totalCount}
+                                loading={commentsLoading}
+                                user={user}
+                                sortMode={sortMode}
+                                setSortMode={setSortMode}
+                                addComment={addComment}
+                                editComment={editComment}
+                                deleteComment={deleteComment}
+                                toggleCommentLike={toggleCommentLike}
+                                togglePin={togglePin}
+                                reportComment={reportComment}
+                                isTargetOwner={!!(user && project && (project as any).user_id === user.id)}
+                            />
                         </StorySection>
                     </div>
 

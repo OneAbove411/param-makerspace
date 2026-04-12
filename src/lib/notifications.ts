@@ -12,6 +12,8 @@ export type NotificationEmailType =
   | 'project_approved'
   | 'project_rejected'
   | 'new_comment'
+  | 'comment_reply'
+  | 'comment_mention'
   | 'new_reaction'
   | 'event_broadcast'
   | 'event_update'
@@ -27,11 +29,23 @@ export async function sendNotificationEmail(
   data: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await supabase.functions.invoke('send-notification-email', {
-      body: { type, data },
-    });
+    const { data: responseData, error } = await supabase.functions.invoke(
+      'send-notification-email',
+      { body: { type, data } },
+    );
+
+    // supabase.functions.invoke doesn't throw on server errors —
+    // it returns { error } instead. Log it so we can debug.
+    if (error) {
+      console.warn('[notifications] Edge Function returned error:', error);
+      return;
+    }
+
+    if (responseData) {
+      console.info('[notifications] Email result:', responseData);
+    }
   } catch (err) {
-    // Log but don't surface to the user — notifications are best-effort
-    console.warn('[notifications] Failed to send notification email:', err);
+    // Network-level failure (timeout, DNS, CORS, etc.)
+    console.warn('[notifications] Failed to invoke Edge Function:', err);
   }
 }

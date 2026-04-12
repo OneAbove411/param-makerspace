@@ -1,5 +1,4 @@
 
-
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -14,6 +13,8 @@ type EmailType =
   | "project_approved"
   | "project_rejected"
   | "new_comment"
+  | "comment_reply"
+  | "comment_mention"
   | "new_reaction"
   | "event_update"
   | "event_reminder"
@@ -192,6 +193,10 @@ async function buildNewComment(data: Record<string, unknown>): Promise<EmailMess
   // Don't notify if user comments on their own content
   if (target.ownerId === commenterId) return [];
 
+  // Skip if the owner was already notified via mention or reply
+  const alreadyNotified = (data.already_notified_ids as string[] | undefined) || [];
+  if (alreadyNotified.includes(target.ownerId)) return [];
+
   const { data: commenter } = await supabase
     .from("app_user")
     .select("name")
@@ -217,6 +222,94 @@ async function buildNewComment(data: Record<string, unknown>): Promise<EmailMess
       project_title: target.title,
       comment_preview: commentContent.slice(0, 200),
       project_url: target.url,
+    }),
+  }];
+}
+
+async function buildCommentReply(data: Record<string, unknown>): Promise<EmailMessage[]> {
+  const supabase = createSupabaseAdmin();
+  const targetType = data.target_type as string;
+  const targetId = data.target_id as string;
+  const replierId = data.replier_id as string;
+  const parentUserId = data.parent_comment_user_id as string;
+  const commentContent = data.comment_content as string;
+
+  // Don't notify if user replies to their own comment
+  if (replierId === parentUserId) return [];
+
+  const target = await resolveTarget(supabase, targetType, targetId);
+  if (!target) return [];
+
+  const { data: replier } = await supabase
+    .from("app_user")
+    .select("name")
+    .eq("id", replierId)
+    .single();
+
+  const { data: parentUser } = await supabase
+    .from("app_user")
+    .select("email, name")
+    .eq("id", parentUserId)
+    .single();
+
+  if (!parentUser || !replier) return [];
+
+  const label = targetLabel(targetType);
+
+  return [{
+    to: parentUser.email,
+    subject: `${replier.name} replied to your comment on "${target.title}"`,
+    html: renderTemplate("comment_reply", {
+      user_name: parentUser.name,
+      replier_name: replier.name,
+      target_title: target.title,
+      target_label: label,
+      comment_preview: commentContent.slice(0, 200),
+      target_url: target.url,
+    }),
+  }];
+}
+
+async function buildCommentMention(data: Record<string, unknown>): Promise<EmailMessage[]> {
+  const supabase = createSupabaseAdmin();
+  const targetType = data.target_type as string;
+  const targetId = data.target_id as string;
+  const mentionerId = data.mentioner_id as string;
+  const mentionedUserId = data.mentioned_user_id as string;
+  const commentContent = data.comment_content as string;
+
+  // Don't notify if user mentions themselves
+  if (mentionerId === mentionedUserId) return [];
+
+  const target = await resolveTarget(supabase, targetType, targetId);
+  if (!target) return [];
+
+  const { data: mentioner } = await supabase
+    .from("app_user")
+    .select("name")
+    .eq("id", mentionerId)
+    .single();
+
+  const { data: mentionedUser } = await supabase
+    .from("app_user")
+    .select("email, name")
+    .eq("id", mentionedUserId)
+    .single();
+
+  if (!mentionedUser || !mentioner) return [];
+
+  const label = targetLabel(targetType);
+
+  return [{
+    to: mentionedUser.email,
+    subject: `${mentioner.name} mentioned you in a comment on "${target.title}"`,
+    html: renderTemplate("comment_mention", {
+      user_name: mentionedUser.name,
+      mentioner_name: mentioner.name,
+      target_title: target.title,
+      target_label: label,
+      comment_preview: commentContent.slice(0, 200),
+      target_url: target.url,
     }),
   }];
 }
@@ -443,6 +536,8 @@ function renderTemplate(type: string, vars: Record<string, string>): string {
     project_approved: TEMPLATE_PROJECT_APPROVED,
     project_rejected: TEMPLATE_PROJECT_REJECTED,
     new_comment: TEMPLATE_NEW_COMMENT,
+    comment_reply: TEMPLATE_COMMENT_REPLY,
+    comment_mention: TEMPLATE_COMMENT_MENTION,
     new_reaction: TEMPLATE_NEW_REACTION,
     event_broadcast: TEMPLATE_EVENT_BROADCAST,
     event_reminder: TEMPLATE_EVENT_REMINDER,
@@ -485,6 +580,8 @@ const builders: Record<EmailType, (data: Record<string, unknown>) => Promise<Ema
   project_approved: buildProjectApproved,
   project_rejected: buildProjectRejected,
   new_comment: buildNewComment,
+  comment_reply: buildCommentReply,
+  comment_mention: buildCommentMention,
   new_reaction: buildNewReaction,
   event_update: buildEventBroadcast,  // alias
   event_broadcast: buildEventBroadcast,
@@ -494,23 +591,22 @@ const builders: Record<EmailType, (data: Record<string, unknown>) => Promise<Ema
 
 // ─── Main Handler ───
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-webhook-secret, x-client-info, x-app-version, apikey",
+};
+
 Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-webhook-secret",
-      },
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -531,7 +627,7 @@ Deno.serve(async (req: Request) => {
     if (!payload.type || !builders[payload.type]) {
       return new Response(JSON.stringify({ error: `Unknown email type: ${payload.type}` }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -541,7 +637,7 @@ Deno.serve(async (req: Request) => {
     if (allMessages.length === 0) {
       return new Response(JSON.stringify({ sent: 0, note: "No recipients found or notification skipped" }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -560,7 +656,7 @@ Deno.serve(async (req: Request) => {
     if (messages.length === 0) {
       return new Response(JSON.stringify({ sent: 0, note: "All recipients have opted out of email notifications" }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -592,7 +688,7 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ sent, total: messages.length, errors: errors.length > 0 ? errors : undefined }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("Edge Function error:", err);
@@ -673,6 +769,8 @@ async function insertInAppNotifications(payload: EmailPayload, messages: EmailMe
       project_approved: `/projects/${targetId}`,
       project_rejected: "/dashboard",
       new_comment: linkMap[targetType || "project"] || `/projects/${targetId}`,
+      comment_reply: linkMap[targetType || "project"] || `/projects/${targetId}`,
+      comment_mention: linkMap[targetType || "project"] || `/projects/${targetId}`,
       new_reaction: linkMap[targetType || "project"] || `/projects/${targetId}`,
       event_broadcast: `/events/${targetId}`,
       event_update: `/events/${targetId}`,
@@ -816,6 +914,32 @@ const TEMPLATE_NEW_COMMENT = wrapTemplate(
   "{{project_url}}"
 );
 
+const TEMPLATE_COMMENT_REPLY = wrapTemplate(
+  "New Reply",
+  "Someone replied to your comment",
+  `<p style="margin:0 0 16px 0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111111;">
+    Hey {{user_name}}, <strong>{{replier_name}}</strong> replied to your comment on the {{target_label}} <strong>"{{target_title}}"</strong>:
+  </p>
+  <div style="background-color:#F5F3EE;padding:16px 20px;border-radius:8px;margin:0 0 16px 0;">
+    <p style="margin:0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#111111;font-style:italic;">"{{comment_preview}}"</p>
+  </div>`,
+  "View Reply",
+  "{{target_url}}"
+);
+
+const TEMPLATE_COMMENT_MENTION = wrapTemplate(
+  "You Were Mentioned",
+  "Someone mentioned you in a comment",
+  `<p style="margin:0 0 16px 0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111111;">
+    Hey {{user_name}}, <strong>{{mentioner_name}}</strong> mentioned you in a comment on the {{target_label}} <strong>"{{target_title}}"</strong>:
+  </p>
+  <div style="background-color:#F5F3EE;padding:16px 20px;border-radius:8px;margin:0 0 16px 0;">
+    <p style="margin:0;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#111111;font-style:italic;">"{{comment_preview}}"</p>
+  </div>`,
+  "View Comment",
+  "{{target_url}}"
+);
+
 const TEMPLATE_NEW_REACTION = wrapTemplate(
   "New {{reaction_type}}",
   "Your post is getting attention",
@@ -872,3 +996,4 @@ const TEMPLATE_WELCOME_BACK = wrapTemplate(
   "Explore Makerspace",
   "{{site_url}}"
 );
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  

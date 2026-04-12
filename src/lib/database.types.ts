@@ -383,14 +383,38 @@ export interface Comment {
     target_type: TargetType;
     target_id: string;
     user_id: string;
+    parent_id: string | null;
     content: string;
+    is_pinned: boolean;
     created_at: string;
     updated_at: string;
 }
 
+export interface CommentMention {
+    id: string;
+    comment_id: string;
+    user_id: string;
+    created_at: string;
+}
+
+export type CommentReportReason = 'spam' | 'harassment' | 'inappropriate' | 'other';
+export type CommentReportStatus = 'pending' | 'reviewed' | 'dismissed';
+
+export interface CommentReport {
+    id: string;
+    comment_id: string;
+    reporter_id: string;
+    reason: CommentReportReason;
+    details: string | null;
+    status: CommentReportStatus;
+    created_at: string;
+}
+
+export type ReactionTargetType = TargetType | 'comment';
+
 export interface Reaction {
     id: string;
-    target_type: TargetType;
+    target_type: ReactionTargetType;
     target_id: string;
     user_id: string;
     reaction_type: ReactionType;
@@ -461,6 +485,8 @@ export type NotificationType =
   | 'project_approved'
   | 'project_rejected'
   | 'new_comment'
+  | 'comment_reply'
+  | 'comment_mention'
   | 'new_reaction'
   | 'event_broadcast'
   | 'event_update'
@@ -560,6 +586,8 @@ export interface Database {
             showcase_slot: { Row: ShowcaseSlot & Record<string, unknown>; Insert: (Partial<ShowcaseSlot> & Pick<ShowcaseSlot, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<ShowcaseSlot> & Record<string, unknown>; Relationships: [] };
             event_website: { Row: EventWebsite & Record<string, unknown>; Insert: (Partial<EventWebsite> & Pick<EventWebsite, 'event_id' | 'user_id' | 'title'>) & Record<string, unknown>; Update: Partial<EventWebsite> & Record<string, unknown>; Relationships: [] };
             comment: { Row: Comment & Record<string, unknown>; Insert: (Partial<Comment> & Pick<Comment, 'target_type' | 'target_id' | 'user_id' | 'content'>) & Record<string, unknown>; Update: Partial<Comment> & Record<string, unknown>; Relationships: [] };
+            comment_mention: { Row: CommentMention & Record<string, unknown>; Insert: (Partial<CommentMention> & Pick<CommentMention, 'comment_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<CommentMention> & Record<string, unknown>; Relationships: [] };
+            comment_report: { Row: CommentReport & Record<string, unknown>; Insert: (Partial<CommentReport> & Pick<CommentReport, 'comment_id' | 'reporter_id' | 'reason'>) & Record<string, unknown>; Update: Partial<CommentReport> & Record<string, unknown>; Relationships: [] };
             reaction: { Row: Reaction & Record<string, unknown>; Insert: (Partial<Reaction> & Pick<Reaction, 'target_type' | 'target_id' | 'user_id' | 'reaction_type'>) & Record<string, unknown>; Update: Partial<Reaction> & Record<string, unknown>; Relationships: [] };
             tag: { Row: Tag & Record<string, unknown>; Insert: (Partial<Tag> & Pick<Tag, 'name'>) & Record<string, unknown>; Update: Partial<Tag> & Record<string, unknown>; Relationships: [] };
             entity_tag: { Row: EntityTag & Record<string, unknown>; Insert: (Partial<EntityTag> & Pick<EntityTag, 'target_type' | 'target_id' | 'tag_id'>) & Record<string, unknown>; Update: Partial<EntityTag> & Record<string, unknown>; Relationships: [] };

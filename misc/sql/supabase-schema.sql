@@ -375,15 +375,37 @@ CREATE TABLE comment (
     target_type TEXT NOT NULL CHECK (target_type IN ('project','challenge','event','maker_profile')),
     target_id   UUID NOT NULL,
     user_id     UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    parent_id   UUID REFERENCES comment(id) ON DELETE CASCADE,
     content     TEXT NOT NULL,
+    is_pinned   BOOLEAN NOT NULL DEFAULT false,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_comment_target ON comment(target_type, target_id);
+CREATE INDEX idx_comment_parent ON comment(parent_id);
+
+CREATE TABLE comment_mention (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    comment_id  UUID NOT NULL REFERENCES comment(id) ON DELETE CASCADE,
+    user_id     UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(comment_id, user_id)
+);
+
+CREATE TABLE comment_report (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    comment_id  UUID NOT NULL REFERENCES comment(id) ON DELETE CASCADE,
+    reporter_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    reason      TEXT NOT NULL CHECK (reason IN ('spam','harassment','inappropriate','other')),
+    details     TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reviewed','dismissed')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(comment_id, reporter_id)
+);
 
 CREATE TABLE reaction (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    target_type   TEXT NOT NULL CHECK (target_type IN ('project','challenge','event','maker_profile')),
+    target_type   TEXT NOT NULL CHECK (target_type IN ('project','challenge','event','maker_profile','comment')),
     target_id     UUID NOT NULL,
     user_id       UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
     reaction_type TEXT NOT NULL CHECK (reaction_type IN ('like','upvote','bookmark')),
@@ -740,13 +762,31 @@ CREATE POLICY ss_insert ON showcase_slot FOR INSERT WITH CHECK (user_id = get_my
 CREATE POLICY ss_read ON showcase_slot FOR SELECT USING (true);
 CREATE POLICY ss_mentor_update ON showcase_slot FOR UPDATE USING (get_my_role() IN ('mentor','admin'));
 
--- ── comment: public read, own insert, own update, own delete ──
+-- ── comment: public read, own insert, own update, own delete, pinning by target owner/admin ──
 CREATE POLICY comment_read ON comment FOR SELECT USING (true);
 CREATE POLICY comment_insert ON comment FOR INSERT WITH CHECK (user_id = get_my_app_user_id());
 CREATE POLICY comment_update_own ON comment FOR UPDATE USING (user_id = get_my_app_user_id()) WITH CHECK (user_id = get_my_app_user_id());
+CREATE POLICY comment_update_admin ON comment FOR UPDATE USING (get_my_role() IN ('mentor','admin'));
 CREATE POLICY comment_delete_own ON comment FOR DELETE USING (user_id = get_my_app_user_id());
+CREATE POLICY comment_delete_admin ON comment FOR DELETE USING (get_my_role() IN ('mentor','admin'));
 
--- ── reaction: public read, own toggle ──
+-- ── comment_mention: public read, insert with comment ──
+ALTER TABLE comment_mention ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cm_read ON comment_mention FOR SELECT USING (true);
+CREATE POLICY cm_insert ON comment_mention FOR INSERT WITH CHECK (
+  EXISTS(SELECT 1 FROM comment c WHERE c.id = comment_mention.comment_id AND c.user_id = get_my_app_user_id())
+);
+CREATE POLICY cm_delete ON comment_mention FOR DELETE USING (
+  EXISTS(SELECT 1 FROM comment c WHERE c.id = comment_mention.comment_id AND c.user_id = get_my_app_user_id())
+);
+
+-- ── comment_report: insert own, read for admin/mentor ──
+ALTER TABLE comment_report ENABLE ROW LEVEL SECURITY;
+CREATE POLICY cr_insert ON comment_report FOR INSERT WITH CHECK (reporter_id = get_my_app_user_id());
+CREATE POLICY cr_own_read ON comment_report FOR SELECT USING (reporter_id = get_my_app_user_id());
+CREATE POLICY cr_admin_all ON comment_report FOR ALL USING (get_my_role() IN ('mentor','admin'));
+
+-- ── reaction: public read, own toggle (now supports 'comment' target_type too) ──
 CREATE POLICY reaction_read ON reaction FOR SELECT USING (true);
 CREATE POLICY reaction_insert ON reaction FOR INSERT WITH CHECK (user_id = get_my_app_user_id());
 CREATE POLICY reaction_delete ON reaction FOR DELETE USING (user_id = get_my_app_user_id());

@@ -125,6 +125,10 @@ async function ensureMakerProfile(
                 .update({ declared_intent: declaredIntent })
                 .eq('user_id', userId);
         }
+        // Backfill first-login XP + Curious badge for users who signed up
+        // before onUserJoined was wired. Both awardXP and awardBadgeByName
+        // are idempotent, so this is safe to call on every session init.
+        try { await onUserJoined(userId); } catch { /* non-critical */ }
         return;
     }
 

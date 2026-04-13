@@ -4,10 +4,13 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 import { useAuth } from '../lib/auth';
 import { useNavigate, useSearchParams } from 'react-router';
-import { useMyProfile, useProfileMutation, useSupabaseQuery } from '../lib/hooks';
+import { useMyProfile, useProfileMutation, useSupabaseQuery, useUserBadges, useRankAccess } from '../lib/hooks';
 import { supabase } from '../lib/supabase';
 import { uploadFile } from '../lib/storage';
 import { useUnsavedChanges } from '../lib/useUnsavedChanges';
+import { getBadgeIcon } from '../lib/badgeIcons';
+import { getProgressToNextRank, getNextRank } from '../lib/xpEngine';
+import { RANK_THRESHOLDS } from '../lib/constants';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -42,6 +45,60 @@ const MAKER_DOMAINS = [
 ] as const;
 
 type DomainChip = (typeof MAKER_DOMAINS)[number];
+
+// ─── Predefined skills for the dropdown ────────────────────────────────
+const PREDEFINED_SKILLS = [
+    'Python',
+    'JavaScript',
+    'TypeScript',
+    'C/C++',
+    'Rust',
+    'Java',
+    'React',
+    'Node.js',
+    'Arduino',
+    'Raspberry Pi',
+    'Electronics',
+    'PCB Design',
+    'Soldering',
+    'Embedded Systems',
+    'Robotics',
+    'ROS',
+    'Computer Vision',
+    'Machine Learning',
+    'Deep Learning',
+    'NLP',
+    'Data Science',
+    '3D Printing',
+    'CAD',
+    'CNC',
+    'Laser Cutting',
+    'Woodworking',
+    'Metalworking',
+    'IoT',
+    'Wireless Comms',
+    'FPGA',
+    'Firmware',
+    'Mechanical Design',
+    'UI/UX Design',
+    'Figma',
+    'Graphic Design',
+    'Web Development',
+    'Mobile Dev',
+    'DevOps',
+    'Cloud (AWS/GCP)',
+    'Docker',
+    'Linux',
+    'Git',
+    'Databases',
+    'API Design',
+    'Cybersecurity',
+    'Quantum Computing',
+    'Bioinformatics',
+    'Signal Processing',
+    'Control Systems',
+    'Power Electronics',
+] as const;
 
 /** Normalize a comma-separated string into a clean chip array. */
 function parseChips(raw: string | null | undefined): string[] {
@@ -182,6 +239,156 @@ function ChipSelect({
     );
 }
 
+/** Skills selector — dropdown with predefined skills + "Others" for custom entry. */
+function SkillsSelector({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (skills: string) => void;
+}) {
+    const selected = useMemo(
+        () => value.split(',').map((s) => s.trim()).filter(Boolean),
+        [value]
+    );
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [customInput, setCustomInput] = useState('');
+    const [showCustom, setShowCustom] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const toggleSkill = (skill: string) => {
+        const next = selected.includes(skill)
+            ? selected.filter((s) => s !== skill)
+            : [...selected, skill];
+        onChange(next.join(', '));
+    };
+
+    const addCustomSkill = () => {
+        const trimmed = customInput.trim();
+        if (trimmed && !selected.includes(trimmed)) {
+            onChange([...selected, trimmed].join(', '));
+        }
+        setCustomInput('');
+        setShowCustom(false);
+    };
+
+    const removeSkill = (skill: string) => {
+        onChange(selected.filter((s) => s !== skill).join(', '));
+    };
+
+    // Skills not in the predefined list (user-added custom ones)
+    const customSkills = selected.filter((s) => !PREDEFINED_SKILLS.includes(s as any));
+
+    return (
+        <div>
+            <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
+                Skills
+            </label>
+
+            {/* Selected skills as removable chips */}
+            {selected.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    {selected.map((skill) => (
+                        <button
+                            key={skill}
+                            type="button"
+                            onClick={() => removeSkill(skill)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brutal-red text-brutal-bg font-data text-[11px] font-bold uppercase tracking-wide hover:bg-brutal-dark transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
+                            aria-label={`Remove ${skill}`}
+                        >
+                            {skill}
+                            <span aria-hidden className="text-brutal-bg/70 ml-0.5">×</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Dropdown trigger + dropdown */}
+            <div className="relative" ref={dropdownRef}>
+                <button
+                    type="button"
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="w-full flex items-center justify-between h-12 rounded-xl bg-brutal-bg border-2 border-brutal-dark/20 px-4 py-2 font-data text-sm text-brutal-dark/60 hover:border-brutal-red/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
+                >
+                    <span>{selected.length > 0 ? `${selected.length} skill${selected.length > 1 ? 's' : ''} selected` : 'Select your skills…'}</span>
+                    <svg className={`w-4 h-4 transition-transform ${showDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+
+                {showDropdown && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-brutal-bg border-2 border-brutal-dark/20 rounded-xl shadow-[6px_6px_0_0_rgba(196,41,30,0.18)] max-h-[280px] overflow-y-auto">
+                        <div className="p-2 grid grid-cols-2 sm:grid-cols-3 gap-1">
+                            {PREDEFINED_SKILLS.map((skill) => {
+                                const isSelected = selected.includes(skill);
+                                return (
+                                    <button
+                                        key={skill}
+                                        type="button"
+                                        onClick={() => toggleSkill(skill)}
+                                        className={`px-2.5 py-1.5 rounded-lg font-data text-[11px] font-bold text-left transition-colors ${
+                                            isSelected
+                                                ? 'bg-brutal-red text-brutal-bg'
+                                                : 'bg-brutal-bg text-brutal-dark/70 hover:bg-brutal-dark/5'
+                                        }`}
+                                    >
+                                        {skill}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Others — add custom skill */}
+                        <div className="border-t border-brutal-dark/10 p-2">
+                            {showCustom ? (
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={customInput}
+                                        onChange={(e) => setCustomInput(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSkill(); } }}
+                                        placeholder="Type a custom skill…"
+                                        className="flex-1 h-9 rounded-lg bg-brutal-bg border-2 border-brutal-dark/20 px-3 font-data text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brutal-red"
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addCustomSkill}
+                                        className="px-3 h-9 rounded-lg bg-brutal-dark text-brutal-bg font-data text-[11px] font-bold uppercase hover:bg-brutal-red transition-colors"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCustom(true)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg font-data text-[11px] font-bold text-brutal-dark/50 hover:bg-brutal-dark/5 text-left transition-colors"
+                                >
+                                    + Others (add custom skill)
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <p className="text-xs font-data text-brutal-dark/60 mt-1.5">
+                These help others find you in the directory.
+            </p>
+        </div>
+    );
+}
+
 export function ProfileSetup() {
     const pageRef = useRef<HTMLDivElement>(null);
     const { user, role } = useAuth();
@@ -198,6 +405,8 @@ export function ProfileSetup() {
 
     const { data: existingProfile, loading: profileLoading } = useMyProfile();
     const { saveProfile } = useProfileMutation();
+    const { data: myBadges } = useUserBadges(user?.id);
+    const { data: rankAccess } = useRankAccess();
 
     const [submitLoading, setSubmitLoading] = useState(false);
     const [topError, setTopError] = useState('');
@@ -214,9 +423,7 @@ export function ProfileSetup() {
         github_url: '',
         linkedin_url: '',
         website_url: '',
-        x_url: '',
-        bluesky_url: '',
-        discord_username: '',
+        instagram_url: '',
         mentor_domains: '',
         approval_domains: '',
     });
@@ -262,43 +469,67 @@ export function ProfileSetup() {
     });
     const domainLevels = Object.entries(domainMap).map(([domain, tier]) => ({ domain, tier }));
 
-    // Pre-fill form when existing profile loads
+    // Track whether we've already populated the form from the DB once.
+    // After the initial hydration, subsequent `existingProfile` changes
+    // (caused by refetches after autosave → refreshUser) must NOT reset
+    // the form — that would wipe whatever the user is currently typing.
+    const initialHydrationDoneRef = useRef(false);
+
+    // Pre-fill form when existing profile loads (ONCE only)
     useEffect(() => {
+        // Skip re-hydration if the form has already been populated.
+        if (initialHydrationDoneRef.current) return;
+
         if (existingProfile) {
             const ep = existingProfile as any;
-            setForm({
-                display_name: ep.display_name || user?.name || '',
-                bio: ep.bio || '',
-                skills: '', // Will be loaded separately via tags
-                aspirations: ep.aspirations || '',
-                github_url: ep.github_url || '',
-                linkedin_url: ep.linkedin_url || '',
-                website_url: ep.website_url || '',
-                x_url: ep.x_url || '',
-                bluesky_url: ep.bluesky_url || '',
-                discord_username: ep.discord_username || '',
-                mentor_domains: ep.mentor_domains || '',
-                approval_domains: ep.approval_domains || '',
-            });
-            setPrivacySettings({ show_email: ep.show_email || false });
-            setAvatarUrl(ep.avatar_url || null);
 
-            // §1.5 F-101: if the user landed here with a declared_intent but
-            // hasn't touched mentor_domains yet, pre-select the matching chip
-            // so the Zeigarnik build-intent becomes a visible, committed
-            // artifact instead of a one-time eyebrow line.
-            const matched = intentToDomain(ep.declared_intent);
-            if (matched && !ep.mentor_domains) {
-                setForm((prev) => ({ ...prev, mentor_domains: matched }));
-            }
+            // Load existing skills from entity_tag so autosave doesn't
+            // send an empty array and wipe them.
+            (async () => {
+                const { data: tagRows } = await supabase
+                    .from('entity_tag')
+                    .select('tag:tag(name)')
+                    .eq('target_type', 'maker_profile')
+                    .eq('target_id', ep.id);
+                const skillNames = (tagRows || [])
+                    .map((t: any) => t.tag?.name)
+                    .filter(Boolean)
+                    .join(', ');
+
+                setForm({
+                    display_name: ep.display_name || user?.name || '',
+                    bio: ep.bio || '',
+                    skills: skillNames,
+                    aspirations: ep.aspirations || '',
+                    github_url: ep.github_url || '',
+                    linkedin_url: ep.linkedin_url || '',
+                    website_url: ep.website_url || '',
+                    instagram_url: ep.instagram_url || '',
+                    mentor_domains: ep.mentor_domains || '',
+                    approval_domains: ep.approval_domains || '',
+                });
+                setPrivacySettings({ show_email: ep.show_email || false });
+                setAvatarUrl(ep.avatar_url || null);
+
+                // §1.5 F-101: if the user landed here with a declared_intent but
+                // hasn't touched mentor_domains yet, pre-select the matching chip
+                // so the Zeigarnik build-intent becomes a visible, committed
+                // artifact instead of a one-time eyebrow line.
+                const matched = intentToDomain(ep.declared_intent);
+                if (matched && !ep.mentor_domains) {
+                    setForm((prev) => ({ ...prev, mentor_domains: matched }));
+                }
+
+                // Mark initial hydration as complete so this never re-runs.
+                initialHydrationDoneRef.current = true;
+
+                // Release the hydration guard next tick so autosave doesn't
+                // fire on the initial preload.
+                setTimeout(() => { hydratedRef.current = true; }, 0);
+            })();
         } else if (user) {
             setForm((prev) => ({ ...prev, display_name: user.name || '' }));
         }
-
-        // Release the hydration guard next tick so autosave doesn't fire
-        // on the initial preload.
-        const id = setTimeout(() => { hydratedRef.current = true; }, 0);
-        return () => clearTimeout(id);
     }, [existingProfile, user]);
 
     // GSAP entrance animations (respect prefers-reduced-motion)
@@ -354,9 +585,7 @@ export function ProfileSetup() {
             linkedin_url: form.linkedin_url || undefined,
             website_url: form.website_url || undefined,
             avatar_url: avatarUrl || undefined,
-            x_url: form.x_url || undefined,
-            bluesky_url: form.bluesky_url || undefined,
-            discord_username: form.discord_username || undefined,
+            instagram_url: form.instagram_url || undefined,
             mentor_domains: form.mentor_domains || undefined,
             approval_domains: form.approval_domains || undefined,
             show_email: privacySettings.show_email,
@@ -458,7 +687,7 @@ export function ProfileSetup() {
             !!form.bio.trim(),
             form.skills.split(',').map((s) => s.trim()).filter(Boolean).length > 0,
             !!(avatarUrl || avatarPreview),
-            !!(form.github_url || form.linkedin_url || form.website_url || form.x_url || form.bluesky_url),
+            !!(form.github_url || form.linkedin_url || form.website_url || form.instagram_url),
         ];
         const done = requirements.filter(Boolean).length;
         const total = requirements.length;
@@ -750,22 +979,13 @@ export function ProfileSetup() {
                             <div id="ps-skills-heading">
                                 <SectionHeading title="Skills & goals" section="skills" />
                             </div>
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
-                                    Skills (comma separated)
-                                </label>
-                                <Input
-                                    placeholder="Hardware, Python, 3D Printing, Electronics"
-                                    value={form.skills}
-                                    onChange={(e) => {
-                                        setForm((prev) => ({ ...prev, skills: e.target.value }));
-                                        markDirtyLatest('skills');
-                                    }}
-                                />
-                                <p className="text-xs font-data text-brutal-dark/60 mt-1">
-                                    These help others find you in the directory.
-                                </p>
-                            </div>
+                            <SkillsSelector
+                                value={form.skills}
+                                onChange={(skills) => {
+                                    setForm((prev) => ({ ...prev, skills }));
+                                    markDirtyLatest('skills');
+                                }}
+                            />
                             <div>
                                 <label className="font-data text-sm font-bold text-brutal-dark mb-2 block">
                                     What are you working toward?
@@ -791,9 +1011,7 @@ export function ProfileSetup() {
                                     { key: 'github_url', label: 'GitHub', placeholder: 'https://github.com/…' },
                                     { key: 'linkedin_url', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/…' },
                                     { key: 'website_url', label: 'Personal website', placeholder: 'https://…' },
-                                    { key: 'x_url', label: 'X (Twitter)', placeholder: 'https://x.com/handle' },
-                                    { key: 'bluesky_url', label: 'Bluesky', placeholder: 'https://bsky.app/profile/handle' },
-                                    { key: 'discord_username', label: 'Discord username', placeholder: 'username' },
+                                    { key: 'instagram_url', label: 'Instagram', placeholder: 'https://instagram.com/handle' },
                                 ].map(({ key, label, placeholder }) => (
                                     <Input
                                         key={key}
@@ -858,32 +1076,120 @@ export function ProfileSetup() {
                                 </h3>
                                 <span className="absolute bottom-[-1px] left-0 h-[2px] w-10 bg-brutal-red" aria-hidden />
                             </div>
-                            {domainLevels.length > 0 ? (
-                                <div className="space-y-2">
-                                    {domainLevels.map((dl) => (
-                                        <div
-                                            key={dl.domain}
-                                            className="flex items-center justify-between p-3 bg-brutal-bg border border-brutal-dark/10 rounded-xl"
-                                        >
-                                            <span className="font-data text-sm font-bold text-brutal-dark">{dl.domain}</span>
-                                            <span
-                                                className={`font-data text-xs font-bold px-2 py-1 rounded uppercase ${
-                                                    dl.tier === 'Tier 3'
-                                                        ? 'bg-brutal-red text-brutal-bg'
-                                                        : dl.tier === 'Tier 2'
-                                                            ? 'bg-brutal-dark text-brutal-bg'
-                                                            : 'bg-brutal-dark/10 text-brutal-dark'
-                                                }`}
-                                            >
-                                                {dl.tier}
+
+                            {/* XP + Rank progress bar */}
+                            {(() => {
+                                const currentXP = rankAccess?.xp ?? 0;
+                                const currentRank = rankAccess?.rank ?? 'Curious';
+                                const nextRank = getNextRank(currentRank);
+                                const progressPercent = getProgressToNextRank(currentXP, currentRank);
+                                const nextThreshold = nextRank ? RANK_THRESHOLDS[nextRank] : null;
+                                const CurRankIcon = getBadgeIcon({ name: currentRank, badge_type: 'achievement', domain: 'General' });
+                                return (
+                                    <div className="p-3 bg-brutal-bg border border-brutal-dark/10 rounded-xl space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <CurRankIcon className="w-4 h-4 text-brutal-red" strokeWidth={2} />
+                                                <span className="font-data text-xs font-bold text-brutal-dark uppercase">{currentRank}</span>
+                                            </div>
+                                            <span className="font-data text-[11px] font-bold text-brutal-dark/50 tabular-nums">
+                                                {currentXP} XP
                                             </span>
                                         </div>
-                                    ))}
+                                        {nextRank && nextThreshold != null && (
+                                            <>
+                                                <div className="w-full h-2 bg-brutal-dark/10 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-brutal-red rounded-full transition-all duration-500"
+                                                        style={{ width: `${Math.max(progressPercent, 3)}%` }}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-data text-[10px] text-brutal-dark/40">
+                                                        {nextThreshold - currentXP} XP to {nextRank}
+                                                    </span>
+                                                    <span className="font-data text-[10px] text-brutal-dark/40 tabular-nums">
+                                                        {nextThreshold} XP
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
+                                        {!nextRank && (
+                                            <p className="font-data text-[10px] text-brutal-red font-bold uppercase">Max rank reached</p>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Earned badges — fallback to Curious if DB badges haven't loaded yet */}
+                            {(() => {
+                                const hasBadgesFromDB = myBadges && myBadges.length > 0;
+                                const badgeList = hasBadgesFromDB
+                                    ? myBadges
+                                    : [{ id: 'fallback-curious', badge: { name: 'Curious', badge_type: 'achievement', domain: 'General', description: 'Joined the Param Makerspace and started exploring.' } }];
+                                return (
+                                    <div>
+                                        <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/35 mb-2">
+                                            Badges earned
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {badgeList.map((ub: any) => {
+                                                const badge = ub.badge;
+                                                if (!badge) return null;
+                                                const BadgeIcon = getBadgeIcon({ name: badge.name, badge_type: badge.badge_type, domain: badge.domain });
+                                                return (
+                                                    <div
+                                                        key={ub.id}
+                                                        title={`${badge.name}: ${badge.description || ''}`}
+                                                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-brutal-dark/5 border border-brutal-dark/10 rounded-xl"
+                                                    >
+                                                        <BadgeIcon className="w-3.5 h-3.5 text-brutal-red" strokeWidth={2} />
+                                                        <span className="font-data text-[11px] font-bold text-brutal-dark">{badge.name}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Quick tip for new users */}
+                            {(rankAccess?.xp ?? 0) < 60 && progress.percent < 100 && (
+                                <div className="p-2.5 bg-brutal-red/5 border border-brutal-red/15 rounded-xl">
+                                    <p className="font-data text-[11px] text-brutal-dark/70">
+                                        <span className="font-bold text-brutal-red">Tip:</span> Complete your profile to earn <span className="font-bold">+50 XP</span> and unlock project proposals.
+                                    </p>
                                 </div>
-                            ) : (
-                                <p className="font-data text-xs text-brutal-dark/60 italic">
-                                    Complete challenges to earn domain levels.
-                                </p>
+                            )}
+
+                            {/* Domain levels */}
+                            {domainLevels.length > 0 && (
+                                <div>
+                                    <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/35 mb-2 mt-3">
+                                        Domain levels
+                                    </div>
+                                    <div className="space-y-2">
+                                        {domainLevels.map((dl) => (
+                                            <div
+                                                key={dl.domain}
+                                                className="flex items-center justify-between p-3 bg-brutal-bg border border-brutal-dark/10 rounded-xl"
+                                            >
+                                                <span className="font-data text-sm font-bold text-brutal-dark">{dl.domain}</span>
+                                                <span
+                                                    className={`font-data text-xs font-bold px-2 py-1 rounded uppercase ${
+                                                        dl.tier === 'Tier 3'
+                                                            ? 'bg-brutal-red text-brutal-bg'
+                                                            : dl.tier === 'Tier 2'
+                                                                ? 'bg-brutal-dark text-brutal-bg'
+                                                                : 'bg-brutal-dark/10 text-brutal-dark'
+                                                    }`}
+                                                >
+                                                    {dl.tier}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </section>
                         </div>

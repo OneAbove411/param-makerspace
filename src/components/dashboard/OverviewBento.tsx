@@ -55,7 +55,7 @@ import { XP_REWARDS } from '../../lib/constants';
 
 export interface OverviewBentoProps {
     nbaInput: NextBestActionInput;
-    rank: { rank: string; xp: number; loading: boolean };
+    rank: { rank: string; xp: number; loading: boolean; role?: string };
     stats: {
         activeProjects: number;
         upcomingEvents: number;
@@ -67,6 +67,8 @@ export interface OverviewBentoProps {
         canCreate: boolean;
         requiredRank: string;
         onPropose: () => void;
+        currentXP: number;
+        profileComplete: boolean;
     };
     attention: Array<{ id: string; status: string; title: string }>;
     badges: {
@@ -103,7 +105,7 @@ export function OverviewBento({
                         <Skeleton variant="card" />
                     </div>
                 ) : (
-                    <RankTower rank={rank.rank} xp={rank.xp} />
+                    <RankTower rank={rank.rank} xp={rank.xp} role={rank.role} />
                 )}
             </div>
 
@@ -159,36 +161,43 @@ export function OverviewBento({
                         </div>
                     </button>
                 ) : (
-                    <div
-                        aria-disabled="true"
-                        aria-label={`Propose Project locked. Unlocks at ${propose.requiredRank}.`}
-                        className={cn(
-                            'rounded-2xl p-4 min-h-[130px] bg-brutal-bg border-2 border-dashed border-brutal-red/35',
-                            'shadow-[6px_6px_0_0_rgba(196,41,30,0.10)]',
-                            'flex flex-col justify-between'
-                        )}
-                    >
-                        <div className="flex items-start justify-between">
-                            <Lock className="w-5 h-5 text-brutal-red/55" aria-hidden />
-                            <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red/60">
-                                Locked
-                            </span>
-                        </div>
-                        <div>
-                            <div className="font-heading font-bold text-xl uppercase tracking-tight-heading leading-none text-brutal-dark/55">
-                                Propose
-                            </div>
-                            <div className="font-data text-[10px] mt-1 text-brutal-dark/40 uppercase">
-                                Need {propose.requiredRank}
-                            </div>
-                            <Link
-                                to="/makers?role=mentor"
-                                className="mt-1 inline-block font-data text-[10px] underline text-brutal-red uppercase tracking-widest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
+                    (() => {
+                        const xpToUnlock = Math.max(0, RANK_THRESHOLDS[propose.requiredRank] - propose.currentXP);
+                        return (
+                            <div
+                                aria-disabled="true"
+                                aria-label={`Propose Project locked. ${xpToUnlock} XP to unlock at ${propose.requiredRank}.`}
+                                className={cn(
+                                    'rounded-2xl p-4 min-h-[130px] bg-brutal-bg border-2 border-dashed border-brutal-red/35',
+                                    'shadow-[6px_6px_0_0_rgba(196,41,30,0.10)]',
+                                    'flex flex-col justify-between'
+                                )}
                             >
-                                Talk to mentor
-                            </Link>
-                        </div>
-                    </div>
+                                <div className="flex items-start justify-between">
+                                    <Lock className="w-5 h-5 text-brutal-red/55" aria-hidden />
+                                    <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red/60">
+                                        Locked
+                                    </span>
+                                </div>
+                                <div>
+                                    <div className="font-heading font-bold text-xl uppercase tracking-tight-heading leading-none text-brutal-dark/55">
+                                        Propose
+                                    </div>
+                                    <div className="font-data text-[10px] mt-1 text-brutal-red font-bold uppercase tabular-nums">
+                                        {xpToUnlock} XP to unlock
+                                    </div>
+                                    <Link
+                                        to={!propose.profileComplete ? '/profile-setup' : '/challenges?tier=Tier+1'}
+                                        className="mt-1 inline-block font-data text-[10px] underline text-brutal-red uppercase tracking-widest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
+                                    >
+                                        {!propose.profileComplete
+                                            ? `Finish your Profile (+50 XP) →`
+                                            : 'Tier 1 challenge →'}
+                                    </Link>
+                                </div>
+                            </div>
+                        );
+                    })()
                 )}
             </div>
 
@@ -357,11 +366,20 @@ function BentoStat({ to, icon: Icon, label, value, loading, dark }: BentoStatPro
 
 const RANK_MILESTONES: Record<string, string> = {
     'Curious':   'Create your account',
-    'Tinkerer':  'Complete a Tier 1 challenge',
-    'Builder':   'Get a project approved',
-    'Maker':     'Complete a project',
-    'Innovator': 'Complete a Tier 3 challenge',
-    'Lab Pro':   'Mentor with 3+ active projects',
+    'Tinkerer':  'Earn 60 XP (profile + login, or a Tier 1 challenge)',
+    'Builder':   'Earn 250 XP (projects, challenges, or events)',
+    'Maker':     'Earn 600 XP (sustained making and challenges)',
+    'Innovator': 'Earn 1,200 XP (advanced challenges and projects)',
+    'Lab Pro':   'Mentor role + 2,500 XP',
+};
+
+/* ── What features unlock at each rank ─────────────────────────────────── */
+const RANK_UNLOCKS: Record<string, string[]> = {
+    'Tinkerer':  ['Propose Projects', 'Submit Challenges', 'Earn Domain Badges'],
+    'Builder':   ['View Tier 3 Challenges', 'Book Showcase Slots'],
+    'Maker':     ['Propose T3 Architect Projects'],
+    'Innovator': ['Request Mentor Status'],
+    'Lab Pro':   ['Full Lab Access'],
 };
 
 /* ── Internal: hand-built rank tower (sized for col-span-4 cell) ───────── */
@@ -369,9 +387,10 @@ const RANK_MILESTONES: Record<string, string> = {
 interface RankTowerProps {
     rank: string;
     xp: number;
+    role?: string;
 }
 
-function RankTower({ rank, xp }: RankTowerProps) {
+function RankTower({ rank, xp, role }: RankTowerProps) {
     const style = RANK_STYLES[rank] || RANK_STYLES['Curious'];
     const progress = getProgressToNextRank(xp, rank);
     const nextRank = getNextRank(rank);
@@ -425,7 +444,16 @@ function RankTower({ rank, xp }: RankTowerProps) {
 
             {/* Progress to next rank — single line label + remainder */}
             <div className="mt-5">
-                {nextRank ? (
+                {nextRank === 'Lab Pro' && role !== 'mentor' && role !== 'admin' ? (
+                    <div className="bg-brutal-dark/5 rounded-xl p-3 border border-brutal-dark/10">
+                        <div className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/55 mb-1">
+                            Next · Lab Pro
+                        </div>
+                        <div className="font-data text-[11px] text-brutal-dark/60">
+                            Lab Pro requires <span className="font-bold text-brutal-red">Mentor role</span>. Apply for mentor status or talk to an admin.
+                        </div>
+                    </div>
+                ) : nextRank ? (
                     <>
                         <div className="flex items-baseline justify-between gap-2 mb-1.5">
                             <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/55 truncate">
@@ -441,6 +469,20 @@ function RankTower({ rank, xp }: RankTowerProps) {
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
+                        {/* What unlocks at next rank */}
+                        {RANK_UNLOCKS[nextRank] && (
+                            <div className="mt-2">
+                                <div className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-dark/35 mb-1">
+                                    Unlocks at {nextRank}
+                                </div>
+                                {RANK_UNLOCKS[nextRank].map((feature) => (
+                                    <div key={feature} className="flex items-center gap-1.5">
+                                        <span className="text-brutal-red text-[9px]" aria-hidden>✦</span>
+                                        <span className="font-data text-[9px] text-brutal-dark/50">{feature}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className={cn('text-center font-data text-xs font-bold uppercase tracking-widest py-2', style.text)}>

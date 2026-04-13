@@ -34,7 +34,7 @@ export async function fetchMakers() {
 }
 
 export async function fetchMakerProfile(id: string) {
-    const profileSelect = 'id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at, x_url, bluesky_url, discord_username, mentor_domains, approval_domains, show_email';
+    const profileSelect = 'id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at, instagram_url, mentor_domains, approval_domains, show_email';
     return supabase
         .from('maker_profile')
         .select(profileSelect)

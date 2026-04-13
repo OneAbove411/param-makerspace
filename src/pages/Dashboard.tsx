@@ -674,10 +674,11 @@ export function Dashboard() {
                                         ? { id: firstDraft.id, title: firstDraft.title }
                                         : null,
                                     currentRank,
+                                    currentXP,
                                     completedChallenges,
                                     upcomingEvents,
                                 }}
-                                rank={{ rank: currentRank, xp: currentXP, loading: rankLoading }}
+                                rank={{ rank: currentRank, xp: currentXP, loading: rankLoading, role: role || 'viewer' }}
                                 stats={{
                                     activeProjects,
                                     upcomingEvents,
@@ -696,6 +697,8 @@ export function Dashboard() {
                                     canCreate: canCreateProject,
                                     requiredRank: createProjectRequiredRank,
                                     onPropose: openProposeForm,
+                                    currentXP,
+                                    profileComplete,
                                 }}
                                 attention={attentionItems.map((p) => ({
                                     id: p.id,
@@ -736,6 +739,8 @@ export function Dashboard() {
                                     challengesLoading={myChallengesLoading || allChallengesLoading}
                                     events={myEventItems}
                                     eventsLoading={myEventsLoading}
+                                    currentXP={currentXP}
+                                    profileComplete={profileComplete}
                                 />
 
                                 {/* Inline new-project form */}

@@ -35,6 +35,7 @@ export interface NextBestActionInput {
     hasRejectedProject: { id: string; title: string } | null;
     hasDraftProject: { id: string; title: string } | null;
     currentRank: string;
+    currentXP: number;
     completedChallenges: number;
     upcomingEvents: number;
     loading: boolean;
@@ -55,9 +56,14 @@ function pickAction(input: NextBestActionInput): Action {
         hasDraftProject,
         profileComplete,
         currentRank,
+        currentXP,
         completedChallenges,
         upcomingEvents,
     } = input;
+
+    // XP delta to Tinkerer (the rank that unlocks project proposals)
+    const tinkererThreshold = 60;
+    const xpToTinkerer = Math.max(0, tinkererThreshold - currentXP);
 
     if (hasRejectedProject) {
         return {
@@ -81,22 +87,36 @@ function pickAction(input: NextBestActionInput): Action {
         };
     }
 
-    if (!profileComplete) {
+    // If locked out of create_project AND profile incomplete → profile is the fastest path
+    if (!canAccess(currentRank, 'create_project') && !profileComplete) {
         return {
-            eyebrow: 'Unlock the lab',
-            headline: 'Finish your profile. Claim +50 XP.',
-            sub: 'Bio, avatar, and a social link — two minutes, new rank.',
+            eyebrow: 'Quick unlock',
+            headline: 'Complete your profile to unlock Propose Project.',
+            sub: `Your profile earns +${XP_REWARDS.profile_completed} XP. ${xpToTinkerer > 0 ? `You're ${xpToTinkerer} XP away from Tinkerer rank.` : 'Propose Project key awaits.'}`,
             ctaLabel: 'Complete profile',
             to: '/profile-setup',
             Icon: UserCheck,
         };
     }
 
-    if (!canAccess(currentRank, 'create_project') && completedChallenges === 0) {
+    // Profile incomplete but NOT locked out → still nudge toward profile for the free XP
+    if (!profileComplete) {
+        return {
+            eyebrow: 'Unlock the lab',
+            headline: 'Finish your profile. Claim +50 XP.',
+            sub: 'Bio, avatar, and a social link — two minutes, free XP.',
+            ctaLabel: 'Complete profile',
+            to: '/profile-setup',
+            Icon: UserCheck,
+        };
+    }
+
+    // Locked out of create_project but profile IS complete → challenge path
+    if (!canAccess(currentRank, 'create_project')) {
         return {
             eyebrow: 'Your unlock path',
             headline: 'Beat a Tier 1 challenge.',
-            sub: `One clean Tier 1 earns you +${XP_REWARDS.tier1_challenge} XP, Tinkerer rank, and the Propose Project key.`,
+            sub: `One clean Tier 1 earns you +${XP_REWARDS.tier1_challenge} XP. ${xpToTinkerer > 0 ? `${xpToTinkerer} XP to Tinkerer.` : 'Propose Project key awaits.'}`,
             ctaLabel: 'Browse Tier 1',
             to: '/challenges?tier=Tier+1',
             Icon: Zap,

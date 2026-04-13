@@ -49,6 +49,8 @@ interface MyWorkTabProps {
     challengesLoading: boolean;
     events: MyEventItem[];
     eventsLoading: boolean;
+    currentXP?: number;
+    profileComplete?: boolean;
 }
 
 export function MyWorkTab({
@@ -62,6 +64,8 @@ export function MyWorkTab({
     challengesLoading,
     events,
     eventsLoading,
+    currentXP = 0,
+    profileComplete = false,
 }: MyWorkTabProps) {
     const navigate = useNavigate();
 
@@ -92,14 +96,22 @@ export function MyWorkTab({
                             <Plus className="w-4 h-4 mr-1" aria-hidden /> Propose Project
                         </Button>
                     ) : (
-                        <Link
-                            to="/challenges?tier=Tier+1"
-                            aria-label={`Propose Project locked. Complete a Tier 1 challenge to unlock.`}
-                            className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 border-2 border-dashed border-yellow-400/60 bg-yellow-50 px-3 py-2 rounded hover:border-yellow-500 hover:bg-yellow-100 transition-colors"
-                        >
-                            <Lock className="w-3.5 h-3.5" aria-hidden />
-                            Complete a Tier 1 challenge to unlock
-                        </Link>
+                        (() => {
+                            const xpToUnlock = Math.max(0, 60 - currentXP);
+                            return (
+                                <Link
+                                    to={!profileComplete ? '/profile-setup' : '/challenges?tier=Tier+1'}
+                                    aria-label={`Propose Project locked. ${xpToUnlock} XP to Tinkerer rank.`}
+                                    className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 border-2 border-dashed border-yellow-400/60 bg-yellow-50 px-3 py-2 rounded hover:border-yellow-500 hover:bg-yellow-100 transition-colors"
+                                >
+                                    <Lock className="w-3.5 h-3.5" aria-hidden />
+                                    {!profileComplete
+                                        ? 'Finish your Profile (+50 XP) to propose'
+                                        : `${xpToUnlock} XP to unlock — Tier 1 challenge`
+                                    }
+                                </Link>
+                            );
+                        })()
                     )}
                 </div>
             </div>
@@ -165,6 +177,10 @@ export function MyWorkTab({
                         <p>No projects yet.</p>
                         {canCreateProject ? (
                             <p>Click <strong>Propose Project</strong> to start your first one.</p>
+                        ) : !profileComplete ? (
+                            <p>
+                                <Link to="/profile-setup" className="text-brutal-red underline hover:text-brutal-dark transition-colors">Finish your Profile</Link> to earn +50 XP and unlock project proposals.
+                            </p>
                         ) : (
                             <p>
                                 Complete a <Link to="/challenges?tier=Tier+1" className="text-brutal-red underline hover:text-brutal-dark transition-colors">Tier 1 challenge</Link> to unlock project proposals.

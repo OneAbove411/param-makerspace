@@ -84,16 +84,14 @@ export function useMaker(id: string | undefined) {
         domainLevels: { domain: string; tier: string }[];
         eventsAttended: { id: string; title: string; event_type: string; date: string }[];
         mentoredProjects: { id: string; title: string; domain: string | null }[];
-        x_url?: string | null;
-        bluesky_url?: string | null;
-        discord_username?: string | null;
+        instagram_url?: string | null;
         mentor_domains?: string | null;
         approval_domains?: string | null;
         show_email?: boolean;
     }) | null>(async () => {
         if (!id) return { data: null, error: null };
 
-        const profileSelect = 'id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at, x_url, bluesky_url, discord_username, mentor_domains, approval_domains, show_email';
+        const profileSelect = 'id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, is_public, created_at, updated_at, instagram_url, mentor_domains, approval_domains, show_email';
 
         let { data: profile, error } = await supabase
             .from('maker_profile')
@@ -153,7 +151,7 @@ export function useMyProfile() {
         if (!user) return { data: null, error: null };
         return supabase
             .from('maker_profile')
-            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, x_url, bluesky_url, discord_username, mentor_domains, approval_domains, show_email, is_public, declared_intent, created_at, updated_at')
+            .select('id, user_id, display_name, pronouns, bio, aspirations, avatar_url, github_url, linkedin_url, website_url, instagram_url, mentor_domains, approval_domains, show_email, is_public, declared_intent, created_at, updated_at')
             .eq('user_id', user.id)
             .single() as any;
     }, [user?.id]);
@@ -171,9 +169,7 @@ export function useProfileMutation() {
         linkedin_url?: string;
         website_url?: string;
         avatar_url?: string;
-        x_url?: string;
-        bluesky_url?: string;
-        discord_username?: string;
+        instagram_url?: string;
         mentor_domains?: string;
         approval_domains?: string;
         show_email?: boolean;

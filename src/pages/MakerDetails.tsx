@@ -135,19 +135,12 @@ export function MakerDetails() {
                             <div className="flex gap-2 flex-wrap mt-2">
                                 {maker.github_url && <SocialIcon href={maker.github_url} iconId="github-icon" label="GitHub" />}
                                 {maker.linkedin_url && <SocialIcon href={maker.linkedin_url} iconId="social-icon" label="LinkedIn" />}
-                                {(maker as any).x_url && <SocialIcon href={(maker as any).x_url} iconId="x-icon" label="X" />}
-                                {(maker as any).bluesky_url && <SocialIcon href={(maker as any).bluesky_url} iconId="bluesky-icon" label="Bluesky" />}
+                                {(maker as any).instagram_url && <SocialIcon href={(maker as any).instagram_url} iconId="social-icon" label="Instagram" />}
                                 {maker.website_url && (
                                     <a href={maker.website_url} target="_blank" rel="noreferrer" title="Website"
                                         className="w-9 h-9 flex items-center justify-center rounded-full border-2 border-brutal-dark/10 hover:border-brutal-dark hover:bg-brutal-dark/5 transition-colors font-data text-xs font-bold text-brutal-dark/60">
                                         www
                                     </a>
-                                )}
-                                {(maker as any).discord_username && (
-                                    <div title={`Discord: ${(maker as any).discord_username}`}
-                                        className="w-9 h-9 flex items-center justify-center rounded-full border-2 border-brutal-dark/10 hover:border-brutal-dark/30 transition-colors cursor-default">
-                                        <svg width="16" height="16"><use href="/icons.svg#discord-icon" /></svg>
-                                    </div>
                                 )}
                             </div>
                         </div>

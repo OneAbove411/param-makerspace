@@ -193,7 +193,7 @@ export function ChallengeWizardShell() {
                 supabase.from('challenge_video').delete().eq('challenge_id', challengeId).select(),
             ]);
 
-            const inserts: Promise<any>[] = [];
+            const inserts: PromiseLike<any>[] = [];
 
             if (state.steps.length > 0) {
                 inserts.push(

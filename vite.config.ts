@@ -32,9 +32,6 @@ export default defineConfig({
       },
     },
   },
-  esbuild: {
-    pure: ['console.log', 'console.debug'],
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

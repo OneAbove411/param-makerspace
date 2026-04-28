@@ -7,12 +7,12 @@ import { supabase } from '../supabase';
 import { useAuth } from '../auth';
 import { toast } from '../toast';
 import { useSupabaseQuery } from './cache';
-import type { Challenge, ChallengeCompletion } from '../database.types';
+import type { Challenge, ChallengeSummary, ChallengeCompletion } from '../database.types';
 
 // ─── List ───
 
 export function useChallenges(tierFilter?: string, domainFilter?: string) {
-    return useSupabaseQuery<Challenge[]>(async () => {
+    return useSupabaseQuery<ChallengeSummary[]>(async () => {
         let q = supabase
             .from('challenge')
             .select('id, title, tier, domain, time_estimate, cover_image_url, mystery, status, created_at')
@@ -224,7 +224,7 @@ export function useRelatedChallenges(
     tier: string | null | undefined,
     limit = 3,
 ) {
-    return useSupabaseQuery<Challenge[]>(async () => {
+    return useSupabaseQuery<ChallengeSummary[]>(async () => {
         if (!challengeId) return { data: [], error: null };
 
         // Try same domain first

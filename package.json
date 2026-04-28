@@ -6,7 +6,9 @@
   "sideEffects": false,
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc -b --noEmit",
     "build": "tsc -b && vite build",
+    "prepare": "husky",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
@@ -41,6 +43,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.2",
     "postcss": "^8.5.8",
     "rollup-plugin-visualizer": "^7.0.1",

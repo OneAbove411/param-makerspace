@@ -33,8 +33,7 @@ export default defineConfig({
     },
   },
   esbuild: {
-    drop: ['debugger'],
-    pure: ['console.log', 'console.debug'],
+    drop: ['console', 'debugger'],
   },
   resolve: {
     alias: {

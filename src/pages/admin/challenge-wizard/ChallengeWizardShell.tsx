@@ -185,12 +185,12 @@ export function ChallengeWizardShell() {
             // ─── Save child data ───────────────────────────────
             // Delete existing children and re-insert (simplest approach for wizard)
             await Promise.all([
-                supabase.from('challenge_step').delete().eq('challenge_id', challengeId),
-                supabase.from('challenge_material').delete().eq('challenge_id', challengeId),
-                supabase.from('challenge_skill').delete().eq('challenge_id', challengeId),
-                supabase.from('challenge_vocabulary').delete().eq('challenge_id', challengeId),
-                supabase.from('challenge_level').delete().eq('challenge_id', challengeId),
-                supabase.from('challenge_video').delete().eq('challenge_id', challengeId),
+                supabase.from('challenge_step').delete().eq('challenge_id', challengeId).select(),
+                supabase.from('challenge_material').delete().eq('challenge_id', challengeId).select(),
+                supabase.from('challenge_skill').delete().eq('challenge_id', challengeId).select(),
+                supabase.from('challenge_vocabulary').delete().eq('challenge_id', challengeId).select(),
+                supabase.from('challenge_level').delete().eq('challenge_id', challengeId).select(),
+                supabase.from('challenge_video').delete().eq('challenge_id', challengeId).select(),
             ]);
 
             const inserts: Promise<any>[] = [];
@@ -203,7 +203,7 @@ export function ChallengeWizardShell() {
                             step_text: s.step_text,
                             display_order: i + 1,
                         })),
-                    ),
+                    ).select(),
                 );
             }
 
@@ -215,7 +215,7 @@ export function ChallengeWizardShell() {
                             name: m.name,
                             display_order: i + 1,
                         })),
-                    ),
+                    ).select(),
                 );
             }
 
@@ -226,7 +226,7 @@ export function ChallengeWizardShell() {
                             challenge_id: challengeId,
                             skill_name: s.skill_name,
                         })),
-                    ),
+                    ).select(),
                 );
             }
 
@@ -238,7 +238,7 @@ export function ChallengeWizardShell() {
                             term: v.term,
                             definition: v.definition || null,
                         })),
-                    ),
+                    ).select(),
                 );
             }
 
@@ -250,7 +250,7 @@ export function ChallengeWizardShell() {
                             level_name: l.level_name,
                             description: l.description || null,
                         })),
-                    ),
+                    ).select(),
                 );
             }
 
@@ -263,7 +263,7 @@ export function ChallengeWizardShell() {
                             video_url: v.video_url,
                             display_order: i + 1,
                         })),
-                    ),
+                    ).select(),
                 );
             }
 
@@ -426,12 +426,11 @@ function Step1({
                 <div>
                     <label className="font-data text-sm font-bold text-brutal-dark flex justify-between items-end">
                         Status
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                            state.status === 'published' ? 'bg-green-100 text-green-800'
-                            : state.status === 'review_ready' ? 'bg-blue-100 text-blue-800'
-                            : state.status === 'archived' ? 'bg-gray-100 text-gray-600'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
+                        <span className={`text-xs px-2 py-0.5 rounded ${state.status === 'published' ? 'bg-green-100 text-green-800'
+                                : state.status === 'review_ready' ? 'bg-blue-100 text-blue-800'
+                                    : state.status === 'archived' ? 'bg-gray-100 text-gray-600'
+                                        : 'bg-yellow-100 text-yellow-800'
+                            }`}>
                             {state.status === 'review_ready' ? 'REVIEW READY' : state.status.toUpperCase()}
                         </span>
                     </label>

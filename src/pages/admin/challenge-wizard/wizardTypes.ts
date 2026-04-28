@@ -81,7 +81,7 @@ export interface LevelItem {
 export interface ImageItem {
     id?: string;
     image_url: string;
-    caption: string;
+    caption: string | null;
     display_order: number;
 }
 

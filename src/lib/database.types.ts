@@ -215,6 +215,12 @@ export interface Challenge {
     updated_at: string;
 }
 
+/** Subset of Challenge returned by list / related queries (partial select). */
+export type ChallengeSummary = Pick<
+    Challenge,
+    'id' | 'title' | 'tier' | 'domain' | 'time_estimate' | 'cover_image_url' | 'mystery' | 'status' | 'created_at'
+>;
+
 export interface ChallengeStep {
     id: string;
     challenge_id: string;

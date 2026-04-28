@@ -16,9 +16,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    // Strip console.log and console.debug from production builds.
-    // console.warn and console.error are kept for real error tracking.
-    minify: 'esbuild',
+    minify: 'oxc',
     rollupOptions: {
       output: {
         manualChunks(id: string) {

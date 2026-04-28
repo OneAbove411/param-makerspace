@@ -37,6 +37,7 @@ export function Philosophy() {
                 <img
                     src="https://images.unsplash.com/photo-1541888086425-d81bb19240f5?q=80&w=2070&auto=format&fit=crop"
                     alt="Concrete texture"
+                    loading="lazy"
                     className="w-full h-full object-cover"
                 />
             </div>

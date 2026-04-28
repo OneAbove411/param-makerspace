@@ -9,6 +9,7 @@ export type BucketName =
     | 'project-files'
     | 'challenge-images'
     | 'event-images'
+    | 'event-gallery'
     | 'event-websites'
     | 'badge-images'
     | 'product-images'

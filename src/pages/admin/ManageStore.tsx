@@ -297,7 +297,7 @@ export function ManageStore() {
                                     {/* Product image */}
                                     <div className="relative h-48 bg-white border-b-2 border-brutal-dark overflow-hidden">
                                         {product.image_url ? (
-                                            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-4" />
+                                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-full h-full object-contain p-4" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-brutal-dark/15">
                                                 <ShoppingBag className="w-16 h-16" />

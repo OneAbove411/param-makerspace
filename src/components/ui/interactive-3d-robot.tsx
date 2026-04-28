@@ -686,7 +686,9 @@ export function InteractiveRobotSpline({ className, flickerRef, introDoneRef }: 
         {/* Rim light — from behind */}
         <directionalLight position={[0, 2, -4]} intensity={0.6} color="#ffffff" />
 
-        {/* Environment map for chrome reflections only — background={false} keeps canvas transparent */}
+        {/* Environment map for chrome reflections — metallic materials need
+            something to reflect or they render black. The "Context Lost"
+            warnings from PMREM processing are suppressed in main.tsx. */}
         <Environment preset="city" background={false} />
 
         <Suspense fallback={null}>

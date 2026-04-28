@@ -47,6 +47,10 @@ console.warn = (...args: unknown[]) => {
   if (typeof first === 'string') {
     if (first.includes('THREE.Clock: This module has been deprecated')) return;
     if (first.includes('PCFSoftShadowMap has been deprecated')) return;
+    // drei's <Environment> creates a scratch PMREM renderer that logs
+    // "Context Lost" when it disposes after generating the cubemap.
+    // Harmless — the main renderer is unaffected.
+    if (first.includes('THREE.WebGLRenderer: Context Lost')) return;
   }
   _origWarn.apply(console, args as []);
 };

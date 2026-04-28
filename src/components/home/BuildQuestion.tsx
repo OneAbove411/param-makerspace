@@ -379,7 +379,8 @@ export function BuildQuestion() {
                 .from('project_image')
                 .select('project_id, image_url')
                 .in('project_id', projectIds)
-                .order('display_order', { ascending: true });
+                .order('display_order', { ascending: true })
+                .limit(20);
 
             if (cancelled) return;
             const imageMap: Record<string, string> = {};
@@ -517,10 +518,6 @@ export function BuildQuestion() {
                         />
                     )}
                 </div>
-
-                <p className="bq-sub font-data text-xs md:text-sm text-brutal-bg/35 mt-6 max-w-md leading-relaxed">
-                    Real projects built by makers in the lab. Click any to explore.
-                </p>
             </div>
         </section>
     );

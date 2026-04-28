@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowRight, Bookmark, Clock, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowRight, Bookmark, Clock, CheckCircle2 } from 'lucide-react';
 import { XpRewardBadge } from '../ui/XpRewardBadge';
 import { cn } from '../../lib/utils';
 import { XP_REWARDS } from '../../lib/constants';
@@ -58,13 +58,15 @@ function DifficultyBar({ tier }: { tier: string | null }) {
 function CompletionPill({ status }: { status: string | null | undefined }) {
     if (!status) return null;
     const isVerified = status === 'verified' || status === 'complete' || status === 'completed';
+    // "In review" state is intentionally hidden on the Explorer Hub — only show verified completions.
+    if (!isVerified) return null;
     return (
         <span className={cn(
             'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-data uppercase tracking-wider',
-            isVerified ? 'bg-green-600/90 text-white' : 'bg-yellow-500/80 text-brutal-dark',
+            'bg-green-600/90 text-white',
         )}>
-            {isVerified ? <CheckCircle2 size={9} aria-hidden /> : <Loader2 size={9} className="animate-spin" aria-hidden />}
-            {isVerified ? 'Completed' : 'In review'}
+            <CheckCircle2 size={9} aria-hidden />
+            Completed
         </span>
     );
 }

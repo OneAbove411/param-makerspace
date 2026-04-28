@@ -20,16 +20,13 @@ import {
     type ExplorerSort,
     type ExplorerTier,
 } from '../components/challenges/ExplorerHubCommandBar';
-import { MOOD_PRESETS, type MoodPreset } from '../components/challenges/MoodStrip';
 import { TierPathway } from '../components/challenges/TierPathway';
 
 // New shared components (SPEC.md Directive 1)
 import { ListingLayout } from '../components/shared/ListingLayout';
 import { ListingSidebar } from '../components/shared/ListingSidebar';
 import { SidebarSearch } from '../components/shared/SidebarSearch';
-import { SidebarChipGroup, type ChipOption } from '../components/shared/SidebarChipGroup';
-import { SidebarMoodPresets } from '../components/shared/SidebarMoodPresets';
-import { GamificationNudge } from '../components/shared/GamificationNudge';
+import { ExplorerHubNudge } from '../components/shared/ExplorerHubNudge';
 import { MobileFilterBar } from '../components/shared/MobileFilterBar';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -39,8 +36,10 @@ gsap.registerPlugin(ScrollTrigger);
 //
 // Layout migration:
 //   • ExplorerHubCommandBar → REMOVED. Logic migrated to sidebar.
-//   • MoodStrip             → REMOVED as standalone. Rendered as
-//                             SidebarMoodPresets inside sidebar.
+//   • MoodStrip / Mood presets → REMOVED entirely from sidebar.
+//   • Domain chips → Replaced with a sidebar dropdown (matches Sort).
+//   • GamificationNudge → Replaced with ExplorerHubNudge ("Surprise me"
+//     + saved-shortcut), which fits the inspiration-feed context.
 //   • CSS multi-columns     → CSS Grid with @container queries.
 //
 // ALL data hooks, URL state, bookmark logic preserved byte-for-byte.
@@ -151,6 +150,37 @@ function SidebarSortSelect({ value, onChange }: { value: ExplorerSort; onChange:
     );
 }
 
+// ── Sidebar domain selector ──
+function SidebarDomainSelect({
+    value,
+    onChange,
+    counts,
+}: {
+    value: string;
+    onChange: (v: string) => void;
+    counts: Record<string, number>;
+}) {
+    return (
+        <div>
+            <h3 className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/50 mb-2">Domain</h3>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-lg border border-brutal-dark/15 bg-transparent font-data text-[11px] font-bold uppercase tracking-wider text-brutal-dark/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-brutal-red"
+            >
+                {DOMAIN_OPTIONS.map((d) => {
+                    const count = d === 'All' ? undefined : counts[d] || 0;
+                    return (
+                        <option key={d} value={d}>
+                            {d === 'All' ? 'All Domains' : `${d}${count !== undefined ? ` (${count})` : ''}`}
+                        </option>
+                    );
+                })}
+            </select>
+        </div>
+    );
+}
+
 // ─────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────
@@ -167,7 +197,6 @@ export function Challenges() {
     const domain = searchParams.get('domain') || 'All';
     const sort = ((searchParams.get('sort') as ExplorerSort) || 'newest') as ExplorerSort;
     const view = searchParams.get('view') === 'saved' ? 'saved' : 'all';
-    const mood = searchParams.get('mood');
 
     const updateParams = useCallback(
         (mutator: (p: URLSearchParams) => void) => {
@@ -187,51 +216,22 @@ export function Challenges() {
         updateParams((p) => {
             if (next === 'All') p.delete('tier');
             else p.set('tier', next);
-            p.delete('mood');
         });
     const setDomain = (next: string) =>
         updateParams((p) => {
             if (next === 'All') p.delete('domain');
             else p.set('domain', next);
-            p.delete('mood');
         });
     const setSort = (next: ExplorerSort) =>
         updateParams((p) => {
             if (next === 'newest') p.delete('sort');
             else p.set('sort', next);
-            p.delete('mood');
         });
     const setView = (next: 'all' | 'saved') =>
         updateParams((p) => {
             if (next === 'all') p.delete('view');
             else p.set('view', next);
         });
-
-    const selectMood = (preset: MoodPreset | null) => {
-        updateParams((p) => {
-            if (preset == null) {
-                p.delete('mood');
-                p.delete('tier');
-                p.delete('domain');
-                p.delete('sort');
-                return;
-            }
-            p.set('mood', preset.id);
-            const patch = preset.patch;
-            if (patch.tier !== undefined) {
-                if (patch.tier === 'All') p.delete('tier');
-                else p.set('tier', patch.tier);
-            }
-            if (patch.domain !== undefined) {
-                if (patch.domain === 'All') p.delete('domain');
-                else p.set('domain', patch.domain);
-            }
-            if (patch.sort !== undefined) {
-                if (patch.sort === 'newest') p.delete('sort');
-                else p.set('sort', patch.sort);
-            }
-        });
-    };
 
     // ── Data ────────────────────────────────────────────────
     const { data: allChallenges, loading } = useChallenges('All', 'All');
@@ -246,7 +246,7 @@ export function Challenges() {
     const shuffleSeed = useRef(Date.now().toString(36));
     const subPhrase = useMemo(pickSubPhrase, []);
 
-    // ── Domain counts for sidebar chip group ──
+    // ── Domain counts for sidebar dropdown ──
     const domainCounts = useMemo(() => {
         if (!allChallenges) return {} as Record<string, number>;
         const counts: Record<string, number> = {};
@@ -255,12 +255,6 @@ export function Challenges() {
         }
         return counts;
     }, [allChallenges]);
-
-    const domainChips: ChipOption[] = DOMAIN_OPTIONS.filter(d => d !== 'All').map((d) => ({
-        value: d,
-        label: d,
-        count: domainCounts[d] || 0,
-    }));
 
     // Filtered + sorted list
     const filtered = useMemo(() => {
@@ -316,11 +310,6 @@ export function Challenges() {
     const visibleChallenges = filtered.slice(0, visibleCount);
     const hasMore = filtered.length > visibleCount;
 
-    const activeMood = useMemo(() => {
-        if (!mood) return null;
-        return MOOD_PRESETS.find((p) => p.id === mood) || null;
-    }, [mood]);
-
     const savedCount = bookmarkSet.size;
 
     // ── "Continue browsing" strip ──
@@ -369,7 +358,7 @@ export function Challenges() {
     // ── Mobile filter sheet state ──
     const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
-    const hasActiveFilter = !!query || tier !== 'All' || domain !== 'All' || view === 'saved' || !!mood;
+    const hasActiveFilter = !!query || tier !== 'All' || domain !== 'All' || view === 'saved';
 
     return (
         <div
@@ -468,20 +457,10 @@ export function Challenges() {
                                 placeholder="Search blueprints…"
                                 inputRef={searchInputRef}
                             />
-                            <SidebarMoodPresets
-                                active={activeMood?.id || null}
-                                onSelect={selectMood}
-                            />
                             <SidebarTierSelect value={tier} onChange={setTier} />
-                            <SidebarChipGroup
-                                label="Domain"
-                                options={domainChips}
-                                selected={domain === 'All' ? [] : [domain]}
-                                onChange={(vals) => setDomain(vals.length > 0 ? vals[0] : 'All')}
-                                singleSelect
-                            />
+                            <SidebarDomainSelect value={domain} onChange={setDomain} counts={domainCounts} />
                             <SidebarSortSelect value={sort} onChange={setSort} />
-                            <GamificationNudge />
+                            <ExplorerHubNudge savedCount={savedCount} />
                         </ListingSidebar>
                     }
                 >

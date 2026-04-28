@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router';
 import { useAuth } from '../../lib/auth';
 import { useProject, useProjectMutations } from '../../lib/hooks';
@@ -645,7 +645,9 @@ export function EditProjectShell() {
   const totalMilestones = milestones.length;
   const milestonePercent = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
 
-  const contextValue = {
+  // Memoize the context value so consumers only re-render when the
+  // actual data they depend on changes, not on every parent render.
+  const contextValue = useMemo(() => ({
     project,
     user,
     form,
@@ -709,7 +711,20 @@ export function EditProjectShell() {
     newVideoUrlRef,
     handleSave,
     handleSubmitForReview,
-  };
+  }), [
+    project, user, form, formDirty, autosaveStatus, lastSavedAt,
+    actionLoading, uploadingImage, uploadingFile, milestones,
+    newMilestoneTitle, newMilestoneDesc, videos, newVideoUrl,
+    newVideoTitle, videoUrlError, addingVideo, members, addingRole,
+    searchQuery, searchResults, isSearching, mediaTab,
+    // Stable refs/callbacks (included for correctness, won't trigger re-memo)
+    saveNow, updateField, refetch, fetchMilestones, handleAddMilestone,
+    handleToggleMilestone, handleDeleteMilestone, handleReorderMilestone,
+    fetchVideos, handleAddVideo, handleDeleteVideo, handleImageUpload,
+    handleDeleteImage, handleFileUpload, handleDeleteFile, fetchMembers,
+    handleAddMember, handleRemoveMember, handleUpdateMemberRole,
+    handleSave, handleSubmitForReview,
+  ]);
 
   // ─────────────────────────────────────────────────────────────────────
   // §10 Edit Cockpit — single-screen bento (v2: brutalist hierarchy).

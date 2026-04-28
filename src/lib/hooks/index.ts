@@ -46,6 +46,10 @@ export {
     useMyChallengeCompletionStatus,
     useChallenge,
     useChallengeCompletion,
+    useChallengeCompletionCount,
+    useRelatedChallenges,
+    useChallengeCompletions,
+    useChallengeAnalytics,
 } from './useChallenges';
 
 // Events

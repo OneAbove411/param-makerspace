@@ -91,7 +91,7 @@ function ensureUsersLoaded(): Promise<void> {
     if (cachePromise) return cachePromise;
     cachePromise = (async () => {
         try {
-            const { data } = await supabase.from('app_user').select('id, name');
+            const { data } = await supabase.from('app_user').select('id, name').limit(100);
             cachedUsers = data || [];
         } catch {
             cachedUsers = [];

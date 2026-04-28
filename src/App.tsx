@@ -5,6 +5,7 @@ import { ScrollToTop } from './components/layout/ScrollToTop';
 import { AuthProvider } from './lib/auth';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { AppBootLoader } from './components/layout/AppBootLoader';
 
 /**
  * Route-level code splitting.
@@ -35,8 +36,10 @@ const ProjectDetails = lazyNamed(() => import('./pages/ProjectDetails'), 'Projec
 const RemixPage = lazyNamed(() => import('./pages/RemixPage'), 'RemixPage');
 const Challenges = lazyNamed(() => import('./pages/Challenges'), 'Challenges');
 const ChallengeDetails = lazyNamed(() => import('./pages/ChallengeDetails'), 'ChallengeDetails');
+const ChallengeSubmit = lazyNamed(() => import('./pages/ChallengeSubmit'), 'ChallengeSubmit');
 const Events = lazyNamed(() => import('./pages/Events'), 'Events');
 const EventDetails = lazyNamed(() => import('./pages/EventDetails'), 'EventDetails');
+const SpeakerPitch = lazyNamed(() => import('./pages/SpeakerPitch'), 'SpeakerPitch');
 const Makers = lazyNamed(() => import('./pages/Makers'), 'Makers');
 const MakerDetails = lazyNamed(() => import('./pages/MakerDetails'), 'MakerDetails');
 const Badges = lazyNamed(() => import('./pages/Badges'), 'Badges');
@@ -51,7 +54,14 @@ const AuthCallback = lazyNamed(() => import('./pages/AuthCallback'), 'AuthCallba
 const EditProject = lazyNamed(() => import('./pages/EditProject'), 'EditProject');
 const ManageUsers = lazyNamed(() => import('./pages/admin/ManageUsers'), 'ManageUsers');
 const ManageChallenges = lazyNamed(() => import('./pages/admin/ManageChallenges'), 'ManageChallenges');
+const ChallengeWizardShell = lazyNamed(() => import('./pages/admin/challenge-wizard/ChallengeWizardShell'), 'ChallengeWizardShell');
 const ManageEvents = lazyNamed(() => import('./pages/admin/ManageEvents'), 'ManageEvents');
+const ManageSeries = lazyNamed(() => import('./pages/admin/ManageSeries'), 'ManageSeries');
+const ManageSpeakerPitches = lazyNamed(() => import('./pages/admin/ManageSpeakerPitches'), 'ManageSpeakerPitches');
+const BuildChallengeWizard = lazyNamed(() => import('./pages/admin/event-wizard/BuildChallengeWizard'), 'BuildChallengeWizard');
+const MakerMeetupWizard = lazyNamed(() => import('./pages/admin/event-wizard/MakerMeetupWizard'), 'MakerMeetupWizard');
+const TechTuesdayWizard = lazyNamed(() => import('./pages/admin/event-wizard/TechTuesdayWizard'), 'TechTuesdayWizard');
+const EventConsole = lazyNamed(() => import('./pages/admin/event-console/EventConsole'), 'EventConsole');
 const ManageBadges = lazyNamed(() => import('./pages/admin/ManageBadges'), 'ManageBadges');
 const ManageStore = lazyNamed(() => import('./pages/admin/ManageStore'), 'ManageStore');
 const ManageEquipment = lazyNamed(() => import('./pages/admin/ManageEquipment'), 'ManageEquipment');
@@ -94,6 +104,7 @@ function RouteFallback() {
 function App() {
   return (
     <AuthProvider>
+      <AppBootLoader>
       <BrowserRouter>
         <ScrollToTop />
         <ErrorBoundary>
@@ -114,6 +125,7 @@ function App() {
               <Route path="/events/tech-tuesdays" element={<TechTuesdays />} />
               <Route path="/events/meetups" element={<MakerMeetups />} />
               <Route path="/events/:id" element={<EventDetails />} />
+              <Route path="/speak" element={<SpeakerPitch />} />
               <Route path="/makers" element={<Makers />} />
               <Route path="/makers/:id" element={<MakerDetails />} />
               <Route path="/badges" element={<Badges />} />
@@ -131,6 +143,8 @@ function App() {
               <Route element={<ProtectedRoute allowedRoles={['viewer', 'maker', 'mentor', 'admin']} />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/profile-setup" element={<ProfileSetup />} />
+                {/* Challenge submission — guided stepper */}
+                <Route path="/challenges/:id/submit" element={<ChallengeSubmit />} />
                 {/* §10 Edit Cockpit — single-page bento (no nested routes). */}
                 <Route path="/projects/:id/edit" element={<EditProject />} />
                 {/* Backwards-compat redirects: any deep links to the old
@@ -149,8 +163,22 @@ function App() {
                 <Route path="/admin/review-submissions" element={<ReviewEventSubmissions />} />
                 <Route path="/admin/review-websites" element={<ReviewWebsiteSubmissions />} />
                 <Route path="/admin/events" element={<ManageEvents />} />
+                <Route path="/admin/series" element={<ManageSeries />} />
+                <Route path="/admin/speakers" element={<ManageSpeakerPitches />} />
+                {/* P1 — type-specific wizard routes. Each is a thin wrapper over
+                    the shared WizardShell; see src/pages/admin/event-wizard/. */}
+                <Route path="/admin/events/new/build-challenge" element={<BuildChallengeWizard />} />
+                <Route path="/admin/events/new/maker-meetup" element={<MakerMeetupWizard />} />
+                <Route path="/admin/events/new/tech-tuesday" element={<TechTuesdayWizard />} />
+                {/* P7 — ops console for a single event. The /edit sibling route
+                    renders the same console with the Edit Basics modal layered
+                    on top, so deep-linking to edit keeps the console context. */}
+                <Route path="/admin/events/:id" element={<EventConsole />} />
+                <Route path="/admin/events/:id/edit" element={<EventConsole editing />} />
                 <Route path="/admin/inventory" element={<ManageInventory />} />
                 <Route path="/admin/challenges" element={<ManageChallenges />} />
+                <Route path="/admin/challenges/new" element={<ChallengeWizardShell />} />
+                <Route path="/admin/challenges/:id/edit" element={<ChallengeWizardShell />} />
                 <Route path="/admin/projects" element={<ManageProjects />} />
               </Route>
 
@@ -171,6 +199,7 @@ function App() {
         </Suspense>
         </ErrorBoundary>
       </BrowserRouter>
+      </AppBootLoader>
     </AuthProvider>
   );
 }

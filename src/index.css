@@ -245,3 +245,244 @@ body::before {
     transparent 100%
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Project Details page — refined experience
+   Research-backed: WCAG AA hero overlay, prose readability,
+   accordion motion, scroll-spy. See UI_UX audit.
+═══════════════════════════════════════════════════════════════ */
+
+/* WCAG AA hero overlay — ensures 4.5:1 text contrast regardless of image
+   See W3C WCAG 2.2 SC 1.4.3 + WCAG.com guidance on text-over-images. */
+.hero-wcag-overlay {
+  background: linear-gradient(
+    180deg,
+    rgba(17, 17, 17, 0.25) 0%,
+    rgba(17, 17, 17, 0.08) 30%,
+    rgba(17, 17, 17, 0.35) 60%,
+    rgba(17, 17, 17, 0.82) 100%
+  );
+}
+
+/* Prose — Inter body with comfortable line-height for long-form reading */
+.pd-prose {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.75;
+  color: rgba(17, 17, 17, 0.82);
+  font-feature-settings: "ss01", "ss02", "cv11";
+  letter-spacing: -0.008em;
+}
+.pd-prose p + p { margin-top: 1em; }
+.pd-prose strong { color: rgba(17, 17, 17, 0.95); font-weight: 600; }
+
+/* Accordion content expand/collapse — respects reduced motion */
+@keyframes pdAccordionOpen {
+  from { opacity: 0; max-height: 0; transform: translateY(-4px); }
+  to   { opacity: 1; max-height: 3000px; transform: translateY(0); }
+}
+.pd-accordion-panel {
+  animation: pdAccordionOpen 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-accordion-panel { animation: none; }
+}
+
+/* (SectionNav removed — sidebar now metadata-only) */
+
+/* Chip — for metadata strip in hero (duration, tier, status, domain) */
+.pd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(8px);
+  background: rgba(245, 243, 238, 0.12);
+  border: 1px solid rgba(245, 243, 238, 0.22);
+  color: rgba(245, 243, 238, 0.95);
+  white-space: nowrap;
+}
+.pd-chip--light {
+  padding: 5px 12px;
+  font-size: 11px;
+  background: rgba(17, 17, 17, 0.04);
+  border-color: rgba(17, 17, 17, 0.12);
+  color: rgba(17, 17, 17, 0.65);
+  backdrop-filter: none;
+}
+.pd-chip--red {
+  background: rgba(196, 41, 30, 0.14);
+  border-color: rgba(196, 41, 30, 0.35);
+  color: #ffeceb;
+}
+
+/* Icon-only circular action (like/bookmark/share) — 40px thumb-safe target */
+.pd-iconbtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(245, 243, 238, 0.28);
+  background: rgba(245, 243, 238, 0.06);
+  color: rgba(245, 243, 238, 0.9);
+  backdrop-filter: blur(10px);
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+.pd-iconbtn:hover {
+  background: rgba(245, 243, 238, 0.14);
+  border-color: rgba(245, 243, 238, 0.55);
+  transform: translateY(-1px);
+}
+.pd-iconbtn--active {
+  background: #C4291E;
+  border-color: #C4291E;
+  color: #F5F3EE;
+}
+.pd-iconbtn--light {
+  border-color: rgba(17, 17, 17, 0.15);
+  background: transparent;
+  color: rgba(17, 17, 17, 0.65);
+  backdrop-filter: none;
+}
+.pd-iconbtn--light:hover {
+  background: rgba(17, 17, 17, 0.04);
+  border-color: rgba(17, 17, 17, 0.35);
+  color: rgba(17, 17, 17, 0.9);
+}
+
+/* Mobile sticky bottom action bar — thumb zone CTA placement */
+.pd-mobile-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(245, 243, 238, 0.92);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(17, 17, 17, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (min-width: 1024px) {
+  .pd-mobile-bar { display: none; }
+}
+
+/* Mobile tab scroll fade indicators */
+@media (max-width: 767px) {
+  .pd-tab-scroll {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black 12px,
+      black calc(100% - 24px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black 12px,
+      black calc(100% - 24px),
+      transparent 100%
+    );
+  }
+}
+
+/* Tab content crossfade */
+@keyframes pdTabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pd-tab-fade {
+  animation: pdTabFadeIn 200ms ease-out both;
+}
+
+/* Disable the page's own fade-in when reduced motion is requested */
+@media (prefers-reduced-motion: reduce) {
+  .story-section { opacity: 1 !important; transform: none !important; }
+  .pd-tab-fade { animation: none; }
+  .pd-hero-reveal { opacity: 1 !important; transform: none !important; }
+  .pd-scroll-reveal { opacity: 1 !important; transform: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Oryzo-style split-pane hero — GSAP stagger targets
+   Initial hidden state; GSAP timeline animates to final state.
+═══════════════════════════════════════════════════════════════ */
+/* Initial state handled by GSAP. CSS fallback uses a keyframe so content
+   is always visible even if JS fails. GSAP overrides this on mount. */
+@keyframes pdHeroRevealFallback {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pd-hero-reveal {
+  animation: pdHeroRevealFallback 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+/* Stagger via nth-child */
+.pd-hero-reveal:nth-child(1) { animation-delay: 0.05s; }
+.pd-hero-reveal:nth-child(2) { animation-delay: 0.15s; }
+.pd-hero-reveal:nth-child(3) { animation-delay: 0.25s; }
+.pd-hero-reveal:nth-child(4) { animation-delay: 0.35s; }
+.pd-hero-reveal:nth-child(5) { animation-delay: 0.45s; }
+.pd-hero-reveal:nth-child(6) { animation-delay: 0.55s; }
+/* When GSAP takes over, it sets inline styles that override the animation */
+
+/* Scroll-triggered content reveals — used by tab body sections */
+.pd-scroll-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  will-change: opacity, transform;
+}
+
+/* Split layout — left text pane gradient fade at bottom for scroll hint */
+.pd-left-pane {
+  scrollbar-width: none;
+}
+.pd-left-pane::-webkit-scrollbar {
+  display: none;
+}
+
+/* Right image pane — subtle Ken Burns drift on the hero image */
+@keyframes pdKenBurns {
+  0%   { transform: scale(1.0)  translate(0, 0); }
+  50%  { transform: scale(1.06) translate(-1%, -1%); }
+  100% { transform: scale(1.0)  translate(0, 0); }
+}
+.pd-ken-burns {
+  animation: pdKenBurns 25s ease-in-out infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-ken-burns { animation: none; }
+}
+
+/* Stagger delay utility classes for hero elements */
+.pd-stagger-1 { transition-delay: 0.05s; }
+.pd-stagger-2 { transition-delay: 0.10s; }
+.pd-stagger-3 { transition-delay: 0.15s; }
+.pd-stagger-4 { transition-delay: 0.20s; }
+.pd-stagger-5 { transition-delay: 0.25s; }
+.pd-stagger-6 { transition-delay: 0.30s; }
+
+/* Smooth image reveal with clip-path wipe */
+@keyframes pdImageReveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.pd-image-reveal {
+  animation: pdImageReveal 1s cubic-bezier(0.77, 0, 0.175, 1) 0.3s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-image-reveal { animation: none; clip-path: none; }
+}

@@ -20,14 +20,15 @@ export function useEvents(typeFilter?: string) {
         if (typeFilter && typeFilter !== 'All') {
             q = q.eq('event_type', typeFilter as any);
         }
-        const { data: events, error } = await q;
+        const { data: events, error } = await q.limit(200);
         if (error || !events) return { data: [], error };
 
         const eventIds = (events as Event[]).map(e => e.id);
         const { data: regData } = await supabase
             .from('event_registration')
             .select('event_id')
-            .in('event_id', eventIds);
+            .in('event_id', eventIds)
+            .limit(200);
 
         const regCounts: Record<string, number> = {};
         (regData || []).forEach((r: any) => {
@@ -79,15 +80,16 @@ export function useEventHosts(eventId: string | undefined) {
         const { data: hosts, error } = await supabase
             .from('event_host')
             .select('id, user_id, event_id, created_at')
-            .eq('event_id', eventId);
+            .eq('event_id', eventId)
+            .limit(50);
 
         if (error || !hosts || hosts.length === 0) return { data: [], error: null };
 
         const userIds = (hosts as EventHost[]).map(h => h.user_id);
 
         const [usersRes, profilesRes] = await Promise.all([
-            supabase.from('app_user').select('id, name').in('id', userIds),
-            supabase.from('maker_profile').select('user_id, avatar_url').in('user_id', userIds),
+            supabase.from('app_user').select('id, name').in('id', userIds).limit(50),
+            supabase.from('maker_profile').select('user_id, avatar_url').in('user_id', userIds).limit(50),
         ]);
 
         const nameMap: Record<string, string> = {};
@@ -170,7 +172,8 @@ export function useEventWebsites(eventId: string | undefined) {
             .select('id, event_id, user_id, title, description, html_content, file_url, thumbnail_url, host_names, status, created_at, updated_at, user:app_user!user_id(name)')
             .eq('event_id', eventId)
             .eq('status', 'approved')
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(200);
 
         if (error || !data) return { data: [], error };
 
@@ -180,7 +183,8 @@ export function useEventWebsites(eventId: string | undefined) {
             const { data: profiles } = await supabase
                 .from('maker_profile')
                 .select('user_id, avatar_url')
-                .in('user_id', userIds);
+                .in('user_id', userIds)
+                .limit(50);
             (profiles || []).forEach((p: any) => { avatarMap[p.user_id] = p.avatar_url; });
         }
 
@@ -219,7 +223,7 @@ export function useEventWebsitesForReview(eventId?: string) {
             q = q.eq('event_id', eventId);
         }
 
-        const { data, error } = await q;
+        const { data, error } = await q.limit(200);
         if (error || !data) return { data: [], error };
 
         const enriched = (data as any[]).map(w => ({
@@ -287,7 +291,8 @@ export function useAllEvents() {
         return supabase
             .from('event')
             .select('id, title, description, event_type, date, end_date, location, capacity, cover_image_url, registration_status, auto_badge_id, created_by, created_at, updated_at')
-            .order('date', { ascending: false }) as any;
+            .order('date', { ascending: false })
+            .limit(200) as any;
     }, []);
 }
 

@@ -3,14 +3,16 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { useAllEvents, useEventMutations, useSupabaseQuery, useEventHosts, useEventHostMutations } from '../../lib/hooks';
 import { uploadFile } from '../../lib/storage';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Calendar as CalendarIcon, Plus, Trash2, Edit2, X, Image as ImageIcon, UserPlus, UserMinus } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, Edit2, X, Image as ImageIcon, UserPlus, UserMinus, Zap, Users as UsersIcon, Mic2, Zap as ZapIcon } from 'lucide-react';
+import { EVENT_TYPE_LABELS, EVENT_TYPE_SLUGS, EVENT_TYPE_TAGLINES } from './event-wizard/wizardTypes';
 import type { Event, EventType, Badge } from '../../lib/database.types';
 import { AdminPageShell } from '../../components/admin/AdminPageShell';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
+import { fetchDefaultTTSeries } from '../../lib/api/eventSeries';
 
 // ─── Showcase Slots Admin ───
 const ShowcaseSlotsAdmin = ({ eventId }: { eventId: string }) => {
@@ -217,8 +219,27 @@ const GalleryManager = ({ urls, onChange }: { urls: string[]; onChange: (urls: s
 // ─── Main ManageEvents ───
 export function ManageEvents() {
     const { user, role } = useAuth();
+    const navigate = useNavigate();
     const { data: events, loading, refetch } = useAllEvents();
     const { createEvent, updateEvent, deleteEvent } = useEventMutations();
+    // P10 — "New Tech Tuesday" fast action: one click routes to the TT
+    // wizard with ?series=<id> so Step 1 is prefilled from the default
+    // series and the user lands on Step 2 (speaker/topic/Luma URL only).
+    const [ttFastLoading, setTtFastLoading] = useState(false);
+    const handleNewTechTuesday = async () => {
+        if (ttFastLoading) return;
+        setTtFastLoading(true);
+        const series = await fetchDefaultTTSeries();
+        setTtFastLoading(false);
+        if (!series) {
+            const go = window.confirm(
+                'No Tech Tuesday series exists yet. Create one first?',
+            );
+            if (go) navigate('/admin/series');
+            return;
+        }
+        navigate(`/admin/events/new/tech-tuesday?series=${series.id}`);
+    };
 
     const { data: badges } = useSupabaseQuery<Partial<Badge>[]>(async () => {
         return supabase.from('badge').select('id, name').order('name');
@@ -368,13 +389,7 @@ export function ManageEvents() {
             title="Event Management"
             subtitle="Schedule and format new lab events, workshops, and inductions."
             icon={CalendarIcon}
-            headerAction={
-                !isEditing ? (
-                    <Button onClick={() => startEdit()}>
-                        <Plus className="w-4 h-4 mr-1" /> New Event
-                    </Button>
-                ) : undefined
-            }
+            headerAction={undefined}
         >
             {/* ── Delete confirmation card ────────────────────────── */}
             {deleteTarget && (
@@ -621,25 +636,102 @@ export function ManageEvents() {
                         </div>
                     </form>
 
-                    {/* Host Mentors — shown when editing existing events */}
+                    {/*
+                      Secondary panels (Hosted By, Showcase Slots) — collapsed into
+                      <details> disclosures so the primary form isn't crowded. They
+                      only render when editing an existing event (need an event ID).
+                    */}
                     {isEditing !== 'new' && (
-                        <div className="mt-8 pt-6 border-t-2 border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-lg md:text-xl uppercase tracking-tight mb-1">Hosted By</h3>
-                            <p className="font-data text-[11px] text-brutal-dark/50 mb-4">Assign mentors who host this event. Their names and avatars appear on the event page.</p>
-                            <HostMentorManager eventId={isEditing as string} />
-                        </div>
-                    )}
+                        <div className="mt-8 space-y-3">
+                            <details className="border-2 border-brutal-dark/10 rounded-xl bg-brutal-dark/[0.02] group">
+                                <summary className="cursor-pointer list-none p-4 flex items-center gap-2 select-none">
+                                    <span className="bg-brutal-dark/10 text-brutal-dark/70 text-[9px] font-data font-bold px-2 py-0.5 rounded uppercase">Hosts</span>
+                                    <h3 className="font-heading font-bold text-sm md:text-base uppercase tracking-tight">Hosted By</h3>
+                                    <span className="ml-auto font-data text-[10px] text-brutal-dark/40 group-open:hidden">Click to expand</span>
+                                    <span className="ml-auto font-data text-[10px] text-brutal-dark/40 hidden group-open:inline">Click to collapse</span>
+                                </summary>
+                                <div className="px-4 pb-4">
+                                    <p className="font-data text-[11px] text-brutal-dark/50 mb-4">Assign mentors who host this event. Their names and avatars appear on the event page.</p>
+                                    <HostMentorManager eventId={isEditing as string} />
+                                </div>
+                            </details>
 
-                    {/* Showcase Slots — for maker meetups */}
-                    {isEditing !== 'new' && (form.event_type === 'maker_meetup' || form.event_type === 'tech_tuesday') && (
-                        <div className="mt-8 pt-6 border-t-2 border-brutal-dark/10">
-                            <h3 className="font-heading font-bold text-lg md:text-xl uppercase tracking-tight mb-4">Showcase Slots Management</h3>
-                            <ShowcaseSlotsAdmin eventId={isEditing as string} />
+                            {(form.event_type === 'maker_meetup' || form.event_type === 'tech_tuesday') && (
+                                <details className="border-2 border-brutal-dark/10 rounded-xl bg-brutal-dark/[0.02] group">
+                                    <summary className="cursor-pointer list-none p-4 flex items-center gap-2 select-none">
+                                        <span className="bg-brutal-dark/10 text-brutal-dark/70 text-[9px] font-data font-bold px-2 py-0.5 rounded uppercase">Slots</span>
+                                        <h3 className="font-heading font-bold text-sm md:text-base uppercase tracking-tight">Showcase Slot Requests</h3>
+                                        <span className="ml-auto font-data text-[10px] text-brutal-dark/40 group-open:hidden">Click to expand</span>
+                                        <span className="ml-auto font-data text-[10px] text-brutal-dark/40 hidden group-open:inline">Click to collapse</span>
+                                    </summary>
+                                    <div className="px-4 pb-4">
+                                        <ShowcaseSlotsAdmin eventId={isEditing as string} />
+                                    </div>
+                                </details>
+                            )}
                         </div>
                     )}
                 </Card>
             ) : (
-                /* ── Event list ───────────────────────────────── */
+                <>
+                {/*
+                  ── Fast action: "New Tech Tuesday" (P10) ───────────
+                  Single-click path for the weekly cadence. Pulls the
+                  default event_series, routes to the TT wizard with
+                  ?series=<id> so Step 1 is prefilled (title template,
+                  location, cover, duration) and the user lands on
+                  Step 2 to enter speaker / topic / Luma URL.
+                */}
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                    <Button
+                        onClick={handleNewTechTuesday}
+                        disabled={ttFastLoading}
+                        className="bg-blue-600 hover:bg-blue-700 border-blue-700 text-white"
+                    >
+                        <ZapIcon className="w-4 h-4 mr-2" />
+                        {ttFastLoading ? 'Loading…' : 'New Tech Tuesday (90-second publish)'}
+                    </Button>
+                    <Link
+                        to="/admin/series"
+                        className="font-data text-xs text-brutal-dark/60 underline hover:text-brutal-dark"
+                    >
+                        Manage series →
+                    </Link>
+                    <Link
+                        to="/admin/speakers"
+                        className="font-data text-xs text-brutal-dark/60 underline hover:text-brutal-dark"
+                    >
+                        Speaker pitches →
+                    </Link>
+                </div>
+
+                {/*
+                  ── Create new event: three type-cards ──────────────
+                  Replaces the single "New Event" button. Each card routes
+                  to its own wizard at /admin/events/new/<slug>, which
+                  keeps the creation flow focused on exactly the fields
+                  that type needs (no more 20-field omnibus form for a
+                  Tech Tuesday). See src/pages/admin/event-wizard/.
+                */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <NewEventCard
+                        type="build_challenge"
+                        icon={Zap}
+                        accentClass="text-brutal-red border-brutal-red/30 hover:border-brutal-red"
+                    />
+                    <NewEventCard
+                        type="maker_meetup"
+                        icon={UsersIcon}
+                        accentClass="text-brutal-dark border-brutal-dark/30 hover:border-brutal-dark"
+                    />
+                    <NewEventCard
+                        type="tech_tuesday"
+                        icon={Mic2}
+                        accentClass="text-blue-700 border-blue-300 hover:border-blue-500"
+                    />
+                </div>
+
+                {/* ── Event list ───────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4">
                     {events?.map(event => {
                         const isPast = new Date(event.date) < new Date();
@@ -651,7 +743,7 @@ export function ManageEvents() {
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 bg-brutal-dark/10 overflow-hidden border-2 border-brutal-dark flex-shrink-0">
                                         {event.cover_image_url ? (
-                                            <img src={event.cover_image_url} alt="" className="w-full h-full object-cover" />
+                                            <img src={event.cover_image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-brutal-dark/20">
                                                 <CalendarIcon className="w-8 h-8" />
@@ -676,13 +768,17 @@ export function ManageEvents() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={() => startEdit(event)}
-                                        className="p-2 border-2 border-brutal-dark hover:bg-brutal-dark hover:text-white transition-colors"
-                                        title="Edit" disabled={actionLoading}
+                                    {/* P7 — clicking Edit opens the ops console at /admin/events/:id.
+                                        The legacy inline-edit form remains in this file for any stray
+                                        code paths (e.g. keyboard shortcuts), but the primary host
+                                        workflow now goes through the tabbed console. */}
+                                    <Link
+                                        to={`/admin/events/${event.id}`}
+                                        className="p-2 border-2 border-brutal-dark hover:bg-brutal-dark hover:text-white transition-colors inline-flex items-center"
+                                        title="Open console"
                                     >
                                         <Edit2 className="w-4 h-4" />
-                                    </button>
+                                    </Link>
                                     <button
                                         onClick={() => setDeleteTarget(event)}
                                         className="p-2 border-2 border-brutal-red/20 text-brutal-red hover:bg-brutal-red hover:text-white transition-colors"
@@ -700,7 +796,44 @@ export function ManageEvents() {
                         </div>
                     )}
                 </div>
+                </>
             )}
         </AdminPageShell>
+    );
+}
+
+// ─── "Create <type>" card ─────────────────────────────────────────
+// Each card routes to its own wizard. The three wizards share a common
+// shell (src/pages/admin/event-wizard/WizardShell.tsx) but are scoped
+// to a single event type at the URL level so the creation flow is
+// uncluttered by fields that don't apply to that type.
+
+function NewEventCard({
+    type,
+    icon: Icon,
+    accentClass,
+}: {
+    type: keyof typeof EVENT_TYPE_LABELS;
+    icon: React.ComponentType<{ className?: string }>;
+    accentClass: string;
+}) {
+    return (
+        <Link
+            to={`/admin/events/new/${EVENT_TYPE_SLUGS[type]}`}
+            className={`border-2 bg-white rounded-xl p-5 flex flex-col gap-2 transition-all ${accentClass} shadow-[4px_4px_0_0_rgba(17,17,17,0.08)] hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(17,17,17,0.12)]`}
+        >
+            <div className="flex items-center gap-2">
+                <Icon className="w-5 h-5" />
+                <h3 className="font-heading font-bold text-base uppercase tracking-tight">
+                    New {EVENT_TYPE_LABELS[type]}
+                </h3>
+            </div>
+            <p className="font-data text-xs text-brutal-dark/60 leading-relaxed">
+                {EVENT_TYPE_TAGLINES[type]}
+            </p>
+            <span className="mt-auto pt-2 font-data text-[11px] font-bold uppercase tracking-widest flex items-center gap-1">
+                <Plus className="w-3.5 h-3.5" /> Start
+            </span>
+        </Link>
     );
 }

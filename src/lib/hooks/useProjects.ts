@@ -84,6 +84,8 @@ export function useProjects(
             q = q.eq('domain', domainFilter);
         }
 
+        q = q.limit(200);
+
         const { data: rows, error } = (await (q as any)) as { data: any[] | null; error: any };
         if (error) return { data: null, error };
         if (!rows || rows.length === 0) return { data: [], error: null };
@@ -91,22 +93,25 @@ export function useProjects(
         const ids = rows.map((r) => r.id);
         const ownerIds = Array.from(new Set(rows.map((r) => r.owner_id).filter(Boolean)));
 
+        // Enrichment queries run in parallel with limits.
         const [reactionsRes, tagsRes, usersRes, profilesRes] = await Promise.all([
             supabase
                 .from('reaction')
                 .select('target_id, reaction_type')
                 .eq('target_type', 'project')
-                .in('target_id', ids),
+                .in('target_id', ids)
+                .limit(2000),
             supabase
                 .from('entity_tag')
                 .select('target_id, tag:tag(name)')
                 .eq('target_type', 'project')
-                .in('target_id', ids),
+                .in('target_id', ids)
+                .limit(500),
             ownerIds.length > 0
-                ? supabase.from('app_user').select('id, name').in('id', ownerIds)
+                ? supabase.from('app_user').select('id, name').in('id', ownerIds).limit(200)
                 : Promise.resolve({ data: [], error: null } as any),
             ownerIds.length > 0
-                ? supabase.from('maker_profile').select('user_id, avatar_url').in('user_id', ownerIds)
+                ? supabase.from('maker_profile').select('user_id, avatar_url').in('user_id', ownerIds).limit(200)
                 : Promise.resolve({ data: [], error: null } as any),
         ]);
 
@@ -189,8 +194,15 @@ export function useProjects(
         refetchRef.current = query.refetch;
     }, [query.refetch]);
 
+    // Real-time project inserts — debounced to prevent thundering herd.
+    // Instead of refetching immediately on every INSERT (which at 10K users
+    // would cause 10K simultaneous refetch queries), we debounce with a 5s
+    // window. Multiple rapid inserts coalesce into a single refetch.
+    // Only refetches if the new project would be visible (active + public).
     useEffect(() => {
         let cancelled = false;
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
         const channel = supabase
             .channel('projects_list_realtime')
             .on(
@@ -198,10 +210,15 @@ export function useProjects(
                 { event: 'INSERT', schema: 'public', table: 'project' },
                 (payload: any) => {
                     if (cancelled) return;
-                    if (typeof console !== 'undefined') {
-                        console.debug('[realtime] project insert', payload?.new?.id);
-                    }
-                    refetchRef.current();
+                    // Only refetch for projects that would appear in the public list
+                    const newRow = payload?.new;
+                    if (newRow?.status !== 'active' || newRow?.visibility !== 'public') return;
+
+                    // Debounce: coalesce rapid inserts into one refetch
+                    if (debounceTimer) clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        if (!cancelled) refetchRef.current();
+                    }, 5000);
                 }
             )
             .subscribe((status, err) => {
@@ -211,6 +228,7 @@ export function useProjects(
             });
         return () => {
             cancelled = true;
+            if (debounceTimer) clearTimeout(debounceTimer);
             supabase.removeChannel(channel);
         };
     }, []);
@@ -317,16 +335,16 @@ export function useProject(id: string | undefined) {
 
         if (error || !project) return { data: null, error };
 
-        const [tagsRes, reactionsRes] = await Promise.all([
-            supabase.from('entity_tag').select('tag_id, tag:tag(name)').eq('target_type', 'project').eq('target_id', id),
-            supabase.from('reaction').select('reaction_type').eq('target_type', 'project').eq('target_id', id),
+        // Use head:true counts instead of fetching every reaction row.
+        // At scale, a popular project could have 10K+ reactions — we only need the count.
+        const [tagsRes, likesRes, bookmarksRes] = await Promise.all([
+            supabase.from('entity_tag').select('tag_id, tag:tag(name)').eq('target_type', 'project').eq('target_id', id).limit(30),
+            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'like'),
+            supabase.from('reaction').select('id', { count: 'exact', head: true }).eq('target_type', 'project').eq('target_id', id).eq('reaction_type', 'bookmark'),
         ]);
 
-        let likes = 0, bookmarks = 0;
-        for (const r of (reactionsRes.data || []) as { reaction_type: string }[]) {
-            if (r.reaction_type === 'like') likes++;
-            else if (r.reaction_type === 'bookmark') bookmarks++;
-        }
+        const likes = likesRes.count ?? 0;
+        const bookmarks = bookmarksRes.count ?? 0;
 
         let remix_origin_title: string | null = null;
         let remix_origin_owner: string | null = null;
@@ -648,7 +666,8 @@ export function useProjectBomMutations() {
     }, []);
 
     const reorderLines = useCallback(async (projectId: string, lines: { id: string; display_order: number }[]) => {
-        await Promise.all(
+        // allSettled: if one row update fails, the rest should still reorder
+        await Promise.allSettled(
             lines.map((line) =>
                 supabase.from('project_bom_line').update({ display_order: line.display_order }).eq('id', line.id)
             )
@@ -669,22 +688,39 @@ export function useProjectMakes(projectId: string | undefined) {
             if (cached && Date.now() - cached.at < PROJECT_BOM_CACHE_TTL_MS) {
                 return { data: cached.data, error: null };
             }
+            // Fetch makes with owner name via FK embed. Avatar comes from
+            // a separate query because maker_profile has no FK from
+            // project_make (only app_user does), so PostgREST can't join it.
             const { data, error } = await supabase
                 .from('project_make')
                 .select(`
                     id, project_id, user_id, image_url, caption, build_notes, created_at,
-                    app_user!project_make_user_id_fkey ( name ),
-                    maker_profile!project_make_user_id_fkey ( avatar_url )
+                    app_user!project_make_user_id_fkey ( name )
                 `)
                 .eq('project_id', projectId)
                 .order('created_at', { ascending: false })
                 .abortSignal(signal);
 
             if (error) return { data: null, error };
+
+            // Fetch avatars separately via user_id
+            const userIds = Array.from(new Set((data || []).map((m: any) => m.user_id).filter(Boolean)));
+            const avatarMap = new Map<string, string | null>();
+            if (userIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('maker_profile')
+                    .select('user_id, avatar_url')
+                    .in('user_id', userIds)
+                    .limit(50);
+                for (const p of (profiles || []) as any[]) {
+                    avatarMap.set(p.user_id, p.avatar_url || null);
+                }
+            }
+
             const enriched = (data || []).map((make: any) => ({
                 ...make,
                 user_name: make.app_user?.name || 'Unknown',
-                user_avatar_url: make.maker_profile?.avatar_url || null,
+                user_avatar_url: avatarMap.get(make.user_id) || null,
             }));
             projectMakesCache.set(projectId, { data: enriched, at: Date.now() });
             return { data: enriched, error: null };

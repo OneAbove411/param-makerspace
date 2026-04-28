@@ -84,6 +84,7 @@ export function EditMediaTab() {
                     <img
                       src={img.image_url}
                       alt={img.caption || `Gallery image ${i + 1}`}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
                   </div>
@@ -156,6 +157,7 @@ export function EditMediaTab() {
                       <img
                         src={thumb}
                         alt=""
+                        loading="lazy"
                         className="w-16 h-10 rounded object-cover flex-shrink-0"
                       />
                     )}

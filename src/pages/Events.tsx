@@ -10,9 +10,10 @@ import { ListingLayout } from '../components/shared/ListingLayout';
 import { ListingSidebar } from '../components/shared/ListingSidebar';
 import { SidebarSearch } from '../components/shared/SidebarSearch';
 import { SidebarChipGroup, type ChipOption } from '../components/shared/SidebarChipGroup';
-import { GamificationNudge } from '../components/shared/GamificationNudge';
 import { MobileFilterBar } from '../components/shared/MobileFilterBar';
 import { zeroCTA } from '../lib/zeroCTA';
+import { AdminEventActions } from '../components/events/AdminEventActions';
+import { EventsSidebarNudge } from '../components/events/EventsSidebarNudge';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -278,7 +279,7 @@ export function Events() {
                 onChange={handleTimeChange}
                 singleSelect
             />
-            <GamificationNudge />
+            <EventsSidebarNudge nextEvent={split.upcoming[0] ?? null} />
         </ListingSidebar>
     );
 
@@ -287,7 +288,7 @@ export function Events() {
             <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-0">
                 {/* ── PAGE HEADER ── */}
                 <div className="px-0 lg:px-8 mb-6 md:mb-8">
-                    <div className="flex items-end justify-between">
+                    <div className="flex items-end justify-between gap-4 flex-wrap">
                         <div>
                             <div className="ev-hero-text flex items-center gap-2 mb-3">
                                 <span className="inline-block w-6 h-[3px] bg-brutal-red" aria-hidden />
@@ -302,6 +303,14 @@ export function Events() {
                             <p className="ev-hero-text font-data text-xs text-brutal-dark/55 mt-3 max-w-lg leading-relaxed">
                                 Meetups, build sprints, and knowledge drops. Show up, plug in, make things happen.
                             </p>
+                        </div>
+                        {/* Mentor/admin shortcut — renders nothing for public visitors.
+                            Intentionally not decorated with .ev-hero-text: the GSAP
+                            animation leaves an inline transform on that class, which
+                            creates a new stacking context and traps the dropdown menu
+                            behind the event cards below. */}
+                        <div>
+                            <AdminEventActions />
                         </div>
                     </div>
                 </div>
@@ -393,8 +402,9 @@ export function Events() {
                 </ListingLayout>
             </div>
 
-            {/* Mobile gamification nudge */}
-            <GamificationNudge variant="mobile-bar" />
+            {/* Mobile gamification nudge — events-flavored: surfaces the
+                next upcoming event, falling back to /speak when empty. */}
+            <EventsSidebarNudge variant="mobile-bar" nextEvent={split.upcoming[0] ?? null} />
         </div>
     );
 }

@@ -5,6 +5,7 @@ import { Footer } from './Footer';
 import { RankUpModal } from '../ui/RankUpModal';
 import { Toaster } from '../ui/Toaster';
 import { SessionGuard } from './SessionGuard';
+import { CommandPalette } from '../CommandPalette';
 
 export function RootLayout() {
     const [rankUp, setRankUp] = useState<{
@@ -25,6 +26,7 @@ export function RootLayout() {
             </main>
             <Footer />
             <SessionGuard />
+            <CommandPalette />
             <Toaster />
             {rankUp && (
                 <RankUpModal

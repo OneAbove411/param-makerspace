@@ -208,28 +208,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             //    If the token is actually dead, the first data query below
             //    (fetchAppUser) will 401 and handleAuthError will clean up.
 
-            // 4. Load app user
+            // 4. Load app user + avatar before marking init as done.
+            //    The avatar is a single-row lookup (~10-30ms) and loading it
+            //    before setIsLoading(false) prevents the navbar from flickering
+            //    when the avatar arrives after the boot loader has lifted.
             setSession(s);
             const appUser = await fetchAppUser(s.user.id);
-            if (mounted) {
+            if (mounted && appUser) {
+                // Await avatar so it's included in the first render
+                const avatar = await fetchAvatar(appUser.id).catch(() => undefined);
+                const userWithAvatar = avatar ? { ...appUser, avatar } : appUser;
+                setUser(userWithAvatar);
+                setIsLoading(false);
+
+                // Fire-and-forget profile ensure (with optional intent backfill)
+                // — this doesn't affect UI so it can stay async.
+                const pendingIntent = readPendingDeclaredIntent(s.user);
+                ensureMakerProfile(appUser.id, appUser.name, pendingIntent)
+                    .then(() => {
+                        if (pendingIntent) {
+                            try { sessionStorage.removeItem('pending_declared_intent'); } catch { /* ignore */ }
+                        }
+                    })
+                    .catch(console.error);
+            } else if (mounted) {
                 setUser(appUser);
                 setIsLoading(false);
-                if (appUser) {
-                    // Fire-and-forget avatar load
-                    fetchAvatar(appUser.id).then((avatar) => {
-                        if (mounted && avatar)
-                            setUser((prev) => (prev ? { ...prev, avatar } : prev));
-                    });
-                    // Fire-and-forget profile ensure (with optional intent backfill)
-                    const pendingIntent = readPendingDeclaredIntent(s.user);
-                    ensureMakerProfile(appUser.id, appUser.name, pendingIntent)
-                        .then(() => {
-                            if (pendingIntent) {
-                                try { sessionStorage.removeItem('pending_declared_intent'); } catch { /* ignore */ }
-                            }
-                        })
-                        .catch(console.error);
-                }
             }
             initDone.current = true;
 

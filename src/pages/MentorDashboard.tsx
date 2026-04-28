@@ -48,7 +48,6 @@ interface ShowcaseSlot {
     status: string;
     event_id: string;
     user_id: string;
-    topic: string;
     project: { id: string; title: string };
     app_user: { name: string };
     event: { title: string };
@@ -105,7 +104,7 @@ export function MentorDashboard() {
                 const { data, error } = await supabase
                     .from('showcase_slot')
                     .select(
-                        'id, status, event_id, user_id, topic, project:project!project_id(id, title), app_user:app_user!user_id(name), event:event!event_id(title)'
+                        'id, status, event_id, user_id, project:project!project_id(id, title), app_user:app_user!user_id(name), event:event!event_id(title)'
                     )
                     .eq('status', 'pending')
                     .order('created_at', { ascending: false });
@@ -581,7 +580,7 @@ export function MentorDashboard() {
                                                 <dl className="space-y-1.5 mb-4">
                                                     <MetaRow label="By" value={slot.app_user?.name || '—'} />
                                                     <MetaRow label="Event" value={slot.event?.title || '—'} />
-                                                    <MetaRow label="Topic" value={slot.topic || '—'} />
+                                                    {/* topic column not yet in DB — re-enable after migration */}
                                                 </dl>
 
                                                 <div className="flex flex-wrap gap-2">

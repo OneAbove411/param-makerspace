@@ -1,169 +1,103 @@
-import React, { useState, useRef, useEffect } from 'react';
+/**
+ * ManageChallenges — P5 Revamp
+ *
+ * Table-based admin list with:
+ *   - BrutalTabBar status filters (All / Draft / Published / Archived)
+ *   - BrutalTable with sortable columns
+ *   - Row actions: Edit (→ wizard), Delete, Quick status toggle
+ *   - Multi-select + bulk action bar
+ *   - "New Challenge" routes to wizard
+ *
+ * Inline form removed — the P2 wizard at /admin/challenges/new handles creation.
+ */
+
+import React, { useState, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../../lib/auth';
-import { useAllChallenges, useChallengeMutations } from '../../lib/hooks';
-import { uploadFile } from '../../lib/storage';
-import { Link } from 'react-router';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { ImageUploadField } from '../../components/ui/ImageUploadField';
-import { Zap, Plus, Trash2, Edit2, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { useAllChallenges, useChallengeMutations, useChallengeAnalytics } from '../../lib/hooks';
+import { Zap, Plus, Trash2, Edit2, Eye, Archive, Send, Trophy, Users } from 'lucide-react';
 import type { Challenge } from '../../lib/database.types';
 import { AdminPageShell } from '../../components/admin/AdminPageShell';
+import { BrutalTable, type BrutalColumn } from '../../components/admin/BrutalTable';
+import { BrutalTabBar, type TabOption } from '../../components/admin/BrutalTabBar';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
-import { BrutalPill } from '../../components/admin/BrutalPill';
+import { BrutalStatCard } from '../../components/admin/BrutalStatCard';
+import { Button } from '../../components/ui/Button';
+import { toast } from '../../lib/toast';
+import { cn } from '../../lib/utils';
 
-const TIER_COLORS: Record<string, string> = {
-    'Tier 1': 'bg-amber-600',
-    'Tier 2': 'bg-gray-400',
-    'Tier 3': 'bg-yellow-400',
+type StatusFilter = 'all' | 'draft' | 'review_ready' | 'published' | 'archived';
+
+const TIER_DOT: Record<string, string> = {
+    'Tier 1': 'bg-green-500',
+    'Tier 2': 'bg-yellow-500',
+    'Tier 3': 'bg-brutal-red',
 };
 
 export function ManageChallenges() {
-    const { user, role } = useAuth();
+    const navigate = useNavigate();
+    const { role } = useAuth();
     const { data: challenges, loading, refetch } = useAllChallenges();
-    const { createChallenge, updateChallenge, deleteChallenge } =
-        useChallengeMutations();
+    const { updateChallenge, deleteChallenge } = useChallengeMutations();
 
-    const [isEditing, setIsEditing] = useState<string | 'new' | null>(null);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const formRef = useRef<HTMLDivElement>(null);
-
-    // Delete confirmation state
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const { data: analytics } = useChallengeAnalytics();
     const [deleteTarget, setDeleteTarget] = useState<Challenge | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
-    useEffect(() => {
-        if (isEditing && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // ─── Derived ───────────────────────────────────────────────────
+    const statusCounts = useMemo(() => {
+        const counts = { all: 0, draft: 0, review_ready: 0, published: 0, archived: 0 };
+        for (const c of challenges || []) {
+            counts.all++;
+            if (c.status === 'draft') counts.draft++;
+            else if (c.status === 'review_ready') counts.review_ready++;
+            else if (c.status === 'published') counts.published++;
+            else if (c.status === 'archived') counts.archived++;
         }
-    }, [isEditing]);
+        return counts;
+    }, [challenges]);
 
-    const [form, setForm] = useState<Partial<Challenge>>({
-        title: '',
-        tier: 'Tier 1',
-        domain: 'Interdisciplinary',
-        mystery: '',
-        core_idea: '',
-        mission: '',
-        success_criteria: '',
-        status: 'draft',
-    });
-    // imageFile = locally staged file; form.cover_image_url = saved URL
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [editingChallenge, setEditingChallenge] =
-        useState<Challenge | null>(null);
+    const filtered = useMemo(() => {
+        if (!challenges) return [];
+        if (statusFilter === 'all') return challenges;
+        return challenges.filter((c) => c.status === statusFilter);
+    }, [challenges, statusFilter]);
 
-    const [childData, setChildData] = useState<{
-        steps: any[];
-        materials: any[];
-        vocabulary: any[];
-        skills: any[];
-    }>({ steps: [], materials: [], vocabulary: [], skills: [] });
+    const tabs: TabOption<StatusFilter>[] = [
+        { value: 'all', label: 'All', count: statusCounts.all },
+        { value: 'draft', label: 'Draft', count: statusCounts.draft },
+        { value: 'review_ready', label: 'Review', count: statusCounts.review_ready },
+        { value: 'published', label: 'Published', count: statusCounts.published },
+        { value: 'archived', label: 'Archived', count: statusCounts.archived },
+    ];
 
-    const fetchChildData = async (challengeId: string) => {
-        const [stepsRes, matsRes, vocabRes, skillsRes] = await Promise.all([
-            supabase
-                .from('challenge_step')
-                .select('id, challenge_id, step_text, display_order')
-                .eq('challenge_id', challengeId)
-                .order('display_order'),
-            supabase
-                .from('challenge_material')
-                .select('id, challenge_id, name, display_order')
-                .eq('challenge_id', challengeId)
-                .order('display_order'),
-            supabase
-                .from('challenge_vocabulary')
-                .select('id, challenge_id, term, definition')
-                .eq('challenge_id', challengeId),
-            supabase
-                .from('challenge_skill')
-                .select('id, challenge_id, skill_name')
-                .eq('challenge_id', challengeId),
-        ]);
-
-        setChildData({
-            steps: stepsRes.data || [],
-            materials: matsRes.data || [],
-            vocabulary: vocabRes.data || [],
-            skills: skillsRes.data || [],
+    // ─── Handlers ──────────────────────────────────────────────────
+    const toggleSelect = (id: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
         });
     };
 
-    if (role !== 'admin' && role !== 'mentor') {
-        return (
-            <div className="p-24 text-center font-data text-2xl">
-                Access Denied: Mentor or Admin Only
-            </div>
-        );
-    }
-
-    const startEdit = (challenge?: Challenge) => {
-        if (challenge) {
-            setForm(challenge);
-            setEditingChallenge(challenge);
-            setIsEditing(challenge.id);
-            fetchChildData(challenge.id);
+    const selectAll = () => {
+        if (selectedIds.size === filtered.length) {
+            setSelectedIds(new Set());
         } else {
-            setForm({
-                title: '',
-                status: 'draft',
-                tier: 'Tier 1',
-                domain: 'Interdisciplinary',
-            });
-            setEditingChallenge(null);
-            setIsEditing('new');
+            setSelectedIds(new Set(filtered.map((c) => c.id)));
         }
-        setImageFile(null);
     };
 
-    const cancelEdit = () => {
-        setIsEditing(null);
-        setForm({});
-        setEditingChallenge(null);
-        setImageFile(null);
-        setChildData({ steps: [], materials: [], vocabulary: [], skills: [] });
-    };
-
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
+    const handleQuickStatus = async (id: string, newStatus: string) => {
         setActionLoading(true);
-
-        try {
-            let coverUrl = form.cover_image_url;
-
-            if (imageFile && user) {
-                const path = `${user.id}/${Date.now()}-${imageFile.name}`;
-                const { url, error } = await uploadFile('challenge-images', path, imageFile);
-                if (error) throw new Error(error);
-                if (url) coverUrl = url;
-            }
-
-            const payload = {
-                ...form,
-                cover_image_url: coverUrl,
-                created_by: user?.id,
-            } as any;
-
-            if (isEditing === 'new') {
-                const { error } = await createChallenge(payload);
-                if (error) throw new Error(error);
-            } else if (isEditing) {
-                const { error } = await updateChallenge(isEditing, payload);
-                if (error) throw new Error(error);
-            }
-
-            await refetch();
-            cancelEdit();
-        } catch (err: any) {
-            alert(err.message || 'Failed to save challenge');
-        } finally {
-            setSaving(false);
-            setActionLoading(false);
-        }
+        const { error } = await updateChallenge(id, { status: newStatus } as any);
+        if (error) toast.error(error);
+        else toast.success(`Status updated to ${newStatus}.`);
+        await refetch();
+        setActionLoading(false);
     };
 
     const handleDelete = async (id: string) => {
@@ -172,30 +106,189 @@ export function ManageChallenges() {
         await refetch();
         setActionLoading(false);
         setDeleteTarget(null);
+        setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
     };
 
-    if (loading)
-        return (
-            <div className="p-24 flex justify-center font-data">
-                Loading challenges...
-            </div>
-        );
+    const handleBulkAction = async (action: 'publish' | 'archive' | 'delete') => {
+        if (selectedIds.size === 0) return;
+        setActionLoading(true);
 
+        const ids = Array.from(selectedIds);
+        if (action === 'delete') {
+            for (const id of ids) await deleteChallenge(id);
+            toast.success(`Deleted ${ids.length} challenges.`);
+        } else {
+            const status = action === 'publish' ? 'published' : 'archived';
+            for (const id of ids) await updateChallenge(id, { status } as any);
+            toast.success(`${ids.length} challenges ${status}.`);
+        }
+
+        await refetch();
+        setSelectedIds(new Set());
+        setActionLoading(false);
+    };
+
+    // ─── Access guard ──────────────────────────────────────────────
+    if (role !== 'admin' && role !== 'mentor') {
+        return <div className="p-24 text-center font-data text-2xl">Access Denied: Mentor or Admin Only</div>;
+    }
+
+    if (loading) {
+        return (
+            <AdminPageShell role={role} title="Challenge Management" subtitle="Loading..." icon={Zap}>
+                <p className="font-data text-brutal-dark/60">Loading challenges...</p>
+            </AdminPageShell>
+        );
+    }
+
+    // ─── Table columns ─────────────────────────────────────────────
+    const columns: BrutalColumn<Challenge>[] = [
+        {
+            key: 'select',
+            header: '',
+            headerClassName: 'w-10',
+            cellClassName: 'w-10',
+            render: (item) => (
+                <input
+                    type="checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => toggleSelect(item.id)}
+                    className="w-4 h-4 accent-brutal-red cursor-pointer"
+                />
+            ),
+        },
+        {
+            key: 'title',
+            header: 'Title',
+            render: (item) => (
+                <div className="flex items-center gap-2 min-w-0">
+                    {item.cover_image_url ? (
+                        <img src={item.cover_image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-brutal-dark/10" />
+                    ) : (
+                        <div className="w-8 h-8 rounded bg-brutal-dark/5 flex items-center justify-center flex-shrink-0">
+                            <Zap size={12} className="text-brutal-dark/20" />
+                        </div>
+                    )}
+                    <span className="font-heading font-bold text-sm uppercase truncate">{item.title}</span>
+                </div>
+            ),
+        },
+        {
+            key: 'tier',
+            header: 'Tier',
+            cellClassName: 'w-24',
+            render: (item) => (
+                <span className="inline-flex items-center gap-1.5 font-data text-xs font-bold">
+                    <span className={cn('w-2 h-2 rounded-full', TIER_DOT[item.tier || ''] || 'bg-brutal-dark/20')} />
+                    {item.tier || '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'domain',
+            header: 'Domain',
+            cellClassName: 'w-32',
+            render: (item) => (
+                <span className="font-data text-xs text-brutal-dark/70">{item.domain || '—'}</span>
+            ),
+        },
+        {
+            key: 'status',
+            header: 'Status',
+            cellClassName: 'w-28',
+            render: (item) => (
+                <span className={cn(
+                    'inline-block px-2 py-0.5 rounded font-data text-[10px] font-bold uppercase',
+                    item.status === 'published' ? 'bg-green-100 text-green-800 border border-green-300'
+                        : item.status === 'review_ready' ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : item.status === 'archived' ? 'bg-gray-100 text-gray-600 border border-gray-300'
+                                : 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+                )}>
+                    {item.status === 'review_ready' ? 'review' : item.status}
+                </span>
+            ),
+        },
+        {
+            key: 'created',
+            header: 'Created',
+            cellClassName: 'w-28',
+            render: (item) => (
+                <span className="font-data text-xs text-brutal-dark/50 tabular-nums">
+                    {new Date(item.created_at).toLocaleDateString()}
+                </span>
+            ),
+        },
+        {
+            key: 'actions',
+            header: 'Actions',
+            headerAlign: 'right',
+            cellClassName: 'w-36',
+            render: (item) => (
+                <div className="flex items-center gap-1 justify-end">
+                    <Link
+                        to={`/challenges/${item.id}`}
+                        className="p-1.5 rounded hover:bg-brutal-dark/5 text-brutal-dark/40 hover:text-brutal-dark transition-colors"
+                        title="Preview"
+                    >
+                        <Eye size={14} />
+                    </Link>
+                    <Link
+                        to={`/admin/challenges/${item.id}/edit`}
+                        className="p-1.5 rounded hover:bg-brutal-dark/5 text-brutal-dark/40 hover:text-brutal-dark transition-colors"
+                        title="Edit"
+                    >
+                        <Edit2 size={14} />
+                    </Link>
+                    {item.status === 'draft' && (
+                        <button
+                            type="button"
+                            onClick={() => handleQuickStatus(item.id, 'published')}
+                            disabled={actionLoading}
+                            className="p-1.5 rounded hover:bg-green-50 text-green-600/50 hover:text-green-700 transition-colors"
+                            title="Publish"
+                        >
+                            <Send size={14} />
+                        </button>
+                    )}
+                    {item.status === 'published' && (
+                        <button
+                            type="button"
+                            onClick={() => handleQuickStatus(item.id, 'archived')}
+                            disabled={actionLoading}
+                            className="p-1.5 rounded hover:bg-brutal-dark/5 text-brutal-dark/30 hover:text-brutal-dark transition-colors"
+                            title="Archive"
+                        >
+                            <Archive size={14} />
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setDeleteTarget(item)}
+                        disabled={actionLoading}
+                        className="p-1.5 rounded hover:bg-brutal-red/5 text-brutal-red/30 hover:text-brutal-red transition-colors"
+                        title="Delete"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            ),
+        },
+    ];
+
+    // ─── Render ────────────────────────────────────────────────────
     return (
         <AdminPageShell
             role={role}
             title="Challenge Management"
-            subtitle="Create, edit, and publish platform challenges."
+            subtitle={`${statusCounts.all} challenges · ${statusCounts.published} published`}
             icon={Zap}
             headerAction={
-                !isEditing ? (
-                    <Button onClick={() => startEdit()}>
-                        <Plus className="w-5 h-5 mr-2" /> New Challenge
-                    </Button>
-                ) : undefined
+                <Button onClick={() => navigate('/admin/challenges/new')}>
+                    <Plus className="w-4 h-4 mr-1.5" /> New Challenge
+                </Button>
             }
         >
-            {/* ── Delete confirmation ─────────────────────────── */}
+            {/* Delete confirmation */}
             {deleteTarget && (
                 <ConfirmDeleteCard
                     entityName={deleteTarget.title}
@@ -210,492 +303,72 @@ export function ManageChallenges() {
                 />
             )}
 
-            {/* ── Edit / Create form ── */}
-            {isEditing && (
-                <Card
-                    ref={formRef}
-                    className="p-8 border-2 border-brutal-dark border-t-8 border-t-brutal-red shadow-[6px_6px_0_0_rgba(17,17,17,1)] scroll-mt-32"
-                >
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="font-heading font-bold text-3xl uppercase">
-                            {isEditing === 'new' ? 'Signal New Challenge' : 'Edit Challenge'}
-                        </h2>
-                        <button
-                            onClick={cancelEdit}
-                            className="p-2 hover:bg-brutal-dark/10 rounded-full transition-colors"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-
-                    <form onSubmit={handleSave} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Input
-                                label="Title"
-                                required
-                                value={form.title || ''}
-                                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                            />
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark flex justify-between items-end">
-                                    Status
-                                    <span
-                                        className={`text-xs px-2 py-0.5 rounded ${form.status === 'published'
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-yellow-100 text-yellow-800'
-                                            }`}
-                                    >
-                                        {form.status?.toUpperCase()}
-                                    </span>
-                                </label>
-                                <select
-                                    className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
-                                    value={form.status || 'draft'}
-                                    onChange={(e) =>
-                                        setForm({ ...form, status: e.target.value as any })
-                                    }
-                                >
-                                    <option value="draft">Draft (Hidden)</option>
-                                    <option value="published">Published (Public)</option>
-                                    <option value="archived">Archived</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark block mb-1">
-                                    Domain
-                                </label>
-                                <select
-                                    className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
-                                    value={form.domain || ''}
-                                    onChange={(e) =>
-                                        setForm({ ...form, domain: e.target.value })
-                                    }
-                                >
-                                    <option value="">Select domain...</option>
-                                    <option value="Electronics">Electronics</option>
-                                    <option value="Robotics">Robotics</option>
-                                    <option value="AI">AI</option>
-                                    <option value="Design">Design</option>
-                                    <option value="Fabrication">Fabrication</option>
-                                    <option value="Bio">Bio</option>
-                                    <option value="Interdisciplinary">Interdisciplinary</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark block mb-1">
-                                    Tier
-                                </label>
-                                <select
-                                    className="w-full h-12 mt-1 rounded bg-brutal-bg border-2 border-brutal-dark px-4 font-data focus:border-brutal-red focus:ring-1 focus:ring-brutal-red outline-none"
-                                    value={form.tier || ''}
-                                    onChange={(e) =>
-                                        setForm({ ...form, tier: e.target.value })
-                                    }
-                                >
-                                    <option value="">Select tier...</option>
-                                    <option value="Tier 1">Tier 1 — Explorer</option>
-                                    <option value="Tier 2">Tier 2 — Solver</option>
-                                    <option value="Tier 3">Tier 3 — Architect</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* ── Cover image with live preview ── */}
-                        <ImageUploadField
-                            label="Cover Image"
-                            currentUrl={form.cover_image_url}
-                            file={imageFile}
-                            onChange={(f) => setImageFile(f)}
-                            onClear={() => setForm({ ...form, cover_image_url: undefined })}
-                        />
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark block mb-1">
-                                    Mystery (Hook)
-                                </label>
-                                <textarea
-                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
-                                    value={form.mystery || ''}
-                                    onChange={(e) =>
-                                        setForm({ ...form, mystery: e.target.value })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark block mb-1">
-                                    Core Idea
-                                </label>
-                                <textarea
-                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
-                                    value={form.core_idea || ''}
-                                    onChange={(e) =>
-                                        setForm({ ...form, core_idea: e.target.value })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark block mb-1">
-                                    Mission (Brief)
-                                </label>
-                                <textarea
-                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
-                                    value={form.mission || ''}
-                                    onChange={(e) =>
-                                        setForm({ ...form, mission: e.target.value })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <label className="font-data text-sm font-bold text-brutal-dark block mb-1">
-                                    Success Criteria
-                                </label>
-                                <textarea
-                                    className="w-full bg-brutal-bg border-2 border-brutal-dark p-3 rounded font-data min-h-[80px] focus:outline-none focus:border-brutal-red"
-                                    value={form.success_criteria || ''}
-                                    onChange={(e) =>
-                                        setForm({ ...form, success_criteria: e.target.value })
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-4 pt-6 border-t-2 border-brutal-dark/10">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={cancelEdit}
-                                disabled={saving}
-                                className="disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:border-brutal-dark/10"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={saving}
-                                className="disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:border-brutal-dark/10"
-                            >
-                                {saving ? 'Saving...' : 'Save Challenge'}
-                            </Button>
-                        </div>
-                    </form>
-
-                    {/* ── Child data editors (existing challenge only) ── */}
-                    {isEditing !== 'new' && editingChallenge?.id && (
-                        <div className="mt-8 space-y-6">
-                            <h3 className="font-heading font-bold text-2xl uppercase border-b-2 border-brutal-dark pb-2">
-                                Challenge Details (Auto-saves)
-                            </h3>
-
-                            {/* Materials */}
-                            <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
-                                <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
-                                    Materials{' '}
-                                    <span className="text-brutal-dark/50 text-sm">
-                                        {childData.materials.length} Items
-                                    </span>
-                                </h4>
-                                <ul className="space-y-2 mb-4">
-                                    {childData.materials.map((m: any) => (
-                                        <li
-                                            key={m.id}
-                                            className="flex justify-between items-center bg-brutal-dark/5 p-2 px-4 border border-brutal-dark/20"
-                                        >
-                                            <span className="font-data text-sm">{m.name}</span>
-                                            <button
-                                                onClick={async () => {
-                                                    await supabase
-                                                        .from('challenge_material')
-                                                        .delete()
-                                                        .eq('id', m.id);
-                                                    fetchChildData(editingChallenge.id);
-                                                }}
-                                                className="text-brutal-red hover:bg-brutal-red/10 p-1"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const input = (e.target as any).elements.materialName;
-                                        if (!input.value) return;
-                                        await supabase.from('challenge_material').insert({
-                                            challenge_id: editingChallenge.id,
-                                            name: input.value,
-                                        });
-                                        input.value = '';
-                                        fetchChildData(editingChallenge.id);
-                                    }}
-                                    className="flex gap-2"
-                                >
-                                    <input
-                                        name="materialName"
-                                        placeholder="New material name..."
-                                        className="flex-1 bg-white border-2 border-brutal-dark p-2 font-data text-sm"
-                                    />
-                                    <Button type="submit">
-                                        <Plus className="w-4 h-4" />
-                                    </Button>
-                                </form>
-                            </div>
-
-                            {/* Steps */}
-                            <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
-                                <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
-                                    Steps{' '}
-                                    <span className="text-brutal-dark/50 text-sm">
-                                        {childData.steps.length} Items
-                                    </span>
-                                </h4>
-                                <ul className="space-y-2 mb-4">
-                                    {childData.steps.map((s: any, idx: number) => (
-                                        <li
-                                            key={s.id}
-                                            className="flex justify-between items-center bg-brutal-dark/5 p-2 px-4 border border-brutal-dark/20"
-                                        >
-                                            <span className="font-data text-sm">
-                                                <strong className="mr-2">{idx + 1}.</strong>
-                                                {s.step_text}
-                                            </span>
-                                            <button
-                                                onClick={async () => {
-                                                    await supabase
-                                                        .from('challenge_step')
-                                                        .delete()
-                                                        .eq('id', s.id);
-                                                    fetchChildData(editingChallenge.id);
-                                                }}
-                                                className="text-brutal-red hover:bg-brutal-red/10 p-1"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const input = (e.target as any).elements.stepText;
-                                        if (!input.value) return;
-                                        await supabase.from('challenge_step').insert({
-                                            challenge_id: editingChallenge.id,
-                                            step_text: input.value,
-                                            display_order: childData.steps.length + 1,
-                                        });
-                                        input.value = '';
-                                        fetchChildData(editingChallenge.id);
-                                    }}
-                                    className="flex gap-2"
-                                >
-                                    <input
-                                        name="stepText"
-                                        placeholder="New step instructions..."
-                                        className="flex-1 bg-white border-2 border-brutal-dark p-2 font-data text-sm"
-                                    />
-                                    <Button type="submit">
-                                        <Plus className="w-4 h-4" />
-                                    </Button>
-                                </form>
-                            </div>
-
-                            {/* Skills — using BrutalPill */}
-                            <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
-                                <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
-                                    Skills{' '}
-                                    <span className="text-brutal-dark/50 text-sm">
-                                        {childData.skills.length} Items
-                                    </span>
-                                </h4>
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {childData.skills.map((s: any) => (
-                                        <BrutalPill
-                                            key={s.id}
-                                            label={s.skill_name}
-                                            selected
-                                            onRemove={async () => {
-                                                await supabase
-                                                    .from('challenge_skill')
-                                                    .delete()
-                                                    .eq('id', s.id);
-                                                fetchChildData(editingChallenge.id);
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const input = (e.target as any).elements.skillName;
-                                        if (!input.value) return;
-                                        await supabase.from('challenge_skill').insert({
-                                            challenge_id: editingChallenge.id,
-                                            skill_name: input.value,
-                                        });
-                                        input.value = '';
-                                        fetchChildData(editingChallenge.id);
-                                    }}
-                                    className="flex gap-2"
-                                >
-                                    <input
-                                        name="skillName"
-                                        placeholder="New skill (e.g. Soldering)"
-                                        className="flex-1 bg-white border-2 border-brutal-dark p-2 font-data text-sm"
-                                    />
-                                    <Button type="submit">
-                                        <Plus className="w-4 h-4" />
-                                    </Button>
-                                </form>
-                            </div>
-
-                            {/* Vocabulary */}
-                            <div className="bg-brutal-bg border-2 border-brutal-dark p-6">
-                                <h4 className="font-heading font-bold text-xl uppercase mb-4 flex justify-between">
-                                    Vocabulary{' '}
-                                    <span className="text-brutal-dark/50 text-sm">
-                                        {childData.vocabulary.length} Items
-                                    </span>
-                                </h4>
-                                <ul className="space-y-2 mb-4">
-                                    {childData.vocabulary.map((v: any) => (
-                                        <li
-                                            key={v.id}
-                                            className="flex flex-col bg-brutal-dark/5 p-3 border border-brutal-dark/20 relative pr-10"
-                                        >
-                                            <strong className="font-heading font-bold text-lg leading-tight">
-                                                {v.term}
-                                            </strong>
-                                            <span className="font-data text-sm text-brutal-dark/70 mt-1">
-                                                {v.definition || 'No definition'}
-                                            </span>
-                                            <button
-                                                onClick={async () => {
-                                                    await supabase
-                                                        .from('challenge_vocabulary')
-                                                        .delete()
-                                                        .eq('id', v.id);
-                                                    fetchChildData(editingChallenge.id);
-                                                }}
-                                                className="text-brutal-red hover:bg-brutal-red/10 p-2 absolute right-2 top-2"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const term = (e.target as any).elements.term.value;
-                                        const def = (e.target as any).elements.definition.value;
-                                        if (!term) return;
-                                        await supabase.from('challenge_vocabulary').insert({
-                                            challenge_id: editingChallenge.id,
-                                            term,
-                                            definition: def,
-                                        });
-                                        (e.target as any).reset();
-                                        fetchChildData(editingChallenge.id);
-                                    }}
-                                    className="flex flex-col md:flex-row gap-2"
-                                >
-                                    <input
-                                        name="term"
-                                        placeholder="Term"
-                                        className="w-full md:w-1/3 bg-white border-2 border-brutal-dark p-2 font-data text-sm"
-                                    />
-                                    <input
-                                        name="definition"
-                                        placeholder="Definition"
-                                        className="w-full md:flex-1 bg-white border-2 border-brutal-dark p-2 font-data text-sm"
-                                    />
-                                    <Button type="submit">
-                                        <Plus className="w-4 h-4" />
-                                    </Button>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                </Card>
+            {/* Analytics */}
+            {analytics && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <BrutalStatCard value={analytics.totalChallenges} label="Total Challenges" icon={Zap} />
+                    <BrutalStatCard value={statusCounts.published} label="Published" icon={Send} variant="success" />
+                    <BrutalStatCard value={analytics.totalCompletions} label="Verified Completions" icon={Trophy} />
+                    <BrutalStatCard
+                        value={analytics.byDomain.length > 0 ? analytics.byDomain[0].domain : '—'}
+                        label={analytics.byDomain.length > 0 ? `${analytics.byDomain[0].count} completions` : 'Top Domain'}
+                        icon={Users}
+                    />
+                </div>
             )}
 
-            {/* ── Challenge quest card grid ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {challenges?.map((challenge) => (
-                    <div
-                        key={challenge.id}
-                        className="border-2 border-brutal-dark bg-brutal-bg shadow-[6px_6px_0_0_rgba(17,17,17,1)] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[8px_8px_0_0_rgba(17,17,17,1)] transition-all duration-200 ease-magnetic overflow-hidden group flex flex-col"
+            {/* Filters */}
+            <BrutalTabBar tabs={tabs} activeTab={statusFilter} onTabChange={setStatusFilter} />
+
+            {/* Bulk action bar */}
+            {selectedIds.size > 0 && (
+                <div className="flex items-center gap-3 p-3 bg-brutal-dark/5 border-2 border-brutal-dark/15 rounded-xl">
+                    <span className="font-data text-xs font-bold text-brutal-dark/70">
+                        {selectedIds.size} selected
+                    </span>
+                    <div className="flex gap-2 ml-auto">
+                        <Button
+                            variant="ghost"
+                            onClick={() => handleBulkAction('publish')}
+                            disabled={actionLoading}
+                            className="text-xs"
+                        >
+                            <Send size={12} className="mr-1" /> Publish
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => handleBulkAction('archive')}
+                            disabled={actionLoading}
+                            className="text-xs"
+                        >
+                            <Archive size={12} className="mr-1" /> Archive
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => handleBulkAction('delete')}
+                            disabled={actionLoading}
+                            className="text-xs text-brutal-red"
+                        >
+                            <Trash2 size={12} className="mr-1" /> Delete
+                        </Button>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setSelectedIds(new Set())}
+                        className="font-data text-xs text-brutal-dark/40 hover:text-brutal-dark"
                     >
-                        {/* Tier color band */}
-                        <div className={`h-2 ${TIER_COLORS[challenge.tier || ''] || 'bg-brutal-dark/20'}`} />
+                        Clear
+                    </button>
+                </div>
+            )}
 
-                        {/* Cover image */}
-                        <div className="relative h-36 bg-brutal-dark/5 overflow-hidden">
-                            {challenge.cover_image_url ? (
-                                <img
-                                    src={challenge.cover_image_url}
-                                    alt={challenge.title}
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-brutal-dark/15">
-                                    <Zap className="w-12 h-12" />
-                                </div>
-                            )}
-                            {/* Status dot */}
-                            <div className={`absolute top-2 right-2 w-3 h-3 rounded-full border border-white shadow ${
-                                challenge.status === 'published' ? 'bg-green-500' :
-                                challenge.status === 'archived' ? 'bg-gray-400' :
-                                'bg-yellow-400'
-                            }`} />
-                        </div>
-
-                        {/* Card body */}
-                        <div className="p-4 flex-1 flex flex-col gap-2">
-                            <h3 className="font-heading font-bold text-lg uppercase leading-tight">
-                                {challenge.title}
-                            </h3>
-                            <div className="flex items-center gap-2 font-data text-xs font-bold text-brutal-dark/60 flex-wrap">
-                                <span className={`px-2 py-0.5 uppercase ${
-                                    challenge.status === 'published'
-                                        ? 'bg-green-100 text-green-800 border border-green-300'
-                                        : 'bg-brutal-dark/10 text-brutal-dark border border-brutal-dark/20'
-                                }`}>
-                                    {challenge.status?.toUpperCase()}
-                                </span>
-                                {challenge.domain && <span>• {challenge.domain}</span>}
-                                {challenge.tier && <span>• {challenge.tier}</span>}
-                            </div>
-
-                            {/* Action buttons */}
-                            <div className="flex gap-2 mt-auto pt-3 border-t-2 border-brutal-dark/10">
-                                <button
-                                    onClick={() => startEdit(challenge)}
-                                    className="flex-1 flex items-center justify-center gap-1.5 p-2 border-2 border-brutal-dark font-data text-xs font-bold uppercase tracking-wide hover:bg-brutal-dark hover:text-white transition-colors"
-                                    disabled={actionLoading}
-                                >
-                                    <Edit2 className="w-3.5 h-3.5" /> Edit
-                                </button>
-                                <button
-                                    onClick={() => setDeleteTarget(challenge)}
-                                    className="flex-1 flex items-center justify-center gap-1.5 p-2 border-2 border-brutal-red/30 text-brutal-red font-data text-xs font-bold uppercase tracking-wide hover:bg-brutal-red hover:text-white transition-colors"
-                                    disabled={actionLoading}
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                {challenges?.length === 0 && (
-                    <div className="col-span-full p-12 text-center border-2 border-dashed border-brutal-dark/20 font-data text-brutal-dark/50">
-                        No challenges found. Create one above.
-                    </div>
-                )}
-            </div>
+            {/* Table */}
+            <BrutalTable
+                columns={columns}
+                data={filtered}
+                rowKey={(item) => item.id}
+                emptyMessage="No challenges found."
+            />
         </AdminPageShell>
     );
 }

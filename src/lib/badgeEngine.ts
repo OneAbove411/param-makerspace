@@ -3,21 +3,18 @@ import { awardXP } from './xpEngine'
 import { XP_REWARDS } from './constants'
 import { toast } from './toast'
 
-// Check if user already has a badge by name — avoid duplicates
-async function hasBadge(userId: string, badgeName: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('user_badge')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('badge_id',
-      (await supabase.from('badge').select('id').eq('name', badgeName).single()).data?.id || ''
-    )
-    .maybeSingle()
-  return !!data
-}
-
-// Award a badge by name — looks up badge id, inserts user_badge
-// Exported so xpEngine can call it on rank advance
+// Award a badge by name — looks up badge id, inserts user_badge.
+// Exported so xpEngine can call it on rank advance.
+//
+// IMPORTANT: the "already-earned" check MUST win every race. `onUserJoined`
+// runs on every session-init (including Supabase re-firing SIGNED_IN on tab
+// return), which used to retrigger the celebration toast even though the DB
+// correctly rejected the duplicate row. We now:
+//   1. Look up the badge id first.
+//   2. Check for an existing user_badge row using the resolved badge_id
+//      directly (not a nested query) — faster and race-tight.
+//   3. Insert with onConflict ignore, and ONLY toast if a row was actually
+//      written this call (rowsAffected > 0).
 export async function awardBadgeByName(userId: string, badgeName: string): Promise<void> {
   const { data: badge } = await supabase
     .from('badge')
@@ -27,15 +24,30 @@ export async function awardBadgeByName(userId: string, badgeName: string): Promi
 
   if (!badge) return  // badge doesn't exist in DB yet
 
-  const already = await hasBadge(userId, badgeName)
-  if (already) return  // already awarded
+  // 1. Pre-check — fast path for the common case (user already has it).
+  //    This is the primary guard against SIGNED_IN re-fires on tab switch.
+  const { data: existing } = await supabase
+    .from('user_badge')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('badge_id', badge.id)
+    .maybeSingle()
 
-  await supabase.from('user_badge').insert({
-    user_id: userId,
-    badge_id: badge.id,
-  })
+  if (existing) return
 
-  // Fire a celebration toast so the user sees immediate feedback
+  // 2. Attempt insert. If a concurrent caller beat us, the unique constraint
+  //    on (user_id, badge_id) will reject this — we detect via inserted.data.
+  const { data: inserted, error } = await supabase
+    .from('user_badge')
+    .insert({ user_id: userId, badge_id: badge.id })
+    .select('id')
+    .maybeSingle()
+
+  // 3. Only celebrate if we actually wrote the row this call. Otherwise this
+  //    is a duplicate-insert race (concurrent SIGNED_IN handlers) or the DB
+  //    silently rejected — either way, the user has already been told.
+  if (error || !inserted) return
+
   try {
     toast.badgeEarned(badgeName)
   } catch {

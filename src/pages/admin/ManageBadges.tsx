@@ -277,7 +277,7 @@ export function ManageBadges() {
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 bg-brutal-dark/10 rounded-full object-cover overflow-hidden border-2 border-brutal-dark flex-shrink-0">
                                         {badge.image_url ? (
-                                            <img src={badge.image_url} alt="" className="w-full h-full object-cover" />
+                                            <img src={badge.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-brutal-dark/20">
                                                 <Award className="w-8 h-8" />

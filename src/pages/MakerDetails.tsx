@@ -115,7 +115,7 @@ export function MakerDetails() {
                     <div className="md:col-span-1 space-y-6">
                         <div className="md-hero-text aspect-square w-full rounded-2xl overflow-hidden border-2 border-brutal-dark/10 bg-brutal-dark">
                             {maker.avatar_url ? (
-                                <img src={maker.avatar_url} alt={maker.display_name} className="w-full h-full object-cover grayscale" />
+                                <img src={maker.avatar_url} alt={maker.display_name} loading="lazy" className="w-full h-full object-cover grayscale" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center font-heading text-8xl text-brutal-bg/20">
                                     {maker.display_name?.[0]?.toUpperCase() || '?'}

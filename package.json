@@ -16,8 +16,6 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
-    "@splinetool/react-spline": "^4.0.0",
-    "@splinetool/runtime": "^1.9.0",
     "@supabase/supabase-js": "^2.99.1",
     "@tailwindcss/container-queries": "^0.1.1",
     "clsx": "^2.1.1",

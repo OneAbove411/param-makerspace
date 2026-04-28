@@ -5,6 +5,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  cacheDir: '/tmp/vite-cache',
   plugins: [
     react(),
     visualizer({
@@ -15,6 +16,9 @@ export default defineConfig({
     }),
   ],
   build: {
+    // Strip console.log and console.debug from production builds.
+    // console.warn and console.error are kept for real error tracking.
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks(id: string) {
@@ -24,12 +28,13 @@ export default defineConfig({
           if (id.includes('node_modules/gsap')) {
             return 'vendor-gsap';
           }
-          if (id.includes('node_modules/@splinetool')) {
-            return 'vendor-spline';
-          }
         },
       },
     },
+  },
+  esbuild: {
+    drop: ['debugger'],
+    pure: ['console.log', 'console.debug'],
   },
   resolve: {
     alias: {

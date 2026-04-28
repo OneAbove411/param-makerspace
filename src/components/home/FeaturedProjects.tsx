@@ -82,11 +82,13 @@ export function FeaturedProjects() {
                         .from('project_image')
                         .select('project_id, image_url')
                         .in('project_id', projectIds)
-                        .order('display_order', { ascending: true }),
+                        .order('display_order', { ascending: true })
+                        .limit(12),
                     supabase
                         .from('app_user')
                         .select('id, name')
-                        .in('id', ownerIds),
+                        .in('id', ownerIds)
+                        .limit(12),
                 ]);
 
                 // Map first image per project

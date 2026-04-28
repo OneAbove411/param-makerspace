@@ -58,7 +58,7 @@ export function EventCard({ event, isPast }: EventCardProps) {
         >
             <div
                 className={cn(
-                    'relative overflow-hidden rounded-lg bg-brutal-dark aspect-[3/4]',
+                    'relative overflow-hidden rounded-xl bg-brutal-dark aspect-[3/4] shadow-[0_2px_12px_-2px_rgba(17,17,17,0.15)] group-hover:shadow-[0_6px_20px_-4px_rgba(17,17,17,0.25)] transition-shadow',
                     isPast && 'opacity-75 hover:opacity-100',
                     isImminent && 'ring-2 ring-brutal-red/50',
                 )}

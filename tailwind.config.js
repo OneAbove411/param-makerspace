@@ -18,6 +18,10 @@ export default {
         heading: ['"Space Grotesk"', 'sans-serif'],
         drama: ['"DM Serif Display"', 'serif'],
         data: ['"Space Mono"', 'monospace'],
+        // § Body / prose — Inter is the 2026 standard for UI & long-form
+        // readability. Reserved for descriptions, paragraphs, comment
+        // text. Space Mono remains for metadata chips and code.
+        body: ['"Inter"', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         '2xl': '2rem',

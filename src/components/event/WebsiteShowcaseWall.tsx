@@ -138,7 +138,7 @@ const ShowcaseCard = memo(({ website, isHovered, onHoverEnter, onHoverLeave, onC
                         style={IFRAME_PREVIEW_STYLE}
                     />
                 ) : website.thumbnail_url ? (
-                    <img src={website.thumbnail_url} alt={website.title} className="w-full h-full object-cover" />
+                    <img src={website.thumbnail_url} alt={website.title} loading="lazy" className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-brutal-dark/5">
                         <ExternalLink className="w-8 h-8 text-brutal-dark/20" />

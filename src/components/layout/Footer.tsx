@@ -18,6 +18,7 @@ export function Footer() {
                     <Link to="/challenges" className="hover:text-brutal-red transition-colors">Challenges</Link>
                     <Link to="/events" className="hover:text-brutal-red transition-colors">Events</Link>
                     <Link to="/makers" className="hover:text-brutal-red transition-colors">Makers Directory</Link>
+                    <Link to="/speak" className="hover:text-brutal-red transition-colors">Pitch a talk</Link>
                 </div>
 
                 <div className="flex flex-col gap-4 font-data">

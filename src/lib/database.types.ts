@@ -298,6 +298,121 @@ export interface Event {
     results_summary: string | null;
     prizes_info: string | null;
     learnings: string | null;
+    /**
+     * Block-editor body (P4 of the events-page refactor). JSONB array of
+     * discriminated-union blocks: heading | paragraph | image | list | callout.
+     * The legacy `description` TEXT column is kept as a plaintext mirror so
+     * calendar export / OG previews keep working.
+     */
+    description_blocks: EventBlock[] | null;
+    // ─── Build Challenge config (P8) ───
+    shortlist_deadline: string | null;
+    submission_deadline: string | null;
+    prize_summary: string | null;
+    team_size_max: number | null;
+    /**
+     * Flipping from null → timestamp makes event_winner rows public.
+     * Controlled by the "Publish winners" button on the admin Winners tab.
+     */
+    winners_published_at: string | null;
+    // ─── Maker Meetup config (P9) ───
+    /** ISO timestamp — end of application window for meetups. */
+    application_deadline: string | null;
+    /** Default interview slot length in minutes (used by the admin batch tool). */
+    interview_slot_length_min: number | null;
+    /**
+     * Flipping from null → timestamp makes the final selection status
+     * visible to applicants. Controlled by "Publish selection" on the
+     * admin Selection sub-tab.
+     */
+    selection_published_at: string | null;
+    /** Optional virtual meeting link shown on booked-slot confirmation. */
+    meeting_url: string | null;
+    // ─── Tech Tuesday / event_series config (P10) ───
+    /** Nullable FK to event_series — set for recurring events like Tech Tuesdays. */
+    series_id: string | null;
+    /** External RSVP URL (Luma). Required for published tech_tuesday events. */
+    external_rsvp_url: string | null;
+    /** Speaker display name on the event page (tech_tuesday). */
+    speaker_name: string | null;
+    /** One-line speaker bio (tech_tuesday). */
+    speaker_bio_short: string | null;
+    /** One-paragraph topic description (tech_tuesday). */
+    topic_summary: string | null;
+    /** Advertised event duration in minutes (tech_tuesday). */
+    duration_min: number | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * A recurring-event template — e.g. the weekly Tech Tuesday.
+ * event.series_id points to one of these rows so admins can clone,
+ * bulk-edit defaults, and feature-flag series-specific behaviour.
+ */
+export interface EventSeries {
+    id: string;
+    event_type: EventType;
+    title_template: string;
+    default_location: string | null;
+    default_duration_min: number | null;
+    default_capacity: number | null;
+    default_cover_image_url: string | null;
+    owner_id: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+// ─── Speaker pitch (P11) ───
+
+/**
+ * Submission lifecycle for a self-serve speaker pitch.
+ * Anyone (signed in or not) can create a 'new' pitch. Admins move it
+ * through 'reviewing' → 'accepted' (which launches a prefilled wizard)
+ * or 'archived'.
+ */
+export type SpeakerPitchStatus = 'new' | 'reviewing' | 'accepted' | 'archived';
+
+export interface SpeakerPitch {
+    id: string;
+    /** Nullable — anonymous/logged-out pitchers are allowed. */
+    user_id: string | null;
+    name: string;
+    email: string;
+    topic_title: string;
+    /** Block-editor body; capped at 5 blocks by the form. */
+    topic_abstract: EventBlock[];
+    /** Which event_type the pitcher thinks fits best. */
+    preferred_event_type: EventType;
+    /** Up to 3 URLs of past talks / recordings. */
+    past_talk_links: string[];
+    status: SpeakerPitchStatus;
+    /** Admin who last touched the pitch. */
+    reviewer_id: string | null;
+    /** Admin-only note surfaced on the detail page. */
+    reviewer_note: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/** Block-editor blocks stored on event.description_blocks (jsonb). */
+export type EventBlock =
+    | { type: 'heading'; level: 2 | 3; text: string }
+    | { type: 'paragraph'; text: string }
+    | { type: 'image'; url: string; alt: string; caption?: string }
+    | { type: 'list'; ordered: boolean; items: string[] }
+    | { type: 'callout'; variant: 'info' | 'warning' | 'success'; text: string };
+
+/**
+ * Per-user, per-type wizard draft. One row per (user_id, event_type).
+ * Payload is the entire wizard form as JSON — generic on purpose so
+ * we don't migrate this table every time the wizard adds a field.
+ */
+export interface EventDraft {
+    id: string;
+    user_id: string;
+    event_type: EventType;
+    payload: Record<string, unknown>;
     created_at: string;
     updated_at: string;
 }
@@ -339,14 +454,134 @@ export interface EventTeamMember {
     joined_at: string;
 }
 
+/**
+ * Build Challenge submission row.
+ *
+ * The table pre-dates Prompt 8 and originally supported a lighter-weight
+ * flow. P8 extends it with the submission-form columns (title/repo/demo/
+ * description_blocks) and a lock window (`locked_at`) that the server
+ * sets when submission_deadline hits.
+ *
+ * `application_id` is nullable to keep pre-P8 rows valid; new Build
+ * Challenge submissions always have it set.
+ */
 export interface EventSubmission {
     id: string;
     event_id: string;
     team_id: string | null;
     user_id: string;
     project_id: string | null;
+    application_id: string | null;
+    title: string | null;
+    repo_url: string | null;
+    demo_url: string | null;
+    description_blocks: EventBlock[];
+    submitted_at: string | null;
+    locked_at: string | null;
     status: string;
     created_at: string;
+    updated_at: string;
+}
+
+/**
+ * A single row in event_application.
+ *
+ * The status enum was widened in Prompt 9 to include 'selected' so the
+ * Maker Meetup pipeline can distinguish "passed interview + invited
+ * to join" from "shortlisted to interview". Build Challenge flows
+ * never use 'selected'.
+ */
+export type EventApplicationStatus =
+    | 'pending'
+    | 'shortlisted'
+    | 'rejected'
+    | 'withdrawn'
+    | 'selected';
+
+/**
+ * Past-work link captured on a Maker Meetup application.
+ * Stored as a JSONB array on event_application.past_work_links.
+ */
+export interface PastWorkLink {
+    label: string;
+    url: string;
+}
+
+export interface EventApplication {
+    id: string;
+    event_id: string;
+    /** Captain (BC) or applicant (MM) — the row owner. */
+    user_id: string;
+    team_name: string;
+    /** Other platform users tagged as team members (uuid[]). Empty for meetups. */
+    team_member_user_ids: string[];
+    pitch: string;
+    status: EventApplicationStatus;
+    /** Meetup-only: JSONB array of { label, url } entries. */
+    past_work_links: PastWorkLink[];
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * A published winner row. rank 1/2/3 for podium; negative values are
+ * reserved for honourable mentions (-1, -2, …). Rendering order is
+ * ASC rank (positives first, then negatives).
+ */
+export interface EventWinner {
+    id: string;
+    event_id: string;
+    submission_id: string;
+    rank: number;
+    prize_label: string;
+    citation: string;
+    created_at: string;
+}
+
+/** Admin-only scratch note on a submission. */
+export interface EventSubmissionNote {
+    id: string;
+    submission_id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+    updated_at: string;
+}
+
+/** Maker Meetup interview slot status lifecycle (P9). */
+export type EventInterviewSlotStatus = 'open' | 'booked' | 'done' | 'no_show';
+
+/**
+ * A bookable interview window created by an admin for a Maker Meetup
+ * event. The applicant claims one by flipping status 'open' → 'booked'
+ * and setting application_id. A partial unique index enforces one
+ * booking per application per event.
+ */
+export interface EventInterviewSlot {
+    id: string;
+    event_id: string;
+    start_at: string;
+    end_at: string;
+    mentor_user_id: string;
+    /** Null while status = 'open'. Set to applicant's application.id on book. */
+    application_id: string | null;
+    status: EventInterviewSlotStatus;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * Admin-only private note on an application, used by the Maker Meetup
+ * Selection sub-tab. One row per (application, author_id) — each admin
+ * keeps their own note.
+ */
+export interface EventSelectionNote {
+    id: string;
+    application_id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ShowcaseSlot {
@@ -354,7 +589,7 @@ export interface ShowcaseSlot {
     event_id: string;
     user_id: string;
     project_id: string | null;
-    topic: string | null;
+    // topic: string | null; — column not yet in DB, re-enable after migration
     status: string;
     created_at: string;
 }
@@ -577,12 +812,20 @@ export interface Database {
             challenge_video: { Row: ChallengeVideo & Record<string, unknown>; Insert: (Partial<ChallengeVideo> & Pick<ChallengeVideo, 'challenge_id' | 'title' | 'video_url'>) & Record<string, unknown>; Update: Partial<ChallengeVideo> & Record<string, unknown>; Relationships: [] };
             challenge_completion: { Row: ChallengeCompletion & Record<string, unknown>; Insert: (Partial<ChallengeCompletion> & Pick<ChallengeCompletion, 'challenge_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<ChallengeCompletion> & Record<string, unknown>; Relationships: [] };
             event: { Row: Event & Record<string, unknown>; Insert: (Partial<Event> & Pick<Event, 'title' | 'event_type' | 'date'>) & Record<string, unknown>; Update: Partial<Event> & Record<string, unknown>; Relationships: [] };
+            event_series: { Row: EventSeries & Record<string, unknown>; Insert: (Partial<EventSeries> & Pick<EventSeries, 'event_type' | 'title_template'>) & Record<string, unknown>; Update: Partial<EventSeries> & Record<string, unknown>; Relationships: [] };
+            speaker_pitch: { Row: SpeakerPitch & Record<string, unknown>; Insert: (Partial<SpeakerPitch> & Pick<SpeakerPitch, 'name' | 'email' | 'topic_title' | 'preferred_event_type'>) & Record<string, unknown>; Update: Partial<SpeakerPitch> & Record<string, unknown>; Relationships: [] };
+            event_draft: { Row: EventDraft & Record<string, unknown>; Insert: (Partial<EventDraft> & Pick<EventDraft, 'user_id' | 'event_type'>) & Record<string, unknown>; Update: Partial<EventDraft> & Record<string, unknown>; Relationships: [] };
             event_host: { Row: EventHost & Record<string, unknown>; Insert: (Partial<EventHost> & Pick<EventHost, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventHost> & Record<string, unknown>; Relationships: [] };
             event_registration: { Row: EventRegistration & Record<string, unknown>; Insert: (Partial<EventRegistration> & Pick<EventRegistration, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventRegistration> & Record<string, unknown>; Relationships: [] };
             event_checkin: { Row: EventCheckin & Record<string, unknown>; Insert: (Partial<EventCheckin> & Pick<EventCheckin, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventCheckin> & Record<string, unknown>; Relationships: [] };
             event_team: { Row: EventTeam & Record<string, unknown>; Insert: (Partial<EventTeam> & Pick<EventTeam, 'event_id' | 'name' | 'lead_id'>) & Record<string, unknown>; Update: Partial<EventTeam> & Record<string, unknown>; Relationships: [] };
             event_team_member: { Row: EventTeamMember & Record<string, unknown>; Insert: (Partial<EventTeamMember> & Pick<EventTeamMember, 'team_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventTeamMember> & Record<string, unknown>; Relationships: [] };
             event_submission: { Row: EventSubmission & Record<string, unknown>; Insert: (Partial<EventSubmission> & Pick<EventSubmission, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<EventSubmission> & Record<string, unknown>; Relationships: [] };
+            event_application: { Row: EventApplication & Record<string, unknown>; Insert: (Partial<EventApplication> & Pick<EventApplication, 'event_id' | 'user_id' | 'team_name' | 'pitch'>) & Record<string, unknown>; Update: Partial<EventApplication> & Record<string, unknown>; Relationships: [] };
+            event_winner: { Row: EventWinner & Record<string, unknown>; Insert: (Partial<EventWinner> & Pick<EventWinner, 'event_id' | 'submission_id' | 'rank' | 'prize_label'>) & Record<string, unknown>; Update: Partial<EventWinner> & Record<string, unknown>; Relationships: [] };
+            event_submission_note: { Row: EventSubmissionNote & Record<string, unknown>; Insert: (Partial<EventSubmissionNote> & Pick<EventSubmissionNote, 'submission_id' | 'author_id' | 'body'>) & Record<string, unknown>; Update: Partial<EventSubmissionNote> & Record<string, unknown>; Relationships: [] };
+            event_interview_slot: { Row: EventInterviewSlot & Record<string, unknown>; Insert: (Partial<EventInterviewSlot> & Pick<EventInterviewSlot, 'event_id' | 'start_at' | 'end_at' | 'mentor_user_id'>) & Record<string, unknown>; Update: Partial<EventInterviewSlot> & Record<string, unknown>; Relationships: [] };
+            event_selection_note: { Row: EventSelectionNote & Record<string, unknown>; Insert: (Partial<EventSelectionNote> & Pick<EventSelectionNote, 'application_id' | 'author_id' | 'body'>) & Record<string, unknown>; Update: Partial<EventSelectionNote> & Record<string, unknown>; Relationships: [] };
             showcase_slot: { Row: ShowcaseSlot & Record<string, unknown>; Insert: (Partial<ShowcaseSlot> & Pick<ShowcaseSlot, 'event_id' | 'user_id'>) & Record<string, unknown>; Update: Partial<ShowcaseSlot> & Record<string, unknown>; Relationships: [] };
             event_website: { Row: EventWebsite & Record<string, unknown>; Insert: (Partial<EventWebsite> & Pick<EventWebsite, 'event_id' | 'user_id' | 'title'>) & Record<string, unknown>; Update: Partial<EventWebsite> & Record<string, unknown>; Relationships: [] };
             comment: { Row: Comment & Record<string, unknown>; Insert: (Partial<Comment> & Pick<Comment, 'target_type' | 'target_id' | 'user_id' | 'content'>) & Record<string, unknown>; Update: Partial<Comment> & Record<string, unknown>; Relationships: [] };

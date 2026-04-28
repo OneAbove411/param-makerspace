@@ -91,7 +91,7 @@ export function ShowcaseSlotBooking({ eventId, eventType }: Props) {
                 const { data, error } = await supabase
                     .from('showcase_slot')
                     .select(
-                        'id, event_id, user_id, project_id, topic, status, created_at'
+                        'id, event_id, user_id, project_id, status, created_at'
                     )
                     .eq('event_id', eventId);
 
@@ -159,7 +159,7 @@ export function ShowcaseSlotBooking({ eventId, eventType }: Props) {
                 event_id: eventId,
                 user_id: user.id,
                 project_id: selectedProjectId || null,
-                topic: topic || null,
+                // topic column not yet in DB — re-enable after migration
             });
 
             if (error) throw error;
@@ -167,7 +167,7 @@ export function ShowcaseSlotBooking({ eventId, eventType }: Props) {
             // Refetch slots (re-enrich)
             const { data: rawSlots, error: fetchError } = await supabase
                 .from('showcase_slot')
-                .select('id, event_id, user_id, project_id, topic, status, created_at')
+                .select('id, event_id, user_id, project_id, status, created_at')
                 .eq('event_id', eventId);
 
             if (fetchError) throw fetchError;

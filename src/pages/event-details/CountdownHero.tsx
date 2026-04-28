@@ -32,10 +32,10 @@ const CountdownHero = ({ date }: { date: string }) => {
     return (
         <div className="flex gap-2">
             {blocks.map(b => (
-                <div key={b.label} className="text-center">
-                    <div className="bg-brutal-dark text-brutal-bg w-12 h-12 md:w-14 md:h-14 rounded-lg flex flex-col items-center justify-center shadow-[3px_3px_0px_rgba(196,41,30,0.4)]">
-                        <span className="font-heading font-bold text-lg md:text-xl leading-none">{String(b.value).padStart(2, '0')}</span>
-                        <span className="font-data text-[7px] font-bold uppercase tracking-widest text-brutal-bg/40 mt-0.5">{b.label}</span>
+                <div key={b.label} className="flex-1 text-center">
+                    <div className="bg-brutal-bg/10 border border-brutal-bg/15 text-brutal-bg w-full py-2 rounded-lg flex flex-col items-center justify-center">
+                        <span className="font-heading font-bold text-xl md:text-2xl leading-none tabular-nums">{String(b.value).padStart(2, '0')}</span>
+                        <span className="font-data text-[8px] font-bold uppercase tracking-widest text-brutal-bg/55 mt-1">{b.label}</span>
                     </div>
                 </div>
             ))}

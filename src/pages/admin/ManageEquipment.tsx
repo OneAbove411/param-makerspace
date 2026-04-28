@@ -227,6 +227,7 @@ export function ManageEquipment() {
                                     <img
                                         src={equip.image_url}
                                         alt={equip.name}
+                                        loading="lazy"
                                         className="w-full h-full object-cover"
                                     />
                                 ) : (

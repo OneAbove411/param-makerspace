@@ -131,6 +131,7 @@ export function ProjectQuickPeek({ project, open, onClose }: ProjectQuickPeekPro
                             <img
                                 src={project.cover_image_url}
                                 alt={project.title}
+                                loading="lazy"
                                 className="w-full h-full object-cover opacity-85"
                             />
                         ) : (

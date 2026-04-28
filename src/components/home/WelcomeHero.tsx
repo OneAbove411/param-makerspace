@@ -187,13 +187,15 @@ export function WelcomeHero() {
     useEffect(() => {
         if (shouldMountCanvas) return;          // already latched on
         if (isLoading) return;                  // wait for auth to resolve
-        // Logged-out: delay 400ms so the headline wins LCP.
-        // Logged-in: mount immediately (same behavior as the old else-branch).
+        // The AppBootLoader has already preloaded the robot GLB into the
+        // HTTP cache, so we can mount the canvas much sooner. A 100ms
+        // micro-delay still lets the hero headline claim LCP, but the
+        // robot now appears almost instantly instead of 400ms later.
         if (user) {
             setShouldMountCanvas(true);
             return;
         }
-        const id = window.setTimeout(() => setShouldMountCanvas(true), 400);
+        const id = window.setTimeout(() => setShouldMountCanvas(true), 100);
         return () => window.clearTimeout(id);
     }, [user, isLoading, shouldMountCanvas]);
 

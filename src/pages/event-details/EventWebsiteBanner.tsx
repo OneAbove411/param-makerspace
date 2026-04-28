@@ -79,7 +79,7 @@ const EventWebsiteBanner = ({ eventId, fallback = null }: { eventId: string; fal
                     </div>
                 ) : hasThumbnail ? (
                     <div className="relative w-full">
-                        <img src={website.thumbnail_url!} alt={website.title} className="w-full h-auto object-cover" />
+                        <img src={website.thumbnail_url!} alt={website.title} loading="lazy" className="w-full h-auto object-cover" />
                     </div>
                 ) : (
                     <div className="p-8 flex items-center justify-between gap-4">

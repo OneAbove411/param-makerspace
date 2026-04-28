@@ -113,6 +113,7 @@ export function ProjectLogEntry({
                             <img
                                 src={img.image_url}
                                 alt={img.caption || 'Log entry image'}
+                                loading="lazy"
                                 className="w-full h-auto object-cover"
                             />
                         </div>

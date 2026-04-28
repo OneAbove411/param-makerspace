@@ -195,7 +195,8 @@ export function LivePulse() {
             const { data: users } = await supabase
                 .from('app_user')
                 .select('id, name')
-                .in('id', userIds);
+                .in('id', userIds)
+                .limit(50);
 
             if (cancelled) return;
             const userMap: Record<string, string> = {};

@@ -30,7 +30,7 @@ export function BadgeIcon({ badge, size = 'md', className }: BadgeIconProps) {
   if (badge.image_url) {
     return (
       <div className={cn(s.container, 'rounded-full overflow-hidden border-2 border-brutal-dark/10 flex-shrink-0 bg-brutal-bg', className)}>
-        <img src={badge.image_url} alt={badge.name} className="w-full h-full object-cover" />
+        <img src={badge.image_url} alt={badge.name} loading="lazy" className="w-full h-full object-cover" />
       </div>
     )
   }

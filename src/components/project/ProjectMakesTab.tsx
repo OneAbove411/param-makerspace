@@ -31,7 +31,7 @@ export function ProjectMakesTab({ projectId }: ProjectMakesTabProps) {
             )}
 
             {!makes || makes.length === 0 ? (
-                <div className="text-center py-12">
+                <div className="text-center py-6">
                     <p className="text-brutal-dark/40 font-data text-sm">No Makes yet. Be the first to build this.</p>
                 </div>
             ) : (
@@ -39,7 +39,7 @@ export function ProjectMakesTab({ projectId }: ProjectMakesTabProps) {
                     {makes.map((make) => (
                         <div key={make.id} className="border border-brutal-dark/20 rounded-lg overflow-hidden hover:shadow-lg transition">
                             {make.image_url && (
-                                <img src={make.image_url} alt={make.caption} className="w-full h-40 object-cover" />
+                                <img src={make.image_url} alt={make.caption} loading="lazy" className="w-full h-40 object-cover" />
                             )}
                             <div className="p-4 space-y-2">
                                 <p className="font-bold text-sm text-brutal-dark">{make.caption}</p>

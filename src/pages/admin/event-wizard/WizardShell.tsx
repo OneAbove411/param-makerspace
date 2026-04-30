@@ -6,6 +6,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Card } from '../../../components/ui/Card';
 import { BlockEditor } from '../../../components/events/BlockEditor';
+import { CoverImageInput } from '../../../components/events/CoverImageInput';
 import { EventBody, blocksToPlainText } from '../../../components/events/EventBody';
 import { useAuth } from '../../../lib/auth';
 import { useEventMutations } from '../../../lib/hooks';
@@ -194,9 +195,24 @@ export function WizardShell({ eventType }: WizardShellProps) {
             return;
         }
 
-        // User picked "fresh" or there is no draft — seed from prefill.
+        // User picked "fresh" or there is no draft — seed accordingly.
+        //
+        // Two prefill sources can collide here:
+        //   • `prefilled` — fields carried forward from the most recent
+        //     event of this type (cover, location, slot length, etc.).
+        //   • `blankWizardState` — a literal empty form.
+        //
+        // If the user explicitly clicked "Start fresh" on the resume
+        // dialog, the label has to mean what it says: a blank form.
+        // We only honour `prefilled` on the natural cold-start path
+        // (no draft existed at all) — that's where it acts as a
+        // legitimate smart default.
         if (draftState === undefined || resumeChoice === 'fresh') {
-            setState(prefilled ?? blankWizardState(eventType));
+            setState(
+                resumeChoice === 'fresh'
+                    ? blankWizardState(eventType)
+                    : (prefilled ?? blankWizardState(eventType)),
+            );
             return;
         }
 
@@ -377,6 +393,7 @@ export function WizardShell({ eventType }: WizardShellProps) {
                         state={state}
                         onChange={setState}
                         eventType={eventType}
+                        userId={user?.id ?? null}
                         onNext={() => canLeaveStep1 && goto(2)}
                         canNext={canLeaveStep1}
                     />
@@ -492,11 +509,12 @@ function ResumeDialog({ draftUpdatedHint, onResume, onFresh }: {
 // ─── Step 1: Basics ────────────────────────────────────────────────
 
 function Step1({
-    state, onChange, eventType, onNext, canNext,
+    state, onChange, eventType, userId, onNext, canNext,
 }: {
     state: WizardFormState;
     onChange: (s: WizardFormState) => void;
     eventType: EventType;
+    userId: string | null;
     onNext: () => void;
     canNext: boolean;
 }) {
@@ -537,12 +555,14 @@ function Step1({
                         onChange={(e) => onChange({ ...state, end_date: e.target.value })}
                     />
                 </div>
-                <Input
-                    label="Cover image URL"
-                    placeholder="https://…"
-                    value={state.cover_image_url}
-                    onChange={(e) => onChange({ ...state, cover_image_url: e.target.value })}
-                />
+                <div className="md:col-span-2">
+                    <CoverImageInput
+                        label="Cover image"
+                        value={state.cover_image_url}
+                        onChange={(url) => onChange({ ...state, cover_image_url: url })}
+                        userId={userId}
+                    />
+                </div>
                 <Input
                     label="Location"
                     placeholder="e.g. ParSEC Jayanagar, Bengaluru"
@@ -554,7 +574,7 @@ function Step1({
             <BlockEditor
                 label="Body"
                 hint="Add at least 3 blocks to clear the health check."
-                blocks={state.description_blocks}
+                blocks={state.description_blocks as any}
                 onChange={(b) => onChange({ ...state, description_blocks: b })}
             />
 

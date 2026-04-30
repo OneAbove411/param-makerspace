@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { gsap } from 'gsap';
+import { smoothScrollIntoView } from '../../lib/scroll';
 import {
     ChevronDown, ArrowRight, Sparkles,
     Bot, Lightbulb, Cpu, Gamepad2,
@@ -495,7 +496,7 @@ export function WelcomeHero() {
     }, []);
 
     const scrollDown = () => {
-        document.getElementById('build-question')?.scrollIntoView({ behavior: 'smooth' });
+        smoothScrollIntoView(document.getElementById('build-question'));
     };
 
     // Handle chip click — Zeigarnik hook. The lurker has now "started" something;

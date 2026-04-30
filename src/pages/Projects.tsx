@@ -16,11 +16,6 @@ import { ProjectCard } from '../components/projects/ProjectCard';
 import type { ProjectsSort, ProjectsView } from '../components/projects/ProjectsFilterRail';
 import { MobileFilterSheet } from '../components/projects/MobileFilterSheet';
 import { RemixModal } from '../components/project/RemixModal';
-import {
-    ProjectsCommandPalette,
-    type ProjectCommand,
-} from '../components/projects/ProjectsCommandPalette';
-
 // New shared components (SPEC.md Directive 1)
 import { ListingLayout } from '../components/shared/ListingLayout';
 import { ListingSidebar } from '../components/shared/ListingSidebar';
@@ -278,7 +273,6 @@ export function Projects() {
     const closeRemix = useCallback(() => setRemixProject(null), []);
 
     // ── Command palette state ────────────────────────────────
-    const [paletteOpen, setPaletteOpen] = useState(false);
 
     // ── Mobile filter sheet state ────────────────────────────
     const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -301,12 +295,6 @@ export function Projects() {
                 (tgt.tagName === 'INPUT' ||
                     tgt.tagName === 'TEXTAREA' ||
                     tgt.isContentEditable);
-
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-                e.preventDefault();
-                setPaletteOpen((o) => !o);
-                return;
-            }
 
             if (typing) return;
 
@@ -358,86 +346,6 @@ export function Projects() {
         return () => ctx.revert();
     }, [loading]);
 
-    // ── Command palette command list ─────────────────────────
-    const commands = useMemo<ProjectCommand[]>(() => {
-        const list: ProjectCommand[] = [];
-
-        for (const p of filteredProjects.slice(0, 20)) {
-            list.push({
-                id: `nav:${p.id}`,
-                label: p.title,
-                hint: p.domain || undefined,
-                section: 'Navigate',
-                keywords: p.tags,
-                run: () => navigate(`/projects/${p.id}`),
-            });
-        }
-
-        for (const d of DOMAINS) {
-            list.push({
-                id: `filter:domain:${d}`,
-                label: `Filter → ${d}`,
-                section: 'Filter',
-                keywords: ['domain', d],
-                run: () => setDomains([d]),
-            });
-        }
-
-        const sorts: Array<{ id: ProjectsSort; label: string }> = [
-            { id: 'trending', label: 'Sort by Trending' },
-            { id: 'newest', label: 'Sort by Newest' },
-            { id: 'oldest', label: 'Sort by Oldest' },
-        ];
-        for (const s of sorts) {
-            list.push({
-                id: `filter:sort:${s.id}`,
-                label: s.label,
-                section: 'Filter',
-                keywords: ['sort', s.id],
-                run: () => setSort(s.id),
-            });
-        }
-
-        const views: Array<{ id: ProjectsView; label: string }> = [
-            { id: 'grid', label: 'Switch to Grid view' },
-            { id: 'list', label: 'Switch to List view' },
-            { id: 'bookmarks', label: 'Show only Bookmarks' },
-        ];
-        for (const v of views) {
-            list.push({
-                id: `view:${v.id}`,
-                label: v.label,
-                section: 'View',
-                keywords: ['view', v.id],
-                run: () => setView(v.id),
-            });
-        }
-
-        list.push({
-            id: 'action:focus-search',
-            label: 'Focus search',
-            hint: '/',
-            section: 'Actions',
-            run: () => searchInputRef.current?.focus(),
-        });
-        list.push({
-            id: 'action:clear',
-            label: 'Clear all filters',
-            section: 'Actions',
-            run: clearAll,
-        });
-        if (canPropose) {
-            list.push({
-                id: 'action:propose',
-                label: 'Propose a new project',
-                section: 'Actions',
-                run: () => navigate('/dashboard'),
-            });
-        }
-        return list;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filteredProjects, canPropose, navigate]);
-
     // ── Sidebar chip data ────────────────────────────────────
     const domainChips: ChipOption[] = DOMAINS.map((d) => ({
         value: d,
@@ -460,7 +368,7 @@ export function Projects() {
             <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-0">
                 {/* ─── Page heading ─── */}
                 <div className="px-0 lg:px-8 mb-6 md:mb-8">
-                    <div className="flex items-end justify-between">
+                    <div className="flex items-end justify-between gap-4 flex-wrap">
                         <div>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="inline-block w-6 h-[3px] bg-brutal-red" aria-hidden />
@@ -484,6 +392,18 @@ export function Projects() {
                                     </p>
                                 );
                             })()}
+                        </div>
+                        {/* Add Project button — visible to all users, routes to project create flow.
+                            `?mode=quick` auto-opens the New Project form on the dashboard
+                            (see Dashboard.tsx — quickMode effect). */}
+                        <div className="flex-shrink-0">
+                            <Link
+                                to="/dashboard?mode=quick"
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-brutal-red text-brutal-bg font-data text-xs font-bold uppercase tracking-wider rounded-xl border-2 border-brutal-red shadow-[3px_3px_0_0_rgba(17,17,17,0.18)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Project
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -641,11 +561,6 @@ export function Projects() {
                 resultCount={filteredProjects.length}
             />
             <RemixModal open={!!remixProject} origin={remixProject} onClose={closeRemix} />
-            <ProjectsCommandPalette
-                open={paletteOpen}
-                onClose={() => setPaletteOpen(false)}
-                commands={commands}
-            />
         </div>
     );
 }

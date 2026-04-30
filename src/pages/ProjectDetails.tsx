@@ -6,6 +6,7 @@ import { toast } from '../lib/toast';
 import { RemixModal } from '../components/project/RemixModal';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { smoothScrollToY } from '../lib/scroll';
 import {
     ArrowLeft,
     Play,
@@ -367,7 +368,7 @@ export function ProjectDetails() {
         if (contentTopRef.current) {
             const rect = contentTopRef.current.getBoundingClientRect();
             const y = window.scrollY + rect.top - 120; // navbar + tab bar offset
-            window.scrollTo({ top: y, behavior: 'smooth' });
+            smoothScrollToY(y);
         }
     }, []);
 

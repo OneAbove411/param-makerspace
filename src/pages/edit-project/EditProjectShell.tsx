@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { toast } from '../../lib/toast';
 import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import { useAutosave, type AutosaveStatus } from '../../lib/useAutosave';
+import { smoothScrollIntoView } from '../../lib/scroll';
 import {
   ArrowLeft,
   Save,
@@ -32,7 +33,7 @@ import {
 } from 'lucide-react';
 import { getYoutubeThumbnail } from '../../lib/videoUtils';
 import type { Project } from '../../lib/database.types';
-import { EditProjectContext } from './EditProjectContext';
+import { EditProjectContext, type EditProjectContextType } from './EditProjectContext';
 import { ProjectBomTab } from '../../components/project/ProjectBomTab';
 import { Package } from 'lucide-react';
 
@@ -343,7 +344,7 @@ export function EditProjectShell() {
     setNewMilestoneTitle('');
     setNewMilestoneDesc('');
     setTimeout(() => {
-      milestoneListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      smoothScrollIntoView(milestoneListRef.current, { block: 'start' });
     }, 100);
     const { error } = await supabase.from('project_milestone').insert({ project_id: id, title, description: desc, display_order: order });
     if (error) {
@@ -588,63 +589,6 @@ export function EditProjectShell() {
     }
   };
 
-  // Early returns
-  if (loading)
-    return (
-      <div className="flex-1 w-full bg-brutal-bg min-h-screen animate-pulse">
-        <div className="pt-20 md:pt-24">
-          <div className="h-[180px] md:h-[260px] bg-brutal-dark/5" />
-          <div className="max-w-6xl mx-auto px-6 md:px-12 -mt-16 md:-mt-20 relative z-10">
-            <div className="bg-brutal-bg rounded-2xl p-8 border border-brutal-dark/10 space-y-4">
-              <div className="h-4 w-24 bg-brutal-dark/8 rounded" />
-              <div className="h-12 w-2/3 bg-brutal-dark/8 rounded" />
-              <div className="h-4 w-1/2 bg-brutal-dark/5 rounded" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-
-  if (!project)
-    return (
-      <div className="flex-1 w-full bg-brutal-bg pt-32 px-12 min-h-screen">
-        <div className="max-w-2xl mx-auto text-center py-32">
-          <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading text-brutal-dark/20">
-            Project Not Found
-          </h1>
-          <p className="font-data text-sm text-brutal-dark/40 mt-4">
-            This project may have been removed or does not exist.
-          </p>
-          <Link to="/projects" className="inline-flex items-center gap-2 mt-8 font-heading font-bold text-sm uppercase text-brutal-dark hover:text-brutal-red transition-colors">
-            <ArrowLeft size={16} /> Back to Archive
-          </Link>
-        </div>
-      </div>
-    );
-
-  if (project.owner_id !== user?.id && (user as any)?.role !== 'admin') {
-    return (
-      <div className="flex-1 w-full bg-brutal-bg pt-32 px-12 min-h-screen">
-        <div className="max-w-2xl mx-auto text-center py-32">
-          <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading text-brutal-red/40">
-            Access Denied
-          </h1>
-          <p className="font-data text-sm text-brutal-dark/40 mt-4">
-            Only the project owner or an admin can edit this project.
-          </p>
-          <Link to="/projects" className="inline-flex items-center gap-2 mt-8 font-heading font-bold text-sm uppercase text-brutal-dark hover:text-brutal-red transition-colors">
-            <ArrowLeft size={16} /> Back to Archive
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const coverImage = project.images?.find((_, i) => i === 0)?.image_url;
-  const completedMilestones = milestones.filter((m: any) => m.is_complete).length;
-  const totalMilestones = milestones.length;
-  const milestonePercent = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
-
   // Memoize the context value so consumers only re-render when the
   // actual data they depend on changes, not on every parent render.
   const contextValue = useMemo(() => ({
@@ -726,6 +670,65 @@ export function EditProjectShell() {
     handleSave, handleSubmitForReview,
   ]);
 
+  // Early returns (must come AFTER all hooks so React's hook order
+  // stays stable across renders)
+  if (loading)
+    return (
+      <div className="flex-1 w-full bg-brutal-bg min-h-screen animate-pulse">
+        <div className="pt-20 md:pt-24">
+          <div className="h-[180px] md:h-[260px] bg-brutal-dark/5" />
+          <div className="max-w-6xl mx-auto px-6 md:px-12 -mt-16 md:-mt-20 relative z-10">
+            <div className="bg-brutal-bg rounded-2xl p-8 border border-brutal-dark/10 space-y-4">
+              <div className="h-4 w-24 bg-brutal-dark/8 rounded" />
+              <div className="h-12 w-2/3 bg-brutal-dark/8 rounded" />
+              <div className="h-4 w-1/2 bg-brutal-dark/5 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+  if (!project)
+    return (
+      <div className="flex-1 w-full bg-brutal-bg pt-32 px-12 min-h-screen">
+        <div className="max-w-2xl mx-auto text-center py-32">
+          <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading text-brutal-dark/20">
+            Project Not Found
+          </h1>
+          <p className="font-data text-sm text-brutal-dark/40 mt-4">
+            This project may have been removed or does not exist.
+          </p>
+          <Link to="/projects" className="inline-flex items-center gap-2 mt-8 font-heading font-bold text-sm uppercase text-brutal-dark hover:text-brutal-red transition-colors">
+            <ArrowLeft size={16} /> Back to Archive
+          </Link>
+        </div>
+      </div>
+    );
+
+  if (project.owner_id !== user?.id && (user as any)?.role !== 'admin') {
+    return (
+      <div className="flex-1 w-full bg-brutal-bg pt-32 px-12 min-h-screen">
+        <div className="max-w-2xl mx-auto text-center py-32">
+          <h1 className="font-heading font-bold text-5xl uppercase tracking-tight-heading text-brutal-red/40">
+            Access Denied
+          </h1>
+          <p className="font-data text-sm text-brutal-dark/40 mt-4">
+            Only the project owner or an admin can edit this project.
+          </p>
+          <Link to="/projects" className="inline-flex items-center gap-2 mt-8 font-heading font-bold text-sm uppercase text-brutal-dark hover:text-brutal-red transition-colors">
+            <ArrowLeft size={16} /> Back to Archive
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const coverImage = project.images?.find((_, i) => i === 0)?.image_url;
+  const completedMilestones = milestones.filter((m: any) => m.is_complete).length;
+  const totalMilestones = milestones.length;
+  const milestonePercent = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
+
+
   // ─────────────────────────────────────────────────────────────────────
   // §10 Edit Cockpit — single-screen bento (v2: brutalist hierarchy).
   //
@@ -746,7 +749,12 @@ export function EditProjectShell() {
   const isLocked = project.status === 'pending_review';
 
   return (
-    <EditProjectContext.Provider value={contextValue}>
+    // The contextValue useMemo runs before the loading/missing-project
+    // early returns above (otherwise React's hook order changes between
+    // renders and we'd get "Rendered more hooks" — see PR for details).
+    // By this point, the early returns have guaranteed project is set,
+    // so the cast to EditProjectContextType is safe.
+    <EditProjectContext.Provider value={contextValue as EditProjectContextType}>
       <div className="flex-1 w-full bg-brutal-bg min-h-screen">
         {/* Remix attribution banner */}
         {project?.remixed_from_id && project?.remix_origin_title && (

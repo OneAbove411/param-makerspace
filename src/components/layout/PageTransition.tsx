@@ -3,16 +3,19 @@ import { useLocation } from 'react-router';
 import { gsap } from 'gsap';
 
 /**
- * PageTransition — Crossfade + lift entrance on every route change.
+ * PageTransition — opacity crossfade on every route change.
  *
- * Wraps the <Outlet /> content (or whatever children are passed).
- * On each pathname change the wrapper:
- *   1. Fades in from opacity 0 → 1
- *   2. Slides up from y: 16px → 0
- *   3. Duration: 400ms with an expo-out ease for that premium feel.
+ * Wraps the <Outlet /> content. On each pathname change the wrapper
+ * fades from opacity 0 → 1 over 300ms.
  *
- * Uses GSAP for hardware-accelerated transforms. Falls back to
- * instant display when `prefers-reduced-motion` is active.
+ * The earlier version also slid the wrapper from `y: 16 → 0`, but that
+ * conflicted with Lenis settling its scroll target after `ScrollToTop`
+ * fired `window.scrollTo`: while Lenis was lerping to the new offset,
+ * GSAP was simultaneously translating the outlet wrapper, and the two
+ * transforms produced a visible "double-bounce" on navigation. An
+ * opacity-only fade leaves Lenis unchallenged and removes the shake.
+ *
+ * Falls back to instant display when `prefers-reduced-motion` is active.
  */
 
 export function PageTransition({ children }: { children: React.ReactNode }) {
@@ -32,30 +35,29 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
         // AppBootLoader's curtain-lift already provides the entrance.
         if (isFirstRender.current) {
             isFirstRender.current = false;
-            gsap.set(el, { opacity: 1, y: 0 });
+            gsap.set(el, { opacity: 1 });
             return;
         }
 
         if (reducedMotion) {
-            gsap.set(el, { opacity: 1, y: 0 });
+            gsap.set(el, { opacity: 1 });
             return;
         }
 
         gsap.fromTo(
             el,
-            { opacity: 0, y: 16 },
+            { opacity: 0 },
             {
                 opacity: 1,
-                y: 0,
-                duration: 0.4,
-                ease: 'expo.out',
-                clearProps: 'transform',
+                duration: 0.3,
+                ease: 'power2.out',
+                clearProps: 'opacity',
             },
         );
     }, [location.pathname, reducedMotion]);
 
     return (
-        <div ref={wrapperRef} style={{ willChange: 'opacity, transform' }}>
+        <div ref={wrapperRef} style={{ willChange: 'opacity' }}>
             {children}
         </div>
     );

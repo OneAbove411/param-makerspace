@@ -53,6 +53,7 @@ import {
     type VideoItem,
 } from './wizardTypes';
 import { computeHealth, type HealthAnchor } from './healthCheck';
+import { smoothScrollToTop } from '../../../lib/scroll';
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export function ChallengeWizardShell() {
     // ─── Handlers ──────────────────────────────────────────────────
     const goto = (step: 1 | 2 | 3 | 4) => {
         setState({ ...state, step });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        smoothScrollToTop();
     };
 
     const canLeaveStep1 = !!state.title.trim() && !!state.tier && !!state.domain;

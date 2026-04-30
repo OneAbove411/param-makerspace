@@ -11,6 +11,7 @@ import { AdminPageShell } from '../../components/admin/AdminPageShell';
 import { BrutalTabBar } from '../../components/admin/BrutalTabBar';
 import type { TabOption } from '../../components/admin/BrutalTabBar';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 type StatusFilter = 'all' | 'draft' | 'pending_review' | 'active' | 'rejected';
 
@@ -40,7 +41,7 @@ export function ManageProjects() {
 
     useEffect(() => {
         if (previewProjectId && videoModalRef.current) {
-            videoModalRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(videoModalRef.current, { block: 'start' });
         }
     }, [previewProjectId]);
 

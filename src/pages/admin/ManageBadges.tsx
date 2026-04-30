@@ -10,6 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Award, Plus, Trash2, Edit2, X, Image as ImageIcon } from 'lucide-react';
 import type { Badge } from '../../lib/database.types';
 import { PROGRESSION_BADGES, DOMAIN_BADGES } from '../../lib/progressionBadges';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 export function ManageBadges() {
     const { user, role } = useAuth();
@@ -24,7 +25,7 @@ export function ManageBadges() {
 
     useEffect(() => {
         if (isEditing && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(formRef.current, { block: 'start' });
         }
     }, [isEditing]);
     

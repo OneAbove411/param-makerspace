@@ -8,6 +8,7 @@ import {
     GitBranch, Star, ExternalLink, Code2,
     ArrowRight, Plus,
 } from 'lucide-react';
+import { smoothScrollIntoView } from '../../lib/scroll';
 import { RANK_ORDER, RANK_THRESHOLDS } from '../../lib/xpEngine';
 import { getBadgeIcon } from '../../lib/badgeIcons';
 import { useAuth } from '../../lib/auth';
@@ -223,11 +224,12 @@ export function KnowMore() {
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
                             const el = cardWrapperRefs.current[next];
-                            if (el && typeof el.scrollIntoView === 'function') {
-                                el.scrollIntoView({
-                                    behavior: reducedMotion ? 'auto' : 'smooth',
-                                    block: 'start',
-                                });
+                            if (el) {
+                                if (reducedMotion) {
+                                    el.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                } else {
+                                    smoothScrollIntoView(el, { block: 'start' });
+                                }
                             }
                         });
                     });

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import { Loader2, Compass, SearchX, Bookmark, Library, ArrowRight } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router';
+import { Loader2, Compass, SearchX, Bookmark, ArrowRight, Plus } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -384,58 +384,15 @@ export function Challenges() {
                         </p>
                     </div>
 
-                    {/* Header ornament */}
-                    <div
-                        className={cn(
-                            'eh-hero-text flex-shrink-0 w-full md:w-auto',
-                            'rounded-2xl border-2 border-brutal-dark p-4 md:p-5',
-                            'bg-brutal-bg shadow-[6px_6px_0_0_rgba(196,41,30,0.55)]',
-                            'flex items-center gap-4 min-w-[240px]',
-                        )}
-                    >
-                        {user ? (
-                            <>
-                                <div className="w-11 h-11 rounded-full bg-brutal-red text-brutal-bg flex items-center justify-center flex-shrink-0 border-2 border-brutal-dark">
-                                    <Bookmark size={18} fill="currentColor" aria-hidden />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-baseline gap-1.5">
-                                        <span className="font-heading font-bold text-3xl md:text-[32px] text-brutal-dark tabular-nums leading-none">
-                                            {savedCount}
-                                        </span>
-                                        <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                            saved
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setView(view === 'saved' ? 'all' : 'saved')}
-                                        className="mt-1 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-red inline-flex items-center gap-1 hover:gap-1.5 transition-all focus:outline-none focus-visible:underline"
-                                    >
-                                        {view === 'saved' ? 'Back to all' : 'Open saved'} <ArrowRight size={11} />
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="w-11 h-11 rounded-full bg-brutal-red text-brutal-bg flex items-center justify-center flex-shrink-0 border-2 border-brutal-dark">
-                                    <Library size={18} aria-hidden />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-baseline gap-1.5">
-                                        <span className="font-heading font-bold text-3xl md:text-[32px] text-brutal-dark tabular-nums leading-none">
-                                            {(allChallenges || []).length}
-                                        </span>
-                                        <span className="font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/45">
-                                            in library
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 font-data text-[10px] font-bold uppercase tracking-widest text-brutal-dark/40">
-                                        Sign in to save
-                                    </p>
-                                </div>
-                            </>
-                        )}
+                    {/* Add Challenge button — visible to all users, routes to challenge create page */}
+                    <div className="flex-shrink-0">
+                        <Link
+                            to="/admin/challenges/new"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-brutal-red text-brutal-bg font-data text-xs font-bold uppercase tracking-wider rounded-xl border-2 border-brutal-red shadow-[3px_3px_0_0_rgba(17,17,17,0.18)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Challenge
+                        </Link>
                     </div>
                 </header>
 

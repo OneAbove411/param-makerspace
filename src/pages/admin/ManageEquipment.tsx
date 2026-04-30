@@ -10,6 +10,7 @@ import { Settings, Plus, Trash2, Edit2, X, Image as ImageIcon, AlertTriangle, Ch
 import type { Equipment } from '../../lib/database.types';
 import { AdminPageShell } from '../../components/admin/AdminPageShell';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 export function ManageEquipment() {
     const { role } = useAuth();
@@ -25,7 +26,7 @@ export function ManageEquipment() {
 
     useEffect(() => {
         if (isEditing && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(formRef.current, { block: 'start' });
         }
     }, [isEditing]);
 

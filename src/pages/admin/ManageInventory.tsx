@@ -12,6 +12,7 @@ import { BrutalStatCard } from '../../components/admin/BrutalStatCard';
 import { BrutalTable } from '../../components/admin/BrutalTable';
 import type { BrutalColumn } from '../../components/admin/BrutalTable';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 export function ManageInventory() {
     const { role } = useAuth();
@@ -27,7 +28,7 @@ export function ManageInventory() {
 
     useEffect(() => {
         if (isEditing && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(formRef.current, { block: 'start' });
         }
     }, [isEditing]);
 

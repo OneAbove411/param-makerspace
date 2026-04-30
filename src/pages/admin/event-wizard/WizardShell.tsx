@@ -25,6 +25,7 @@ import {
 import { Step2TypeFields } from './Step2TypeFields';
 import { AdvancedDrawer } from './AdvancedFields';
 import { computeHealth, type HealthAnchor } from './healthCheck';
+import { smoothScrollToTop } from '../../../lib/scroll';
 
 /**
  * WizardShell — the one-screen 3-step creator for a single event type.
@@ -273,7 +274,7 @@ export function WizardShell({ eventType }: WizardShellProps) {
     // ─── Handlers ──────────────────────────────────────────────────
     const goto = (step: 1 | 2 | 3) => {
         setState({ ...state, step });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        smoothScrollToTop();
     };
 
     const canLeaveStep1 = !!state.title && !!state.start_date;

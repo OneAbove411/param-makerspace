@@ -13,6 +13,7 @@ import type { Event, EventType, Badge } from '../../lib/database.types';
 import { AdminPageShell } from '../../components/admin/AdminPageShell';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
 import { fetchDefaultTTSeries } from '../../lib/api/eventSeries';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 // ─── Showcase Slots Admin ───
 const ShowcaseSlotsAdmin = ({ eventId }: { eventId: string }) => {
@@ -255,7 +256,7 @@ export function ManageEvents() {
 
     useEffect(() => {
         if (isEditing && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(formRef.current, { block: 'start' });
         }
     }, [isEditing]);
 

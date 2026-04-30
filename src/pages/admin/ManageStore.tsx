@@ -12,6 +12,7 @@ import { AdminPageShell } from '../../components/admin/AdminPageShell';
 import { BrutalTabBar } from '../../components/admin/BrutalTabBar';
 import type { TabOption } from '../../components/admin/BrutalTabBar';
 import { ConfirmDeleteCard } from '../../components/admin/ConfirmDeleteCard';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 type CategoryFilter = 'all' | 'materials' | 'kits' | 'tools' | 'swag' | 'misc';
 
@@ -41,7 +42,7 @@ export function ManageStore() {
 
     useEffect(() => {
         if (isEditing && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(formRef.current, { block: 'start' });
         }
     }, [isEditing]);
 

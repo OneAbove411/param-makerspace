@@ -40,14 +40,11 @@ import {
     type DashboardTabId,
     type DashboardSidebarItem,
 } from '../components/dashboard/DashboardSidebar';
-import {
-    DashboardCommandPalette,
-    type DashboardCommand,
-} from '../components/dashboard/DashboardCommandPalette';
 import { OverviewBento } from '../components/dashboard/OverviewBento';
 import { MyWorkTab } from '../components/dashboard/MyWorkTab';
 import { MyBadgesTab } from '../components/dashboard/MyBadgesTab';
 import { isMacPlatform } from '../lib/platform';
+import { smoothScrollIntoView } from '../lib/scroll';
 
 /**
  * §7 Cockpit — Dashboard Shell.
@@ -183,7 +180,6 @@ export function Dashboard() {
             return window.localStorage.getItem(sidebarStorageKey) === '1';
         } catch { return false; }
     });
-    const [paletteOpen, setPaletteOpen] = useState(false);
     // Platform-aware Cmd+K display (Mac shows ⌘K, others show Ctrl K).
     // The keyboard listener accepts BOTH metaKey and ctrlKey, so this is
     // purely a display concern. Memoized once per mount.
@@ -263,9 +259,30 @@ export function Dashboard() {
         }
     }, [quickMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── Cross-page tab jumps from the universal command palette ──
+    //
+    // The palette navigates to `/dashboard?tab=<id>` for tab-jump
+    // actions. We pick that up here, switch to the requested tab,
+    // and clear the query param so refresh doesn't re-trigger and
+    // back/forward feel natural.
+    useEffect(() => {
+        const requested = searchParams.get('tab');
+        if (!requested) return;
+        const valid = ['overview', 'my-work', 'badges', 'mentor', 'admin'] as const;
+        if ((valid as readonly string[]).includes(requested)) {
+            handleTabChange(requested as DashboardTabId);
+        }
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('tab');
+            return next;
+        }, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
     useEffect(() => {
         if (showNewProject && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            smoothScrollIntoView(formRef.current, { block: 'start' });
         }
     }, [showNewProject]);
 
@@ -448,79 +465,7 @@ export function Dashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sidebarItems.length]);
 
-    // ── Command palette commands (RBAC-filtered) ──
-    const commands: DashboardCommand[] = useMemo(() => {
-        const list: DashboardCommand[] = [
-            { id: 'nav-overview', section: 'Navigate', label: 'Go to Overview', tab: 'overview', keywords: ['home', 'dashboard'] },
-            { id: 'nav-my-work', section: 'Navigate', label: 'Go to My Work', tab: 'my-work', keywords: ['projects', 'attention'] },
-        ];
-        if (canViewMentorTools) {
-            list.push({ id: 'nav-mentor', section: 'Navigate', label: 'Go to Mentor Queue', tab: 'mentor' });
-        }
-        if (isAdmin) {
-            list.push({ id: 'nav-admin', section: 'Navigate', label: 'Go to System Control', tab: 'admin' });
-        }
 
-        if (canCreateProject) {
-            list.push({
-                id: 'create-project',
-                section: 'Create',
-                label: 'Propose new project',
-                hint: 'Opens the project form',
-                action: openProposeForm,
-                keywords: ['new', 'project', 'propose', 'add'],
-            });
-        }
-
-        list.push(
-            { id: 'browse-challenges', section: 'Navigate', label: 'Browse Challenges', to: '/challenges' },
-            { id: 'browse-events', section: 'Navigate', label: 'Browse Events', to: '/events' },
-            { id: 'browse-makers', section: 'Navigate', label: 'Browse Makers', to: '/makers' },
-            { id: 'browse-projects', section: 'Navigate', label: 'Browse Projects', to: '/projects' },
-        );
-
-        if (canViewMentorTools) {
-            list.push(
-                { id: 'mentor-projects', section: 'Mentor', label: 'Project Reviews', to: '/admin/review-projects' },
-                { id: 'mentor-challenges', section: 'Mentor', label: 'Challenge Verification', to: '/admin/review-challenges' },
-                { id: 'mentor-submissions', section: 'Mentor', label: 'Event Submissions', to: '/admin/review-submissions' },
-                { id: 'mentor-websites', section: 'Mentor', label: 'Website Submissions', to: '/admin/review-websites' },
-                { id: 'mentor-events-manage', section: 'Mentor', label: 'Manage Events', to: '/admin/events' },
-                { id: 'mentor-inventory', section: 'Mentor', label: 'Lab Inventory', to: '/admin/inventory' },
-                { id: 'mentor-challenges-manage', section: 'Mentor', label: 'Manage Challenges', to: '/admin/challenges' },
-                { id: 'mentor-projects-manage', section: 'Mentor', label: 'Manage Projects', to: '/admin/projects' },
-            );
-        }
-
-        if (isAdmin) {
-            list.push(
-                { id: 'admin-users', section: 'Admin', label: 'Manage Users', to: '/admin/users' },
-                { id: 'admin-badges', section: 'Admin', label: 'Manage Badges', to: '/admin/badges' },
-                { id: 'admin-store', section: 'Admin', label: 'Manage Store', to: '/admin/store' },
-                { id: 'admin-equipment', section: 'Admin', label: 'Manage Equipment', to: '/admin/equipment' },
-            );
-        }
-
-        list.push(
-            { id: 'acct-profile', section: 'Account', label: 'Edit Profile', to: '/profile-setup' },
-            { id: 'acct-view-profile', section: 'Account', label: 'View My Profile', to: '/profile' },
-        );
-
-        return list;
-    }, [canViewMentorTools, isAdmin, canCreateProject, openProposeForm]);
-
-    // Global Cmd+K listener
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => {
-            const isMod = e.metaKey || e.ctrlKey;
-            if (isMod && e.key.toLowerCase() === 'k') {
-                e.preventDefault();
-                setPaletteOpen((p) => !p);
-            }
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, []);
 
     // ── Render ──
     return (
@@ -552,7 +497,7 @@ export function Dashboard() {
                     <div className="db-hero-text flex items-center gap-3 flex-shrink-0">
                         <button
                             type="button"
-                            onClick={() => setPaletteOpen(true)}
+                            onClick={() => window.dispatchEvent(new Event('cmd-palette:open'))}
                             className="hidden lg:inline-flex h-10 items-center gap-2 font-data text-sm font-bold uppercase tracking-wider text-brutal-dark/60 border-2 border-brutal-dark/20 px-4 rounded hover:border-brutal-dark/40 hover:text-brutal-dark hover:bg-brutal-dark/5 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brutal-red"
                         >
                             Quick jump
@@ -657,7 +602,7 @@ export function Dashboard() {
                         onTabChange={handleTabChange}
                         collapsed={sidebarCollapsed}
                         onToggleCollapsed={toggleSidebar}
-                        onOpenCommandPalette={() => setPaletteOpen(true)}
+                        onOpenCommandPalette={() => window.dispatchEvent(new Event('cmd-palette:open'))}
                     />
 
                     {/* Tab body */}
@@ -918,13 +863,6 @@ export function Dashboard() {
                 </div>
             </section>
 
-            {/* Cmd+K palette */}
-            <DashboardCommandPalette
-                open={paletteOpen}
-                onClose={() => setPaletteOpen(false)}
-                commands={commands}
-                onJumpToTab={handleTabChange}
-            />
         </div>
     );
 }

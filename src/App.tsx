@@ -2,7 +2,6 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { RootLayout } from './components/layout/RootLayout';
 import { ScrollToTop } from './components/layout/ScrollToTop';
-import { SmoothScroll } from './components/layout/SmoothScroll';
 import { AuthProvider } from './lib/auth';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
@@ -107,7 +106,6 @@ function App() {
     <AuthProvider>
       <AppBootLoader>
       <BrowserRouter>
-        <SmoothScroll>
         <ScrollToTop />
         <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
@@ -200,7 +198,6 @@ function App() {
           </Routes>
         </Suspense>
         </ErrorBoundary>
-        </SmoothScroll>
       </BrowserRouter>
       </AppBootLoader>
     </AuthProvider>

@@ -2,22 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ═══════════════════════════════════════════════════════════════
-   Lenis smooth scroll — required base styles
-═══════════════════════════════════════════════════════════════ */
-html.lenis, html.lenis body {
-  height: auto;
-}
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-
 @layer base {
   body {
     @apply bg-brutal-bg text-brutal-dark font-heading antialiased selection:bg-brutal-red selection:text-brutal-bg;

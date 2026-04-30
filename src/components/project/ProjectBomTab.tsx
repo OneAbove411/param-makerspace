@@ -3,6 +3,7 @@ import { useProjectBom, useProjectBomMutations } from '../../lib/hooks';
 import type { ProjectBomLine } from '../../lib/database.types';
 import { X, Plus, ExternalLink, ShoppingCart, Printer, Package } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { smoothScrollIntoView } from '../../lib/scroll';
 
 interface ProjectBomTabProps {
     projectId: string;
@@ -275,7 +276,7 @@ export function ProjectBomTab({ projectId, isOwner, variant = 'grid' }: ProjectB
     // Scroll to form whenever it appears
     useEffect(() => {
         if (showNewForm && formRef.current) {
-            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            smoothScrollIntoView(formRef.current, { block: 'center' });
         }
     }, [showNewForm]);
 

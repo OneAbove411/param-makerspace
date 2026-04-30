@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router';
+import { smoothScrollToY } from '../lib/scroll';
 import {
     useChallenge,
     useChallengeCompletion,
@@ -177,7 +178,7 @@ export function ChallengeDetails() {
         if (contentTopRef.current) {
             const rect = contentTopRef.current.getBoundingClientRect();
             const y = window.scrollY + rect.top - 120;
-            window.scrollTo({ top: y, behavior: 'smooth' });
+            smoothScrollToY(y);
         }
     };
 

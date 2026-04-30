@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
+import { smoothScrollToTop } from '../lib/scroll';
 import {
     ArrowLeft,
     ArrowRight,
@@ -99,7 +100,7 @@ export function ChallengeSubmit() {
     // ─── Handlers ──────────────────────────────────────────────────
     const goto = (s: SubmitStep) => {
         setStep(s);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        smoothScrollToTop();
     };
 
     const canLeaveStep1 = !!(evidenceUrl.trim() || evidenceFile);

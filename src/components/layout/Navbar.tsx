@@ -95,7 +95,7 @@ export function Navbar() {
                     type="button"
                     onClick={goBack}
                     className={cn(
-                        "pointer-events-auto inline-flex items-center justify-center w-9 h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2.5 rounded-full transition-all duration-500 font-data text-[11px] font-bold uppercase tracking-wider flex-shrink-0",
+                        "pointer-events-auto inline-flex items-center justify-center w-9 h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2.5 rounded-full transition-[background-color,border-color,color,box-shadow,backdrop-filter] duration-300 font-data text-[11px] font-bold uppercase tracking-wider flex-shrink-0",
                         scrolled || !isHome
                             ? "bg-brutal-bg/80 backdrop-blur-xl border-2 border-brutal-dark/10 shadow-lg text-brutal-dark/70 hover:text-brutal-dark"
                             : "bg-brutal-dark/35 backdrop-blur-md border-2 border-brutal-bg/10 text-brutal-bg/80 hover:text-brutal-bg"
@@ -108,7 +108,7 @@ export function Navbar() {
 
             <nav
                 className={cn(
-                    "pointer-events-auto flex items-center justify-between px-5 py-2.5 rounded-full transition-all duration-500 w-full max-w-5xl",
+                    "pointer-events-auto flex items-center justify-between px-5 py-2.5 rounded-full transition-[background-color,border-color,color,box-shadow,backdrop-filter] duration-300 w-full max-w-5xl",
                     scrolled || !isHome
                         ? "bg-brutal-bg/80 backdrop-blur-xl border-2 border-brutal-dark/10 shadow-lg text-brutal-dark"
                         : "bg-brutal-dark/35 backdrop-blur-md border-2 border-brutal-bg/10 text-brutal-bg"

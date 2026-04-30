@@ -134,6 +134,16 @@ function stopPollingIfIdle() {
     }
 }
 
+/**
+ * Warm the module-level cache so that when useHomeLive() mounts later
+ * the data is already present.  Called by Home.tsx during the boot
+ * overlay phase.  Returns a promise that settles once the first fetch
+ * completes (or the cache is already warm).
+ */
+export function prefetchHomeLive(): Promise<void> {
+    return ensureFetch().then(() => {});
+}
+
 export function useHomeLive(): HomeLiveData {
     const [state, setState] = useState<CacheState | null>(cache);
     const mountedRef = useRef(true);

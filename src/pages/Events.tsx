@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useEvents } from '../lib/hooks';
 import { Link, useSearchParams } from 'react-router';
-import { Calendar, Sparkles } from 'lucide-react';
+import { Calendar, Sparkles, ArrowRight } from 'lucide-react';
+import type { Event } from '../lib/database.types';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { cn } from '../lib/utils';
@@ -70,18 +71,87 @@ type CategoryKey = keyof typeof CATEGORY_CONFIG;
 
 type TimeFilter = 'all' | 'upcoming' | 'past';
 
-// ─── Skeleton card placeholder ───────────────────────────────
+// ─── Skeleton card placeholder (Luma-style shimmer) ─────────
 function EventCardSkeleton() {
     return (
-        <div className="animate-pulse rounded-lg overflow-hidden bg-brutal-dark/10 aspect-[3/4] relative">
-            <div className="absolute inset-x-0 bottom-0 p-4 space-y-2">
-                <div className="h-3 w-16 bg-white/10 rounded" />
-                <div className="h-4 w-3/4 bg-white/10 rounded" />
-                <div className="h-3 w-1/2 bg-white/5 rounded" />
+        <div className="animate-pulse rounded-xl overflow-hidden bg-brutal-dark/[0.06] aspect-[3/4] relative">
+            <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark/10 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-5 space-y-2.5">
+                <div className="h-2.5 w-24 bg-brutal-dark/[0.08] rounded-full" />
+                <div className="h-4 w-4/5 bg-brutal-dark/[0.08] rounded-full" />
+                <div className="h-3 w-1/2 bg-brutal-dark/[0.05] rounded-full" />
             </div>
         </div>
     );
 }
+
+// ─── Featured "Next Up" event hero ──────────────────────────
+function FeaturedEventBanner({ event }: { event: EventListItem }) {
+    const date = new Date(event.date);
+    const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const day = date.getDate();
+    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+
+    return (
+        <Link to={`/events/${event.id}`} className="group block mb-8">
+            <div className="relative overflow-hidden rounded-xl bg-brutal-dark h-[220px] md:h-[260px]">
+                {/* Background image */}
+                {event.cover_image_url && (
+                    <img
+                        src={event.cover_image_url}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 group-hover:scale-105 transition-all duration-700"
+                    />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-brutal-dark via-brutal-dark/80 to-transparent" />
+
+                {/* Content */}
+                <div className="relative z-10 flex items-center h-full px-6 md:px-10 gap-6 md:gap-8">
+                    {/* Luma-style calendar date block */}
+                    <div className="flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 flex flex-col items-center justify-center">
+                        <span className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-red">{month}</span>
+                        <span className="font-heading text-2xl md:text-3xl font-bold text-white leading-none">{day}</span>
+                    </div>
+
+                    {/* Event info */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-brutal-red text-white font-data text-[9px] font-bold uppercase tracking-[0.14em] px-2 py-0.5 rounded-full">
+                                Next Up
+                            </span>
+                            <span className="font-data text-[10px] font-bold uppercase tracking-wider text-white/40">
+                                {formatEventType(event.event_type)}
+                            </span>
+                        </div>
+                        <h2 className="font-heading font-bold text-xl md:text-2xl text-white leading-tight line-clamp-2 mb-2 group-hover:text-brutal-red/90 transition-colors">
+                            {event.title}
+                        </h2>
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <span className="flex items-center gap-1.5 font-body text-[12px] text-white/50">
+                                <Calendar size={12} className="text-white/30" />
+                                {weekday}, {month.charAt(0) + month.slice(1).toLowerCase()} {day} · {time}
+                            </span>
+                            {event.location && !event.location.startsWith('rsvp:') && (
+                                <span className="flex items-center gap-1.5 font-body text-[12px] text-white/50">
+                                    <span className="text-white/30">·</span>
+                                    {event.location}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="hidden md:flex flex-shrink-0 w-10 h-10 rounded-full bg-white/5 items-center justify-center group-hover:bg-brutal-red/20 transition-colors">
+                        <ArrowRight size={16} className="text-white/60 group-hover:text-brutal-red transition-colors" />
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+}
+
+type EventListItem = Event & { registration_count: number };
 
 export function Events() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -362,38 +432,39 @@ export function Events() {
                         {/* Content */}
                         <div ref={contentRef}>
                             {loading ? (
-                                <div className="">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {[...Array(6)].map((_, i) => <EventCardSkeleton key={i} />)}
-                                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    {[...Array(6)].map((_, i) => <EventCardSkeleton key={i} />)}
                                 </div>
                             ) : filteredEvents.length === 0 ? (
-                                <div className="py-12 text-center border-2 border-dashed border-brutal-dark/10 rounded-2xl bg-brutal-bg">
-                                    <Calendar size={28} className="mx-auto mb-3 text-brutal-dark/15" />
-                                    <p className="font-data text-sm text-brutal-dark/40 mb-1">
+                                <div className="py-16 text-center border border-brutal-dark/[0.06] rounded-xl bg-brutal-dark/[0.02]">
+                                    <Calendar size={32} className="mx-auto mb-4 text-brutal-dark/10" />
+                                    <p className="font-body text-sm text-brutal-dark/40 mb-1">
                                         {searchQuery
                                             ? `No events match "${searchQuery}".`
                                             : `No ${timeFilter === 'all' ? '' : timeFilter + ' '}${activeTab === 'all' ? 'events' : CATEGORY_CONFIG[activeTab].label.toLowerCase()} found.`
                                         }
                                     </p>
-                                    <p className="font-data text-[11px] text-brutal-dark/35">
+                                    <p className="font-body text-xs text-brutal-dark/30 mt-1">
                                         Have an idea? Propose one — talk to a mentor at the lab.
                                     </p>
                                 </div>
                             ) : (
-                                <div className="space-y-10">
-                                    {/* Bento grid of events */}
-                                    <div className="">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {filteredEvents.map(event => (
-                                                <div key={event.id} className="ev-card">
-                                                    <EventCard
-                                                        event={event}
-                                                        isPast={new Date(event.date).getTime() < now}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
+                                <div className="space-y-6">
+                                    {/* Featured "Next Up" banner — only for upcoming view with no filters */}
+                                    {featured && activeTab === 'all' && timeFilter === 'upcoming' && !searchQuery && (
+                                        <FeaturedEventBanner event={featured} />
+                                    )}
+
+                                    {/* Event card grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                        {filteredEvents.map(event => (
+                                            <div key={event.id} className="ev-card">
+                                                <EventCard
+                                                    event={event}
+                                                    isPast={new Date(event.date).getTime() < now}
+                                                />
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}

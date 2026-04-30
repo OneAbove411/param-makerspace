@@ -19,6 +19,15 @@ function formatEventType(type: string) {
     } as Record<string, string>)[type] || type;
 }
 
+/** Luma-style date string: "Sat, May 2 · 2:00 PM" */
+function formatDateLuma(d: Date): string {
+    const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const day = d.getDate();
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return `${weekday}, ${month} ${day} · ${time}`;
+}
+
 /** Countdown label */
 function countdownLabel(date: string): string | null {
     const diff = new Date(date).getTime() - Date.now();
@@ -37,11 +46,10 @@ interface EventCardProps {
 }
 
 /**
- * X.company-inspired tall portrait event card.
+ * Portrait event card — Luma-polished, brutalist bones.
  *
- * At rest: full-bleed image + title at bottom.
- * On hover: dark panel slides up covering the full card,
- *           showing title (large) + date/location/registration.
+ * At rest: full-bleed image, date line + title at bottom.
+ * On hover: dark panel crossfades, showing full metadata.
  */
 export function EventCard({ event, isPast }: EventCardProps) {
     const date = new Date(event.date);
@@ -58,106 +66,105 @@ export function EventCard({ event, isPast }: EventCardProps) {
         >
             <div
                 className={cn(
-                    'relative overflow-hidden rounded-xl bg-brutal-dark aspect-[3/4] shadow-[0_2px_12px_-2px_rgba(17,17,17,0.15)] group-hover:shadow-[0_6px_20px_-4px_rgba(17,17,17,0.25)] transition-shadow',
-                    isPast && 'opacity-75 hover:opacity-100',
-                    isImminent && 'ring-2 ring-brutal-red/50',
+                    'relative overflow-hidden rounded-xl bg-brutal-dark aspect-[3/4]',
+                    'shadow-[0_2px_12px_-2px_rgba(17,17,17,0.12)] group-hover:shadow-[0_8px_30px_-6px_rgba(17,17,17,0.3)]',
+                    'transition-all duration-500 ease-out',
+                    isPast && 'opacity-70 hover:opacity-100',
+                    isImminent && 'ring-2 ring-brutal-red/60 ring-offset-2 ring-offset-brutal-bg',
                 )}
             >
                 {/* ── Image layer ── */}
                 <div className={cn(
                     'absolute inset-0',
-                    isPast && 'grayscale-[20%] group-hover:grayscale-0 transition-all duration-500',
+                    isPast && 'grayscale-[30%] group-hover:grayscale-0 transition-all duration-700',
                 )}>
                     {event.cover_image_url ? (
                         <img
                             src={event.cover_image_url}
                             alt={event.title}
                             loading="lazy"
-                            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                         />
                     ) : (
                         <div
-                            className="w-full h-full flex items-center justify-center"
+                            className="w-full h-full flex items-center justify-center bg-brutal-dark"
                             style={{
-                                backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.08) 1px, transparent 1px)',
+                                backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.06) 1px, transparent 1px)',
                                 backgroundSize: '24px 24px',
                             }}
                         >
-                            <Sparkles size={32} className="text-white/10" />
+                            <Sparkles size={28} className="text-white/8" />
                         </div>
                     )}
                 </div>
 
-                {/* ── Resting gradient ── */}
-                <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark/80 via-brutal-dark/20 to-transparent transition-opacity duration-500 group-hover:opacity-0" />
+                {/* ── Resting gradient — deeper for legibility ── */}
+                <div className="absolute inset-0 bg-gradient-to-t from-brutal-dark via-brutal-dark/40 to-transparent transition-opacity duration-500 group-hover:opacity-0" />
 
-                {/* ── Top badges (fade on hover) ── */}
-                <div className="absolute top-3 left-3 z-20 transition-opacity duration-400 group-hover:opacity-0">
-                    <span className="bg-black/50 backdrop-blur-md text-white font-data text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-white/20">
+                {/* ── Top badges ── */}
+                <div className="absolute top-3 left-3 z-20 transition-opacity duration-300 group-hover:opacity-0">
+                    <span className="bg-black/40 backdrop-blur-xl text-white font-data text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border border-white/10">
                         {formatEventType(event.event_type)}
                     </span>
                 </div>
 
-                {/* ── Countdown / concluded badge top-right (fade on hover) ── */}
-                <div className="absolute top-3 right-3 z-20 transition-opacity duration-400 group-hover:opacity-0">
+                {/* ── Countdown / concluded badge ── */}
+                <div className="absolute top-3 right-3 z-20 transition-opacity duration-300 group-hover:opacity-0">
                     {!isPast && countdown && (
-                        <span className="bg-brutal-red text-white text-[9px] font-data font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 tracking-wider">
+                        <span className="bg-brutal-red text-white text-[9px] font-data font-bold uppercase px-2.5 py-1 rounded-full flex items-center gap-1 tracking-wider shadow-lg shadow-brutal-red/20">
                             <Clock size={9} /> {countdown}
                         </span>
                     )}
                     {isPast && (
-                        <span className="bg-black/50 backdrop-blur-md text-white/80 text-[9px] font-data font-medium uppercase px-2 py-0.5 rounded-full border border-white/20 tracking-wider">
+                        <span className="bg-black/40 backdrop-blur-xl text-white/70 text-[9px] font-data font-medium uppercase px-2.5 py-1 rounded-full border border-white/10 tracking-wider">
                             Concluded
                         </span>
                     )}
                 </div>
 
-                {/* ── Resting state: title at bottom ── */}
-                <div className="absolute inset-x-0 bottom-0 z-20 p-4 transition-opacity duration-400 group-hover:opacity-0">
-                    <h3 className="font-heading font-bold text-base uppercase tracking-tight-heading leading-tight line-clamp-2 text-white">
+                {/* ── Resting state: date + title at bottom ── */}
+                <div className="absolute inset-x-0 bottom-0 z-20 p-5 transition-opacity duration-300 group-hover:opacity-0">
+                    <p className="font-body text-[11px] text-white/50 mb-1.5">
+                        {formatDateLuma(date)}
+                    </p>
+                    <h3 className="font-heading font-bold text-[15px] leading-snug line-clamp-2 text-white">
                         {event.title}
                     </h3>
-                    <div className="flex items-center justify-between mt-2">
-                        <span className="font-data text-[9px] font-bold uppercase tracking-widest text-white/40">Event</span>
-                        <span className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-red flex items-center gap-1">
-                            {isPast ? 'Recap' : 'View'} <ArrowRight size={10} />
-                        </span>
-                    </div>
                 </div>
 
-                {/* ── Hover panel: crossfade over image ── */}
-                <div className="absolute inset-0 z-20 bg-brutal-dark flex flex-col justify-end p-5 gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out">
-                    {/* Event type label */}
-                    <span className="font-data text-[9px] font-bold uppercase tracking-widest text-brutal-red/80">
+                {/* ── Hover panel ── */}
+                <div className="absolute inset-0 z-20 bg-brutal-dark/95 backdrop-blur-sm flex flex-col justify-end p-5 gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-400 ease-in-out">
+                    {/* Type */}
+                    <span className="font-data text-[9px] font-bold uppercase tracking-[0.14em] text-brutal-red/80">
                         {formatEventType(event.event_type)}
                     </span>
 
-                    {/* Title — large */}
-                    <h3 className="font-heading font-bold text-xl md:text-2xl uppercase tracking-tight-heading leading-[1.05] text-white">
+                    {/* Title */}
+                    <h3 className="font-heading font-bold text-lg md:text-xl leading-[1.1] text-white">
                         {event.title}
                     </h3>
 
-                    {/* Description */}
+                    {/* Description — body font for readability */}
                     {event.description && (
-                        <p className="font-data text-[12px] text-white/60 leading-relaxed line-clamp-4">
+                        <p className="font-body text-[12px] text-white/50 leading-relaxed line-clamp-3">
                             {event.description}
                         </p>
                     )}
 
-                    {/* Metadata */}
-                    <div className="flex flex-col gap-1.5">
-                        <span className="flex items-center gap-1.5 font-data text-[11px] text-white/55">
-                            <Calendar size={11} className="text-brutal-red/60 flex-shrink-0" />
-                            {date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                    {/* Metadata rows — Luma-style spacing */}
+                    <div className="flex flex-col gap-2 mt-1">
+                        <span className="flex items-center gap-2 font-body text-[12px] text-white/60">
+                            <Calendar size={12} className="text-brutal-red/70 flex-shrink-0" />
+                            {formatDateLuma(date)}
                         </span>
                         {event.location && !event.location.startsWith('rsvp:') && (
-                            <span className="flex items-center gap-1.5 font-data text-[11px] text-white/55">
-                                <MapPin size={11} className="text-brutal-red/60 flex-shrink-0" />
-                                {event.location}
+                            <span className="flex items-center gap-2 font-body text-[12px] text-white/60">
+                                <MapPin size={12} className="text-brutal-red/70 flex-shrink-0" />
+                                <span className="truncate">{event.location}</span>
                             </span>
                         )}
-                        <span className="flex items-center gap-1.5 font-data text-[11px] text-white/40">
-                            <Users size={11} className="flex-shrink-0" />
+                        <span className="flex items-center gap-2 font-body text-[12px] text-white/40">
+                            <Users size={12} className="flex-shrink-0" />
                             {regCTA.isZero ? (
                                 <span className="italic text-white/25">{regCTA.label}</span>
                             ) : capacityRemaining !== null ? (
@@ -168,10 +175,10 @@ export function EventCard({ event, isPast }: EventCardProps) {
                         </span>
                     </div>
 
-                    {/* Footer */}
-                    <div className="pt-1 border-t border-white/8">
-                        <span className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-red flex items-center gap-1">
-                            {isPast ? 'View Recap' : 'View Event'} <ArrowRight size={10} />
+                    {/* Footer CTA */}
+                    <div className="pt-2 mt-auto border-t border-white/[0.06]">
+                        <span className="font-data text-[10px] font-bold uppercase tracking-wider text-brutal-red flex items-center gap-1.5 group-hover:gap-2 transition-all">
+                            {isPast ? 'View Recap' : 'View Event'} <ArrowRight size={11} />
                         </span>
                     </div>
                 </div>

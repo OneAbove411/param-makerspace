@@ -1,6 +1,10 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 import { WelcomeHero } from '../components/home/WelcomeHero';
+import { prefetchHomeLive } from '../lib/hooks/useHomeLive';
+import { prefetchHomeProjects } from '../components/home/BuildQuestion';
+import { prefetchHomeActivity } from '../components/home/LivePulse';
+import { signalHomeDataReady, resetHomeDataReady } from '../lib/homeDataReady';
 
 /**
  * Home — The newcomer journey (v6 — perf pass)
@@ -82,6 +86,23 @@ function SectionPlaceholder({ minHeight }: { minHeight: string }) {
 }
 
 export function Home() {
+    // ── Eager data prefetch ──────────────────────────────────────────
+    // Children mount behind the opaque AppBootLoader overlay, so there's
+    // no LCP concern.  Fire ALL Supabase queries immediately so the data
+    // is warm by the time the boot curtain lifts + the idle callback
+    // mounts the below-fold sections.  When all three settle, signal the
+    // boot loader that it's safe to reveal the page.
+    useEffect(() => {
+        resetHomeDataReady();
+        Promise.all([
+            prefetchHomeLive(),
+            prefetchHomeProjects(),
+            prefetchHomeActivity(),
+        ]).finally(() => {
+            signalHomeDataReady();
+        });
+    }, []);
+
     // Gate the below-the-fold sections behind either an idle callback OR an
     // IntersectionObserver on a sentinel just above the fold. Whichever
     // fires first wins. This means:
@@ -128,9 +149,15 @@ export function Home() {
             <div ref={sentinelRef} aria-hidden="true" />
             {belowFoldReady ? (
                 <Suspense fallback={<SectionPlaceholder minHeight="80vh" />}>
-                    <BuildQuestion />
-                    <LivePulse />
-                    <KnowMore />
+                    <div className="cv-auto">
+                        <BuildQuestion />
+                    </div>
+                    <div className="cv-auto">
+                        <LivePulse />
+                    </div>
+                    <div className="cv-auto">
+                        <KnowMore />
+                    </div>
                 </Suspense>
             ) : (
                 <SectionPlaceholder minHeight="240vh" />

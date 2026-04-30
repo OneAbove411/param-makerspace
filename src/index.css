@@ -2,10 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════
+   Lenis smooth scroll — required base styles
+═══════════════════════════════════════════════════════════════ */
+html.lenis, html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
 @layer base {
   body {
     @apply bg-brutal-bg text-brutal-dark font-heading antialiased selection:bg-brutal-red selection:text-brutal-bg;
     overflow-x: hidden;
+    /* Eliminate the 300ms tap-delay on mobile for snappy interactions */
+    touch-action: manipulation;
+    /* Smooth font rendering on macOS */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Global smoothness: every interactive element uses GPU-accelerated
+     transitions by default so hover/focus/active states never jank. */
+  a, button, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth image rendering */
+  img, video {
+    image-rendering: auto;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 }
 
@@ -25,9 +60,14 @@
   }
 }
 
-/* 
-  Global CSS Noise filter 
+/*
+  Global CSS Noise filter
   As specified: 0.05 opacity SVG feTurbulence background.
+
+  GPU-promoted via `transform: translateZ(0)` so the browser composites
+  this layer on the GPU instead of re-rasterizing on every scroll frame.
+  The `contain: strict` tells the browser this box's internals never
+  affect the rest of the page — huge paint saving.
 */
 body::before {
   content: "";
@@ -40,23 +80,56 @@ body::before {
   pointer-events: none;
   opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  transform: translateZ(0);
+  contain: strict;
+  backface-visibility: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Global smoothness utilities
+═══════════════════════════════════════════════════════════════ */
+
+/* GPU-promote any element that will be animated. Avoids mid-animation
+   layer promotion jank (the "first-frame stutter"). */
+.gpu-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* content-visibility: auto — tells the browser to skip layout/paint
+   for off-screen sections. Massive scroll perf win on long pages. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }
 
 /* Reusable utilities for hover/animations */
 .magnetic-btn {
-  @apply relative overflow-hidden transition-transform duration-300 ease-magnetic;
+  @apply relative overflow-hidden;
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .magnetic-btn:hover {
   @apply scale-103;
 }
 
+.magnetic-btn:active {
+  transform: scale(0.97);
+  transition-duration: 100ms;
+}
+
 .interactive-lift {
-  @apply transition-transform duration-300 ease-out;
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: auto;
 }
 
 .interactive-lift:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+}
+
+.interactive-lift:active {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 100ms;
 }
 
 /* Fade + slide-in for streaming activity items */
@@ -216,11 +289,16 @@ body::before {
 
 /* CTA hover glow */
 .cta-glow {
-  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 400ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .cta-glow:hover {
   box-shadow: 0 0 24px rgba(196, 41, 30, 0.4), 0 4px 16px rgba(196, 41, 30, 0.2);
   transform: translateY(-2px);
+}
+.cta-glow:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 100ms;
 }
 
 /* Chamfered / clipped corner card */

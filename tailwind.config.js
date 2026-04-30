@@ -33,6 +33,16 @@ export default {
       transitionTimingFunction: {
         'magnetic': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
         'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        // Premium easing curves (inspired by oryzo.ai / linear.app)
+        'smooth': 'cubic-bezier(0.22, 1, 0.36, 1)',     // expo-out — most transitions
+        'smooth-in': 'cubic-bezier(0.55, 0, 1, 0.45)',  // expo-in — exit animations
+        'bounce': 'cubic-bezier(0.34, 1.4, 0.64, 1)',   // overshoot — playful enters
+      },
+      transitionDuration: {
+        'fast': '150ms',
+        'normal': '300ms',
+        'slow': '500ms',
+        'slower': '700ms',
       },
       keyframes: {
         fadeInScale: {

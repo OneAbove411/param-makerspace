@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
+import { PageTransition } from './PageTransition';
 import { RankUpModal } from '../ui/RankUpModal';
 import { Toaster } from '../ui/Toaster';
 import { SessionGuard } from './SessionGuard';
@@ -22,7 +23,9 @@ export function RootLayout() {
         <div className="min-h-screen flex flex-col relative">
             <Navbar />
             <main className="flex-1 flex flex-col">
-                <Outlet />
+                <PageTransition>
+                    <Outlet />
+                </PageTransition>
             </main>
             <Footer />
             <SessionGuard />

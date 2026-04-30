@@ -105,8 +105,21 @@ export interface WizardFormState {
     start_date: string;   // ISO datetime-local
     end_date: string;     // ISO datetime-local (optional, empty = none)
     location: string;
-    /** Block-editor body (P4). */
-    description_blocks: EventBlock[];
+    /**
+     * Body content. Two shapes are valid here because the project went
+     * through an editor swap:
+     *
+     *   • Legacy: `EventBlock[]` — the discriminated-union block array
+     *     produced by the old BlockEditor.
+     *   • Current: a Tiptap document (`{ type: 'doc', content: [...] }`)
+     *     produced by DescriptionEditor.
+     *
+     * The storage column is JSONB so both shapes round-trip; the
+     * EventBody renderer dispatches on shape so old events keep
+     * rendering correctly. Typed as `unknown` deliberately — the
+     * shape is narrowed at the boundaries (renderer / publish payload).
+     */
+    description_blocks: EventBlock[] | { type: 'doc'; content?: unknown[] } | unknown[];
     /** Type-specific Step-2 fields. */
     typeFields: TypeFields;
     /** Advanced drawer state + fields. */

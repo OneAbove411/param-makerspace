@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin, Share2 } from 'lucide-react';
 import { formatEventType } from '../Events';
 import HostedBySection from './HostedBySection';
 import EventWebsiteBanner from './EventWebsiteBanner';
@@ -16,63 +16,125 @@ import { InlineCoverImage } from '../../components/events/inline/InlineCoverImag
 import { InlineBlocks } from '../../components/events/inline/InlineBlocks';
 
 // ─────────────────────────────────────────────────────────────
-// PreEventPage — simplified flow + P13 inline editing.
+// PreEventPage — Luma-inspired two-column layout.
 //
-// Mentors/admins see click-to-edit affordances on:
-//   · Cover image (hero overlay)
-//   · Title + tagline (hero)
-//   · Date range (hero meta)
-//   · Location (hero meta)
-//   · Description blocks (fallback About section)
-// Everyone else sees plain read-mode.
+// LEFT column:  Cover image · Presenter/calendar info · Hosts
+// RIGHT column: Type badge · Title · Date block · Location ·
+//               Registration card · About · Discussion
+//
+// Mentors/admins see inline editing affordances.
 // ─────────────────────────────────────────────────────────────
+
+/** Luma-style calendar date block */
+function CalendarDateBlock({ date }: { date: Date }) {
+    const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const day = date.getDate();
+    return (
+        <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-brutal-dark/[0.04] border border-brutal-dark/10 flex flex-col items-center justify-center">
+            <span className="font-data text-[9px] font-bold uppercase tracking-wider text-brutal-red leading-none">{month}</span>
+            <span className="font-heading text-xl font-bold text-brutal-dark leading-none mt-0.5">{day}</span>
+        </div>
+    );
+}
 
 const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps }: any) => {
     const { role } = useAuth();
     const canEdit = role === 'mentor' || role === 'admin';
-
-    // Category-specific accent
-    const accents: Record<string, string> = {
-        build_challenge: 'from-brutal-red/20 via-brutal-dark/90 to-brutal-dark',
-        maker_meetup: 'from-brutal-dark/20 via-brutal-dark/80 to-brutal-dark',
-        tech_tuesday: 'from-brutal-dark/10 via-brutal-dark/70 to-brutal-dark',
-    };
+    const date = new Date(event.date);
+    const endDate = event.end_date ? new Date(event.end_date) : null;
 
     // Split description into About (strip recap suffix if present)
     const [aboutText] = event.description?.includes('---RECAP---')
         ? event.description.split('---RECAP---')
         : [event.description, null];
 
+    // Format date string
+    const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const startTime = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const endTime = endDate
+        ? endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        : null;
+
+    // External RSVP detection
+    const externalRsvpUrl = event.external_rsvp_url
+        ? event.external_rsvp_url
+        : (event.location?.startsWith('rsvp:') ? event.location.replace('rsvp:', '') : null);
+
     return (
         <>
-            {/* ── HERO ── */}
-            <section className="relative min-h-[55vh] md:min-h-[60vh] flex items-end">
-                {/* Background */}
-                {event.cover_image_url ? (
-                    <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
-                ) : (
-                    <div className="absolute inset-0 bg-brutal-dark" style={{
-                        backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.04) 1px, transparent 1px)',
-                        backgroundSize: '30px 30px',
-                    }} />
-                )}
-                <div className={`absolute inset-0 bg-gradient-to-t ${accents[event.event_type] || accents.maker_meetup}`} />
+            {/* ── MAIN TWO-COLUMN LAYOUT ── */}
+            <div className="max-w-6xl mx-auto px-6 md:px-10 lg:px-12 pt-28 md:pt-32 pb-10 md:pb-14">
+                <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 lg:gap-12">
 
-                {/* Cover-image editor (mentor/admin only) */}
-                <InlineCoverImage eventId={id} currentUrl={event.cover_image_url ?? null} canEdit={canEdit} />
+                    {/* ════════════════════════════════════════════
+                        LEFT COLUMN — Cover + Host Info
+                        ════════════════════════════════════════════ */}
+                    <div className="space-y-6">
+                        {/* Cover image */}
+                        <div className="relative rounded-2xl overflow-hidden bg-brutal-dark/[0.04] aspect-square">
+                            {event.cover_image_url ? (
+                                <img
+                                    src={event.cover_image_url}
+                                    alt={event.title}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div
+                                    className="w-full h-full flex items-center justify-center bg-brutal-dark"
+                                    style={{
+                                        backgroundImage: 'radial-gradient(circle, rgba(245,243,238,0.05) 1px, transparent 1px)',
+                                        backgroundSize: '24px 24px',
+                                    }}
+                                />
+                            )}
+                            {/* Inline cover editor overlay for mentors */}
+                            <InlineCoverImage eventId={id} currentUrl={event.cover_image_url ?? null} canEdit={canEdit} />
+                        </div>
 
-                {/* Hero content */}
-                <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pb-8 md:pb-10 pt-32 md:pt-36 max-w-7xl mx-auto">
-                    <div className="flex flex-col gap-3 md:gap-4">
+                        {/* Presenter / calendar info */}
+                        <div className="space-y-5">
+                            {/* Hosted By — Luma-style with avatars */}
+                            <div>
+                                <p className="font-data text-[9px] font-bold uppercase tracking-[0.14em] text-brutal-dark/40 mb-2.5">
+                                    Presented by
+                                </p>
+                                <HostedBySection hosts={hosts} variant="light" />
+                            </div>
+
+                            {/* Contact / report links */}
+                            <div className="flex items-center gap-4 pt-2 border-t border-brutal-dark/[0.06]">
+                                <button
+                                    onClick={() => {
+                                        if (navigator.share) {
+                                            navigator.share({ title: event.title, url: window.location.href });
+                                        } else {
+                                            navigator.clipboard.writeText(window.location.href);
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-wider text-brutal-dark/40 hover:text-brutal-red transition-colors"
+                                >
+                                    <Share2 size={12} /> Share
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Mentor controls (renders nothing for public visitors) */}
+                        <MentorControlsPanel eventId={id} user={user} />
+                    </div>
+
+                    {/* ════════════════════════════════════════════
+                        RIGHT COLUMN — Event Info + Registration
+                        ════════════════════════════════════════════ */}
+                    <div className="space-y-8">
                         {/* Type badge */}
                         <div className="ed-hero-text flex items-center gap-2 flex-wrap">
-                            <span className="bg-brutal-red text-brutal-bg px-2.5 py-0.5 font-data text-[10px] font-bold rounded-full uppercase tracking-wider">
+                            <span className="bg-brutal-red text-brutal-bg px-2.5 py-0.5 font-data text-[10px] font-bold rounded-full uppercase tracking-[0.12em]">
                                 {formatEventType(event.event_type)}
                             </span>
                         </div>
 
                         {/* Title (inline-editable) */}
-                        <h1 className="ed-hero-text font-heading font-bold text-3xl sm:text-5xl md:text-6xl uppercase tracking-tight-heading leading-[0.92] text-brutal-bg max-w-4xl">
+                        <h1 className="ed-hero-text font-heading font-bold text-3xl sm:text-4xl md:text-[42px] leading-[1.05] text-brutal-dark max-w-2xl">
                             <InlineText
                                 eventId={id}
                                 column="title"
@@ -84,7 +146,7 @@ const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps
                         </h1>
 
                         {/* Tagline (inline-editable) */}
-                        <p className="ed-hero-text font-data text-sm md:text-base text-brutal-bg/70 max-w-xl">
+                        <p className="ed-hero-text font-body text-base text-brutal-dark/60 max-w-xl -mt-3">
                             <InlineText
                                 eventId={id}
                                 column="tagline"
@@ -95,111 +157,112 @@ const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps
                             />
                         </p>
 
-                        {/* Date + location row */}
-                        <div className="ed-hero-text flex flex-wrap gap-3 items-center">
-                            <span className="inline-flex items-center gap-2 bg-brutal-dark/30 backdrop-blur-sm text-brutal-bg/90 px-3 py-1.5 rounded-full font-data text-xs">
-                                <Calendar className="w-3 h-3" />
-                                <InlineDateRange
-                                    eventId={id}
-                                    initialStart={event.date}
-                                    initialEnd={event.end_date ?? null}
-                                    canEdit={canEdit}
-                                    render={(start, end) => (
-                                        <>
-                                            {start
-                                                ? new Date(start).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                                : 'TBD'}
-                                            {end && ` → ${new Date(end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`}
-                                        </>
-                                    )}
-                                />
-                            </span>
-                            <span className="inline-flex items-center gap-2 bg-brutal-dark/30 backdrop-blur-sm text-brutal-bg/90 px-3 py-1.5 rounded-full font-data text-xs">
-                                <MapPin className="w-3 h-3" />
-                                <InlineText
-                                    eventId={id}
-                                    column="location"
-                                    initialValue={event.location ?? null}
-                                    canEdit={canEdit}
-                                    placeholder="Location"
-                                    inputClassName="min-w-[200px]"
-                                    render={(v) => v ? <>{v}</> : (canEdit ? <span className="italic opacity-60">Add location</span> : <span>TBD</span>)}
-                                />
-                            </span>
+                        {/* ── Date + Location rows (Luma-style) ── */}
+                        <div className="space-y-3">
+                            {/* Date row with calendar block */}
+                            <div className="flex items-center gap-4">
+                                <CalendarDateBlock date={date} />
+                                <div>
+                                    <p className="font-body text-[15px] font-semibold text-brutal-dark">
+                                        <InlineDateRange
+                                            eventId={id}
+                                            initialStart={event.date}
+                                            initialEnd={event.end_date ?? null}
+                                            canEdit={canEdit}
+                                            render={(start) => (
+                                                <>{start ? new Date(start).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'TBD'}</>
+                                            )}
+                                        />
+                                    </p>
+                                    <p className="font-body text-sm text-brutal-dark/50 mt-0.5">
+                                        {startTime}{endTime ? ` – ${endTime}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Location row */}
+                            {event.location && !event.location.startsWith('rsvp:') && (
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-brutal-dark/[0.04] border border-brutal-dark/10 flex items-center justify-center">
+                                        <MapPin size={20} className="text-brutal-dark/30" />
+                                    </div>
+                                    <div>
+                                        <p className="font-body text-[15px] font-semibold text-brutal-dark">
+                                            <InlineText
+                                                eventId={id}
+                                                column="location"
+                                                initialValue={event.location ?? null}
+                                                canEdit={canEdit}
+                                                placeholder="Location"
+                                                inputClassName="min-w-[200px]"
+                                                render={(v) => v ? <>{v}</> : (canEdit ? <span className="italic opacity-60">Add location</span> : <span>TBD</span>)}
+                                            />
+                                        </p>
+                                        <p className="font-body text-sm text-brutal-dark/40 mt-0.5">In-person</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Hosted by */}
-                        <div className="ed-hero-text">
-                            <HostedBySection hosts={hosts} variant="dark" />
+                        {/* ── Registration card ── */}
+                        <div className="ed-section">
+                            <ActionSidebar event={event} registrationProps={registrationProps} />
                         </div>
-                    </div>
-                </div>
-            </section>
 
-            {/* ── BODY ── */}
-            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-10 md:py-12">
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8 md:gap-10">
-                    {/* Main content column */}
-                    <div className="min-w-0 space-y-10 md:space-y-12">
-                        {/*
-                          Mentor Workspace first — so mentors/admins land directly on their
-                          controls without scrolling past public content. For everyone else
-                          this renders nothing (early-return inside the component).
-                        */}
-                        <MentorControlsPanel eventId={id} user={user} />
+                        {/* ── About Section ── */}
+                        <div className="ed-section">
+                            <EventWebsiteBanner eventId={id!} fallback={
+                                <section>
+                                    <SectionAnchor id="about-anchor" title="About this Event" />
+                                    <InlineBlocks
+                                        eventId={id}
+                                        initialBlocks={event.description_blocks ?? null}
+                                        canEdit={canEdit}
+                                        readView={
+                                            (event.description_blocks && event.description_blocks.length > 0) ? (
+                                                <BlocksPreview blocks={event.description_blocks} />
+                                            ) : aboutText ? (
+                                                <div className="font-body text-[15px] leading-[1.7] text-brutal-dark/75 whitespace-pre-wrap">
+                                                    {aboutText}
+                                                </div>
+                                            ) : canEdit ? (
+                                                <div className="font-body text-sm text-brutal-dark/35 italic">
+                                                    No description yet — click Edit to add one.
+                                                </div>
+                                            ) : null
+                                        }
+                                    />
+                                </section>
+                            } />
+                        </div>
 
-                        {/*
-                          About / description blocks — click-to-edit for mentors/admins.
-                          Falls back to the legacy plain-text `aboutText` when the row has
-                          no description_blocks (older rows). EventWebsiteBanner stays as
-                          the mentor-uploaded page override and is rendered alongside.
-                        */}
-                        <EventWebsiteBanner eventId={id!} fallback={
-                            <section>
-                                <SectionAnchor id="about-anchor" title="About this Event" />
-                                <InlineBlocks
-                                    eventId={id}
-                                    initialBlocks={event.description_blocks ?? null}
-                                    canEdit={canEdit}
-                                    readView={
-                                        (event.description_blocks && event.description_blocks.length > 0) ? (
-                                            <BlocksPreview blocks={event.description_blocks} />
-                                        ) : aboutText ? (
-                                            <div className="font-data text-sm md:text-base leading-relaxed text-brutal-dark/80 whitespace-pre-wrap">
-                                                {aboutText}
-                                            </div>
-                                        ) : canEdit ? (
-                                            <div className="font-data text-sm text-brutal-dark/40 italic">
-                                                No description yet — click Edit to add one.
-                                            </div>
-                                        ) : null
-                                    }
-                                />
-                            </section>
-                        } />
-
-                        {/* Category-specific pre-event content */}
+                        {/* ── Category-specific pre-event content ── */}
                         {event.event_type === 'maker_meetup' && (
-                            <MakerMeetupPreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
+                            <div className="ed-section">
+                                <MakerMeetupPreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
+                            </div>
                         )}
                         {event.event_type === 'build_challenge' && (
-                            <BuildChallengePreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
+                            <div className="ed-section">
+                                <BuildChallengePreEvent id={id} event={event} user={user} isRegistered={registrationProps.isRegistered} />
+                            </div>
                         )}
                         {event.event_type === 'tech_tuesday' && (
-                            <TechTuesdayPreEvent id={id} event={event} user={user} />
+                            <div className="ed-section">
+                                <TechTuesdayPreEvent id={id} event={event} user={user} />
+                            </div>
                         )}
 
-                        {/* P11 — "Pitch yourself as a speaker" CTA on every event page. */}
-                        <PitchCTA defaultEventType={event.event_type} />
+                        {/* Pitch CTA */}
+                        <div className="ed-section">
+                            <PitchCTA defaultEventType={event.event_type} />
+                        </div>
 
                         {/* Discussion */}
-                        <DiscussionSection {...commentsProps} sectionId="discussion" />
+                        <div className="ed-section">
+                            <DiscussionSection {...commentsProps} sectionId="discussion" />
+                        </div>
                     </div>
-
-                    {/* Action sidebar — unified single card (desktop sticky, mobile inline top) */}
-                    <aside className="lg:order-last order-first">
-                        <ActionSidebar event={event} registrationProps={registrationProps} />
-                    </aside>
                 </div>
             </div>
         </>
@@ -210,40 +273,40 @@ const PreEventPage = ({ event, hosts, id, user, registrationProps, commentsProps
 // rather than importing EventBody to avoid pulling in its header / CTA
 // chrome, which isn't wanted here.
 const BlocksPreview: React.FC<{ blocks: any[] }> = ({ blocks }) => (
-    <div className="space-y-4 font-data text-sm md:text-base leading-relaxed text-brutal-dark/85">
+    <div className="space-y-4 font-body text-[15px] leading-[1.7] text-brutal-dark/80">
         {blocks.map((b, i) => {
             switch (b.type) {
                 case 'heading':
                     return b.level === 2 ? (
-                        <h3 key={i} className="font-heading text-xl font-bold uppercase tracking-tight">{b.text}</h3>
+                        <h3 key={i} className="font-heading text-xl font-bold tracking-tight text-brutal-dark mt-2">{b.text}</h3>
                     ) : (
-                        <h4 key={i} className="font-heading text-base font-bold uppercase tracking-tight">{b.text}</h4>
+                        <h4 key={i} className="font-heading text-base font-bold tracking-tight text-brutal-dark mt-1">{b.text}</h4>
                     );
                 case 'paragraph':
                     return <p key={i} className="whitespace-pre-wrap">{b.text}</p>;
                 case 'image':
                     return (
-                        <figure key={i} className="space-y-1">
-                            <img src={b.url} alt={b.alt} className="w-full rounded-lg border-2 border-brutal-dark/10" loading="lazy" />
-                            {b.caption && <figcaption className="text-xs text-brutal-dark/50">{b.caption}</figcaption>}
+                        <figure key={i} className="space-y-1.5">
+                            <img src={b.url} alt={b.alt} className="w-full rounded-xl border border-brutal-dark/[0.06]" loading="lazy" />
+                            {b.caption && <figcaption className="text-xs text-brutal-dark/45">{b.caption}</figcaption>}
                         </figure>
                     );
                 case 'list':
                     return b.ordered ? (
-                        <ol key={i} className="list-decimal pl-5 space-y-1">
+                        <ol key={i} className="list-decimal pl-5 space-y-1.5">
                             {b.items.map((it: string, j: number) => <li key={j}>{it}</li>)}
                         </ol>
                     ) : (
-                        <ul key={i} className="list-disc pl-5 space-y-1">
+                        <ul key={i} className="list-disc pl-5 space-y-1.5">
                             {b.items.map((it: string, j: number) => <li key={j}>{it}</li>)}
                         </ul>
                     );
                 case 'callout': {
-                    const tone = b.variant === 'warning' ? 'bg-yellow-50 border-yellow-400/40'
-                        : b.variant === 'success' ? 'bg-green-50 border-green-400/40'
-                        : 'bg-blue-50 border-blue-400/40';
+                    const tone = b.variant === 'warning' ? 'bg-yellow-50/80 border-yellow-400/30'
+                        : b.variant === 'success' ? 'bg-green-50/80 border-green-400/30'
+                        : 'bg-blue-50/80 border-blue-400/30';
                     return (
-                        <div key={i} className={`p-4 border-2 rounded-lg ${tone}`}>
+                        <div key={i} className={`p-4 border rounded-xl ${tone}`}>
                             <p className="whitespace-pre-wrap">{b.text}</p>
                         </div>
                     );

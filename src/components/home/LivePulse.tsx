@@ -42,6 +42,65 @@ const FALLBACK_ACTIVITY: ActivityItem[] = [
     { time: '3 hr ago', text: 'sarah_j completed the "Neural Interface" challenge' },
 ];
 
+// ─── Module-level activity prefetch cache ─────────────────────────
+// Warmed by Home.tsx during the boot overlay so the feed is populated
+// before the curtain lifts.
+
+let _activityPrefetchCache: ActivityItem[] | null = null;
+let _activityPrefetchInflight: Promise<ActivityItem[]> | null = null;
+
+/**
+ * Prefetch activity feed data into a module-level cache.
+ * Called by Home.tsx on mount (behind the boot overlay).
+ */
+export function prefetchHomeActivity(): Promise<ActivityItem[]> {
+    if (_activityPrefetchCache) return Promise.resolve(_activityPrefetchCache);
+    if (_activityPrefetchInflight) return _activityPrefetchInflight;
+
+    _activityPrefetchInflight = (async () => {
+        try {
+            const { data: xpEvents } = await supabase
+                .from('xp_event')
+                .select('id, user_id, amount, reason, reference_type, created_at')
+                .order('created_at', { ascending: false })
+                .limit(6);
+
+            if (!xpEvents || xpEvents.length === 0) return FALLBACK_ACTIVITY;
+
+            const userIds = [...new Set(xpEvents.map((e: any) => e.user_id))];
+            const { data: users } = await supabase
+                .from('app_user')
+                .select('id, name')
+                .in('id', userIds)
+                .limit(50);
+
+            const userMap: Record<string, string> = {};
+            (users || []).forEach((u: { id: string; name: string }) => {
+                userMap[u.id] = u.name || 'A maker';
+            });
+
+            const items: ActivityItem[] = xpEvents.map((ev: any) => ({
+                time: timeAgo(ev.created_at),
+                text: `${userMap[ev.user_id] || 'A maker'} earned ${ev.amount} XP — ${ev.reason}`,
+            }));
+
+            _activityPrefetchCache = items.length > 0 ? items : FALLBACK_ACTIVITY;
+            return _activityPrefetchCache;
+        } catch {
+            return FALLBACK_ACTIVITY;
+        } finally {
+            _activityPrefetchInflight = null;
+        }
+    })();
+
+    return _activityPrefetchInflight;
+}
+
+/** Read the prefetch cache (null if not yet warmed). */
+export function getActivityPrefetchCache(): ActivityItem[] | null {
+    return _activityPrefetchCache;
+}
+
 const EVERGREEN_SHOWCASE = [
     { tag: 'ROBOTICS', title: 'Six-DOF arm with inverse kinematics', blurb: 'Stepper motors, GT2 belts, and a Raspberry Pi.' },
     { tag: 'IOT', title: 'Smart greenhouse climate loop', blurb: 'ESP32, soil probes, and a mistmaker on a relay.' },
@@ -174,7 +233,10 @@ export function LivePulse() {
     const { activeMakers, upcomingEvents, lastUpdated, loading, refetch } = useHomeLive();
 
     // ── Activity feed: distinct query (xp_event details). Skeleton until ready.
-    const [activityItems, setActivityItems] = useState<ActivityItem[] | null>(null);
+    // Seed from module-level prefetch cache if Home.tsx already warmed it.
+    const [activityItems, setActivityItems] = useState<ActivityItem[] | null>(
+        () => getActivityPrefetchCache(),
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -208,7 +270,9 @@ export function LivePulse() {
                 time: timeAgo(ev.created_at),
                 text: `${userMap[ev.user_id] || 'A maker'} earned ${ev.amount} XP — ${ev.reason}`,
             }));
-            setActivityItems(items.length > 0 ? items : FALLBACK_ACTIVITY);
+            const result = items.length > 0 ? items : FALLBACK_ACTIVITY;
+            _activityPrefetchCache = result;   // keep module cache warm
+            setActivityItems(result);
         }
         fetchActivity();
         return () => { cancelled = true; };

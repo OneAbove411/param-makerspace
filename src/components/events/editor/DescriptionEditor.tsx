@@ -114,7 +114,7 @@ export function DescriptionEditor({
                 );
             },
         },
-        onUpdate: ({ editor }) => {
+        onUpdate: ({ editor }: { editor: Editor }) => {
             onChange(editor.getJSON());
         },
     });

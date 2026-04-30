@@ -49,6 +49,18 @@ function dateInFuture(iso: string): boolean {
     return Number.isFinite(t) && t > Date.now();
 }
 
+/**
+ * Past-or-future, just-not-empty check.
+ * Used by the publish health-check so admins can also post recap-style
+ * past events (e.g. "log last Tuesday's session"). The original
+ * `dateInFuture` is kept around for any caller that genuinely wants
+ * future-only semantics.
+ */
+function dateValid(iso: string): boolean {
+    if (!iso) return false;
+    return Number.isFinite(Date.parse(iso));
+}
+
 function dateAfter(a: string, b: string): boolean {
     if (!a || !b) return false;
     return Date.parse(a) > Date.parse(b);
@@ -62,6 +74,26 @@ function dateBefore(a: string, b: string): boolean {
 // ─── Main ───────────────────────────────────────────────────────────
 
 export function computeHealth(state: WizardFormState): HealthSummary {
+    // ─── Required-everywhere baseline ──────────────────────────
+    //
+    // A published event page renders garbage without title + a parseable
+    // start date. Everything else has either a sensible default or is
+    // editorial polish that should not block publish.
+    //
+    // What changed (UX simplification, see EVENT_FLOW_SIMPLIFICATION_PLAN.md):
+    //   - Tagline: no longer required. Empty taglines render fine and
+    //     the value is editorial; gating publish on it is friction.
+    //   - Cover image: no longer required at the global layer. For
+    //     recurring series the wizard pulls a default from
+    //     event_series.default_cover_image_url. The CoverImageInput
+    //     warns mentors visually if a pasted URL fails to load.
+    //   - Body blocks: no longer required ≥ 3. Tech Tuesdays often link
+    //     to the Luma page as the canonical description, and a body
+    //     of 0 blocks is a valid choice. Cross-field deadline checks
+    //     downstream still apply.
+    //   - Location: still required, but the type-specific Tech Tuesday
+    //     branch makes it "venue or RSVP URL" — a Luma-only event with
+    //     no physical venue is still publishable.
     const items: HealthItem[] = [
         {
             id: 'title',
@@ -70,37 +102,20 @@ export function computeHealth(state: WizardFormState): HealthSummary {
             jumpTo: { step: 1, field: 'title' },
         },
         {
-            id: 'tagline',
-            label: 'Tagline present',
-            status: nonEmpty(state.tagline) ? 'ok' : 'fail',
-            jumpTo: { step: 1, field: 'tagline' },
-        },
-        {
-            id: 'cover',
-            label: 'Cover image set',
-            status: nonEmpty(state.cover_image_url) ? 'ok' : 'fail',
-            jumpTo: { step: 1, field: 'cover_image_url' },
-        },
-        {
             id: 'start_date',
-            label: 'Start date is in the future',
-            status: dateInFuture(state.start_date) ? 'ok' : 'fail',
+            label: 'Start date set',
+            status: dateValid(state.start_date) ? 'ok' : 'fail',
             jumpTo: { step: 1, field: 'start_date' },
-        },
-        {
-            id: 'location',
-            label: 'Location or venue present',
-            status: nonEmpty(state.location) ? 'ok' : 'fail',
-            jumpTo: { step: 1, field: 'location' },
-        },
-        {
-            id: 'body',
-            label: 'Body has at least 3 blocks',
-            status: state.description_blocks.length >= 3 ? 'ok' : 'fail',
-            jumpTo: { step: 1, field: 'title' }, // body edits live on step 1/2 depending on UI; default to step 1
         },
     ];
 
+    // ─── Type-specific minimums (the only "must" beyond title+date) ──
+    //
+    // Per the UX-simplification plan: each event type keeps the smallest
+    // set of fields that the public page genuinely cannot render without.
+    // Smart-defaulted fields (slot length, team size, deadlines) are
+    // therefore *not* checked here — the wizard's blank state seeds them
+    // to safe values and mentors only override when needed.
     switch (state.typeFields.kind) {
         case 'build_challenge': {
             const f = state.typeFields;
@@ -112,9 +127,17 @@ export function computeHealth(state: WizardFormState): HealthSummary {
                     jumpTo: { step: 2, field: 'prize_summary' },
                 },
                 {
+                    // Cross-field consistency — the wizard defaults
+                    // submission_deadline to start+7d but mentors can
+                    // override; we only fail if they've actively set it
+                    // *before* the start date.
                     id: 'submission_after_start',
                     label: 'Submission deadline after start date',
-                    status: dateAfter(f.submission_deadline, state.start_date) ? 'ok' : 'fail',
+                    status:
+                        !nonEmpty(f.submission_deadline) ||
+                        dateAfter(f.submission_deadline, state.start_date)
+                            ? 'ok'
+                            : 'fail',
                     jumpTo: { step: 2, field: 'submission_deadline' },
                 },
             );
@@ -124,37 +147,34 @@ export function computeHealth(state: WizardFormState): HealthSummary {
             const f = state.typeFields;
             items.push(
                 {
+                    // Same consistency-only treatment as build challenges:
+                    // the wizard defaults application_deadline to start-3d,
+                    // we only fail if the mentor has explicitly set it
+                    // *after* the start date.
                     id: 'application_before_start',
                     label: 'Application deadline before start date',
                     status:
-                        nonEmpty(f.application_deadline) && dateBefore(f.application_deadline, state.start_date)
+                        !nonEmpty(f.application_deadline) ||
+                        dateBefore(f.application_deadline, state.start_date)
                             ? 'ok'
                             : 'fail',
                     jumpTo: { step: 2, field: 'application_deadline' },
-                },
-                {
-                    id: 'slot_length',
-                    label: 'Interview slot length > 0',
-                    status: f.interview_slot_length_min > 0 ? 'ok' : 'fail',
-                    jumpTo: { step: 2, field: 'interview_slot_length_min' },
                 },
             );
             break;
         }
         case 'tech_tuesday': {
             const f = state.typeFields;
+            // Tech Tuesday is RSVP'd externally on Luma; the URL is the
+            // single authoritative pointer. Speaker name no longer gates
+            // publish — the autofill flow surfaces it visually but a
+            // last-minute speaker change shouldn't block "post the page".
             items.push(
                 {
                     id: 'luma',
                     label: 'External RSVP URL points to Luma',
                     status: LUMA_URL.test(f.external_rsvp_url) ? 'ok' : 'fail',
                     jumpTo: { step: 2, field: 'external_rsvp_url' },
-                },
-                {
-                    id: 'speaker',
-                    label: 'Speaker name present',
-                    status: nonEmpty(f.speaker_name) ? 'ok' : 'fail',
-                    jumpTo: { step: 2, field: 'speaker_name' },
                 },
             );
             break;

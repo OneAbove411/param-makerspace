@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../lib/auth';
+import { waitForHomeData } from '../../lib/homeDataReady';
 
 /**
  * AppBootLoader — Global loading gate
@@ -60,8 +61,14 @@ function prefetchRobotModel(): Promise<void> {
 const MIN_DISPLAY_MS = 800;
 
 /** Grace period after auth resolves for child hooks to hydrate (ms).
- *  Covers useRankAccess (~10-30ms), any other navbar data hooks. */
+ *  Used on non-home routes where we only need useRankAccess to settle. */
 const HYDRATION_BUFFER_MS = 150;
+
+/** Maximum time to wait for the home page data prefetch signal (ms).
+ *  On the '/' route, Home.tsx fires all Supabase queries immediately
+ *  on mount and signals when they complete.  This cap prevents an
+ *  infinite hang if a query is unreachable. */
+const HOME_DATA_WAIT_MS = 2500;
 
 /** Exit animation duration (ms) — must match the CSS transition. */
 const EXIT_DURATION_MS = 600;
@@ -138,10 +145,22 @@ export function AppBootLoader({ children }: { children: React.ReactNode }) {
 
             if (cancelled) return;
 
-            // Hydration buffer: give child hooks time to complete their
-            // first fetch (useRankAccess, etc.) so the UI is fully
-            // populated before we lift the curtain.
-            await new Promise<void>((r) => setTimeout(r, HYDRATION_BUFFER_MS));
+            // Hydration gate — route-aware.
+            //
+            // On the home page ('/'), Home.tsx fires prefetches for the
+            // project grid, activity feed, and live-pulse data as soon as
+            // it mounts (which happens behind this overlay).  We wait for
+            // the `homeDataReady` signal so the curtain lifts onto a
+            // fully-populated page.  A 2.5s cap ensures we never hang.
+            //
+            // On every other route, a short fixed buffer covers
+            // useRankAccess and other navbar hooks (~10-30ms typical).
+            const isHome = typeof window !== 'undefined' && window.location.pathname === '/';
+            if (isHome) {
+                await waitForHomeData(HOME_DATA_WAIT_MS);
+            } else {
+                await new Promise<void>((r) => setTimeout(r, HYDRATION_BUFFER_MS));
+            }
 
             if (cancelled) return;
 

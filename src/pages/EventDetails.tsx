@@ -71,11 +71,21 @@ export function EventDetails() {
 
     if (loading) {
         return (
-            <div className="pt-32 px-12 flex-1 w-full bg-brutal-bg min-h-screen">
-                <div className="max-w-5xl mx-auto space-y-6 animate-pulse">
-                    <div className="h-[60vh] bg-brutal-dark/5 rounded-xl" />
-                    <div className="h-8 w-3/4 bg-brutal-dark/5 rounded" />
-                    <div className="h-4 w-1/2 bg-brutal-dark/[0.03] rounded" />
+            <div className="pt-32 px-6 md:px-10 flex-1 w-full bg-brutal-bg min-h-screen">
+                <div className="max-w-6xl mx-auto animate-pulse">
+                    <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 lg:gap-12">
+                        <div className="space-y-4">
+                            <div className="aspect-square bg-brutal-dark/[0.04] rounded-2xl" />
+                            <div className="h-4 w-32 bg-brutal-dark/[0.06] rounded-full" />
+                            <div className="h-8 w-48 bg-brutal-dark/[0.04] rounded-full" />
+                        </div>
+                        <div className="space-y-5">
+                            <div className="h-6 w-24 bg-brutal-dark/[0.06] rounded-full" />
+                            <div className="h-10 w-3/4 bg-brutal-dark/[0.05] rounded-lg" />
+                            <div className="h-5 w-1/2 bg-brutal-dark/[0.03] rounded-full" />
+                            <div className="h-40 bg-brutal-dark/[0.03] rounded-2xl mt-6" />
+                        </div>
+                    </div>
                 </div>
             </div>
         );

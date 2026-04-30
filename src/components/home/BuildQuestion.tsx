@@ -4,6 +4,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { supabase } from '../../lib/supabase';
 import { Skeleton } from '../ui/Skeleton';
+import { SmoothImage } from '../ui/SmoothImage';
 import { MagneticCard } from '../ui/MagneticCard';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -22,6 +23,11 @@ gsap.registerPlugin(ScrollTrigger);
  *  - Click navigates to /projects/:id with view-transition where supported.
  *  - Mobile collapses to a 2-column grid with a clamp()'d verb font size.
  */
+
+// ─── Module-level project prefetch cache ──────────────────────────
+// Warmed by Home.tsx during the boot overlay so the grid is populated
+// before the curtain lifts.  The component reads from this cache as
+// initial state, avoiding a flash of skeletons.
 
 interface CarouselProject {
     id: string;
@@ -66,6 +72,67 @@ const PLACEHOLDER_PROJECTS: CarouselProject[] = [
         image: 'https://images.pexels.com/photos/724921/pexels-photo-724921.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&fit=crop',
     },
 ];
+
+let _projectPrefetchCache: CarouselProject[] | null = null;
+let _projectPrefetchInflight: Promise<CarouselProject[]> | null = null;
+
+/**
+ * Prefetch project grid data into a module-level cache.
+ * Called by Home.tsx on mount (behind the boot overlay) so the data is
+ * warm by the time this component mounts after the idle callback.
+ */
+export function prefetchHomeProjects(): Promise<CarouselProject[]> {
+    if (_projectPrefetchCache) return Promise.resolve(_projectPrefetchCache);
+    if (_projectPrefetchInflight) return _projectPrefetchInflight;
+
+    _projectPrefetchInflight = (async () => {
+        try {
+            const { data: projects } = await supabase
+                .from('project')
+                .select('id, title, domain')
+                .eq('status', 'active')
+                .eq('visibility', 'public')
+                .order('created_at', { ascending: false })
+                .limit(12);
+
+            if (!projects || projects.length === 0) return PLACEHOLDER_PROJECTS;
+
+            const projectIds = projects.map((p: any) => p.id);
+            const { data: images } = await supabase
+                .from('project_image')
+                .select('project_id, image_url')
+                .in('project_id', projectIds)
+                .order('display_order', { ascending: true })
+                .limit(20);
+
+            const imageMap: Record<string, string> = {};
+            (images || []).forEach((img: { project_id: string; image_url: string }) => {
+                if (!imageMap[img.project_id]) imageMap[img.project_id] = img.image_url;
+            });
+
+            const result: CarouselProject[] = projects.map((p: any) => ({
+                id: p.id,
+                title: p.title,
+                domain: p.domain || 'Maker',
+                image: imageMap[p.id] || '',
+            })).slice(0, 6);
+
+            _projectPrefetchCache = result;
+            return result;
+        } catch {
+            return PLACEHOLDER_PROJECTS;
+        } finally {
+            _projectPrefetchInflight = null;
+        }
+    })();
+
+    return _projectPrefetchInflight;
+}
+
+/** Read the prefetch cache (null if not yet warmed). */
+export function getProjectPrefetchCache(): CarouselProject[] | null {
+    return _projectPrefetchCache;
+}
 
 // ── Verb pool (≥ 12, maker-flavored). Each verb gets a ghost 1-letter badge ──
 const ROTATING_WORDS = [
@@ -215,27 +282,21 @@ function ScatterGrid({ projects, highlightId, reducedMotion }: ScatterGridProps)
                         >
                             <div className="aspect-[4/3] overflow-hidden bg-brutal-bg/5 flex items-center justify-center">
                                 {project.image ? (
-                                    <img
+                                    <SmoothImage
                                         src={project.image}
                                         alt={project.title}
-                                        className="w-full h-full object-cover transition-transform duration-500 ease-out
-                                                   motion-safe:group-hover/tile:-translate-y-1"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
-                                            const parent = (e.target as HTMLImageElement).parentElement;
-                                            const fallback = parent?.querySelector('span');
-                                            if (fallback) (fallback as HTMLElement).style.display = '';
-                                        }}
+                                        className="w-full h-full"
+                                        imgClassName="object-cover transition-transform duration-500 ease-out
+                                                      motion-safe:group-hover/tile:-translate-y-1"
                                     />
-                                ) : null}
-                                <span
-                                    className="text-3xl md:text-4xl opacity-60 select-none"
-                                    style={project.image ? { display: 'none' } : {}}
-                                    aria-hidden="true"
-                                >
-                                    {icon}
-                                </span>
+                                ) : (
+                                    <span
+                                        className="text-3xl md:text-4xl opacity-60 select-none"
+                                        aria-hidden="true"
+                                    >
+                                        {icon}
+                                    </span>
+                                )}
                             </div>
                             <div className="p-2.5 md:p-3 bg-brutal-dark/80">
                                 <span className="font-data text-[9px] md:text-[10px] text-brutal-red uppercase tracking-widest block">
@@ -327,7 +388,12 @@ function RotatingWord({ reducedMotion }: RotatingWordProps) {
 export function BuildQuestion() {
     const sectionRef = useRef<HTMLDivElement>(null);
     const reducedMotion = usePrefersReducedMotion();
-    const [carouselProjects, setCarouselProjects] = useState<CarouselProject[] | null>(null);
+    // Seed from the module-level prefetch cache if it's already warm.
+    // This avoids the skeleton flash when Home.tsx has pre-warmed the data
+    // during the boot overlay phase.
+    const [carouselProjects, setCarouselProjects] = useState<CarouselProject[] | null>(
+        () => getProjectPrefetchCache(),
+    );
     const [pickedIntent, setPickedIntent] = useState<string | null>(null);
 
     // Read picked intent on mount + when sessionStorage changes within tab.
@@ -395,7 +461,9 @@ export function BuildQuestion() {
                 image: imageMap[p.id] || '',
             }));
 
-            setCarouselProjects(real.slice(0, 6));
+            const sliced = real.slice(0, 6);
+            _projectPrefetchCache = sliced;   // keep module cache warm
+            setCarouselProjects(sliced);
             } catch {
                 if (!cancelled) {
                     setCarouselProjects(prev => prev ?? PLACEHOLDER_PROJECTS);

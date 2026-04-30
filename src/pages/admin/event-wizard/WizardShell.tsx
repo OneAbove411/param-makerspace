@@ -559,7 +559,7 @@ function Step1({
                     <CoverImageInput
                         label="Cover image"
                         value={state.cover_image_url}
-                        onChange={(url) => onChange({ ...state, cover_image_url: url })}
+                        onChange={(url: string) => onChange({ ...state, cover_image_url: url })}
                         userId={userId}
                     />
                 </div>

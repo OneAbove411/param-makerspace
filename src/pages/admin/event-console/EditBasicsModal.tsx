@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import type { Event, EventBlock } from '../../../lib/database.types';
 import { BlockEditor } from '../../../components/events/BlockEditor';
+import { CoverImageInput } from '../../../components/events/CoverImageInput';
 import { blocksToPlainText } from '../../../components/events/EventBody';
+import { useAuth } from '../../../lib/auth';
 import { useAutosave, type AutosaveStatus } from '../../../lib/useAutosave';
 import { updateEvent } from '../../../lib/api/events';
 
@@ -64,6 +66,7 @@ function eventToForm(e: Event): EditForm {
 }
 
 export function EditBasicsModal({ event, onClose, onSaved }: EditBasicsModalProps) {
+    const { user } = useAuth();
     const [form, setForm] = useState<EditForm>(() => eventToForm(event));
     const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -193,13 +196,13 @@ export function EditBasicsModal({ event, onClose, onSaved }: EditBasicsModalProp
                         />
                     </Field>
 
-                    <Field label="Cover image URL">
-                        <input
-                            type="url"
+                    <Field label="Cover image">
+                        <CoverImageInput
+                            label=""
                             value={form.cover_image_url}
-                            onChange={(e) => setForm({ ...form, cover_image_url: e.target.value })}
-                            placeholder="https://…"
-                            className={inputClass}
+                            onChange={(url) => setForm({ ...form, cover_image_url: url })}
+                            userId={user?.id ?? null}
+                            pathPrefix={`event/${event.id}`}
                         />
                     </Field>
 
